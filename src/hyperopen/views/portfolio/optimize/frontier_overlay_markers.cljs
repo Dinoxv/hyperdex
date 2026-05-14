@@ -1,8 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.frontier-overlay-markers
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.frontier :as overlay-model]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
-            [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]
             [hyperopen.views.portfolio.optimize.frontier-vault-markers :as vault-markers]))
 
 (def modes overlay-model/modes)

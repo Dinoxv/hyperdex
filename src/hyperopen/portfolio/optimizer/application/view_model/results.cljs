@@ -1,4 +1,4 @@
-(ns hyperopen.views.portfolio.optimize.results-model
+(ns hyperopen.portfolio.optimizer.application.view-model.results
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.coercion :as coercion]

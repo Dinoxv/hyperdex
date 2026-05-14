@@ -1,12 +1,12 @@
-(ns hyperopen.views.portfolio.optimize.frontier-overlay-model
+(ns hyperopen.portfolio.optimizer.application.view-model.frontier
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.portfolio.optimizer.ids :as ids]
-            [hyperopen.views.portfolio.optimize.format :as opt-format]))
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def modes [:standalone :contribution :none])
 
 (def ^:private non-blank-text coercion/non-blank-text)
+(def ^:private finite-number? coercion/finite-number?)
 
 (defn normalize-mode
   [overlay-mode]
@@ -14,13 +14,17 @@
     overlay-mode
     :standalone))
 
+(defn- point-visible?
+  [point]
+  (and (finite-number? (:volatility point))
+       (finite-number? (:expected-return point))))
+
 (defn visible-points
   [result overlay-mode]
   (let [mode (normalize-mode overlay-mode)]
     (if (contains? #{:standalone :contribution} mode)
       (->> (get-in result [:frontier-overlays mode])
-           (filter #(and (opt-format/finite-number? (:volatility %))
-                         (opt-format/finite-number? (:expected-return %))))
+           (filter point-visible?)
            vec)
       [])))
 
@@ -28,8 +32,7 @@
   [result]
   (->> [:standalone :contribution]
        (mapcat #(get-in result [:frontier-overlays %]))
-       (filter #(and (opt-format/finite-number? (:volatility %))
-                     (opt-format/finite-number? (:expected-return %))))
+       (filter point-visible?)
        vec))
 
 (defn copy

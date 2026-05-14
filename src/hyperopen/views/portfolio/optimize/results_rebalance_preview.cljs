@@ -1,6 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-rebalance-preview
-  (:require [hyperopen.views.portfolio.optimize.format :as opt-format]
-            [hyperopen.views.portfolio.optimize.results-model :as results-model]
+  (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]))
 
 (defn- rebalance-row

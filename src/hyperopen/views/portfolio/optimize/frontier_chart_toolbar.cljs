@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.frontier-chart-toolbar
-  (:require [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model.frontier :as overlay-model]))
 
 (defn- overlay-mode-button
   [current-mode mode]

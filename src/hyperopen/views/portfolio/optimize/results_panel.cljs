@@ -1,7 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
-  (:require [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
+  (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
-            [hyperopen.views.portfolio.optimize.results-model :as results-model]
             [hyperopen.views.portfolio.optimize.results-rebalance-preview :as rebalance-preview]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))

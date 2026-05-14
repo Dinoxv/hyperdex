@@ -213,7 +213,10 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test]
             [hyperopen.portfolio.optimizer.application.view-model-facade-test]
+            [hyperopen.portfolio.optimizer.application.view-model-frontier-test]
             [hyperopen.portfolio.optimizer.application.view-model-index-test]
+            [hyperopen.portfolio.optimizer.application.view-model-rebalance-test]
+            [hyperopen.portfolio.optimizer.application.view-model-results-test]
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
             [hyperopen.portfolio.optimizer.black-litterman-actions-test]
@@ -856,7 +859,10 @@
              'hyperopen.portfolio.optimizer.application.universe-candidates-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
              'hyperopen.portfolio.optimizer.application.view-model-facade-test
+             'hyperopen.portfolio.optimizer.application.view-model-frontier-test
              'hyperopen.portfolio.optimizer.application.view-model-index-test
+             'hyperopen.portfolio.optimizer.application.view-model-rebalance-test
+             'hyperopen.portfolio.optimizer.application.view-model-results-test
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
              'hyperopen.portfolio.optimizer.black-litterman-actions-test

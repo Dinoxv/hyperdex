@@ -1,6 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.target-exposure-table
   (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.ids :as ids]
+            [hyperopen.portfolio.optimizer.application.view-model.rebalance :as rebalance-view-model]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -41,77 +41,17 @@
                                #js {:maximumFractionDigits 0}))))
     "N/A"))
 
-(defn- signed-label
-  [value]
-  (cond
-    (and (opt-format/finite-number? value) (neg? value)) "short"
-    (and (opt-format/finite-number? value) (pos? value)) "long"
-    :else "flat"))
-
-(defn- instrument-group-key
-  [labels-by-instrument instrument-id]
-  (let [value (or (get labels-by-instrument instrument-id)
-                  (str instrument-id))
-        unprefixed (last (str/split value #":"))
-        base (first (str/split unprefixed #"[/-]"))]
-    (if (seq base) base value)))
-
-(defn- instrument-label
-  [labels-by-instrument instrument-id]
-  (or (get labels-by-instrument instrument-id)
-      (str instrument-id)))
-
 (defn- data-role-token
   [value]
   (-> (str value)
       (str/replace #"[^A-Za-z0-9_-]+" "-")
       (str/replace #"(^-+|-+$)" "")))
 
-(def ^:private vault-instrument? ids/vault-instrument-id?)
-
-(defn- base-symbol
-  [value]
-  (some-> value
-          str
-          str/trim
-          (str/replace #"^.*:" "")
-          (str/split #"/|-" 2)
-          first
-          str/trim
-          not-empty))
-
-(defn- instrument-market
-  [labels-by-instrument instrument-id]
-  (let [instrument-id* (str instrument-id)
-        label (instrument-label labels-by-instrument instrument-id)
-        [kind raw-coin] (str/split instrument-id* #":" 2)
-        market-type (case kind
-                      "spot" :spot
-                      "perp" :perp
-                      nil)
-        coin (or (not-empty raw-coin)
-                 (base-symbol label))
-        base (or (base-symbol coin)
-                 (base-symbol label))]
-    {:key instrument-id*
-     :coin coin
-     :symbol (or (when (= :spot market-type)
-                   (when base
-                     (str base "/USDC")))
-                 base
-                 label)
-     :base base
-     :market-type market-type}))
-
 (defn- allocation-asset-icon
-  [asset labels-by-instrument rows]
-  (let [representative (or (some #(when-not (vault-instrument? (:instrument-id %)) %) rows)
-                           (first rows))
-        instrument-id (:instrument-id representative)
-        vault? (vault-instrument? instrument-id)
+  [asset {:keys [icon-kind market]}]
+  (let [vault? (= :vault icon-kind)
         icon-url (when-not vault?
-                   (asset-icon/market-icon-url
-                    (instrument-market labels-by-instrument instrument-id)))]
+                   (asset-icon/market-icon-url market))]
     [:span {:class ["inline-flex" "h-4" "w-4" "shrink-0" "items-center" "justify-center"]
             :data-role (str "portfolio-optimizer-target-exposure-icon-"
                             (data-role-token asset))
@@ -128,96 +68,60 @@
                                 (data-role-token asset))}]
          [:span {:class ["block" "h-3" "w-3" "rounded-full" "border" "border-base-300" "bg-base-200"]}]))]))
 
-(defn- leg-label
-  [labels-by-instrument instrument-id current-weight target-weight]
-  (let [value (str instrument-id)
-        market-type (first (str/split value #":"))]
-    (case market-type
-      "spot" "spot"
-      "perp" (cond
-               (neg? (or target-weight 0)) "perp short"
-               (pos? (or target-weight 0)) "perp long"
-               (neg? (or current-weight 0)) "perp short"
-               :else "perp long")
-      "vault" (instrument-label labels-by-instrument instrument-id)
-      value)))
-
 (defn- exposure-row
-  [idx labels-by-instrument binding-instrument-ids hidden? instrument-id capital-usd current-weight target-weight]
-  (let [current-notional (* (or capital-usd 0) (or current-weight 0))
-        target-notional (* (or capital-usd 0) (or target-weight 0))
-        delta (- (or target-weight 0) (or current-weight 0))
-        binding? (contains? binding-instrument-ids instrument-id)]
-    [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
-                  binding? (conj "bg-warning/10")
-                  hidden? (conj "hidden"))
-          :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
-          :data-binding (when binding? "true")
-          :data-current-sign (signed-label current-weight)
-          :data-target-sign (signed-label target-weight)}
-     [:td {:class ["text-trading-muted"]} ""]
-     [:td {:class ["pl-8" "text-trading-muted"]}
-      (leg-label labels-by-instrument instrument-id current-weight target-weight)]
-     [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-     [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-     [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                   "font-mono" "text-right" "tabular-nums"]}
-      (format-delta-pct delta)]
-     [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                   "font-mono" "text-right" "tabular-nums"]}
-      (format-compact-usdc (- target-notional current-notional))]]))
+  [{:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
+           target-weight delta delta-notional]}]
+  [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
+                binding? (conj "bg-warning/10")
+                hidden? (conj "hidden"))
+        :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
+        :data-binding (when binding? "true")
+        :data-current-sign current-sign
+        :data-target-sign target-sign}
+   [:td {:class ["text-trading-muted"]} ""]
+   [:td {:class ["pl-8" "text-trading-muted"]}
+    leg-label]
+   [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
+                 "font-mono" "text-right" "tabular-nums"]}
+    (format-delta-pct delta)]
+   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
+                 "font-mono" "text-right" "tabular-nums"]}
+    (format-compact-usdc delta-notional)]])
 
 (defn- exposure-group-row
-  [asset labels-by-instrument capital-usd binding-instrument-ids rows]
-  (let [current-weight (reduce + 0 (map :current-weight rows))
-        target-weight (reduce + 0 (map :target-weight rows))
-        delta (- target-weight current-weight)
-        binding? (some #(contains? binding-instrument-ids (:instrument-id %)) rows)
-        expandable? (> (count rows) 1)]
-    [:tr {:class ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
-          :data-role (str "portfolio-optimizer-target-exposure-asset-"
-                          (data-role-token asset))
-          :data-target-sign (signed-label target-weight)}
-     [:td {:class ["w-5" "font-mono" "text-trading-muted/70"]}
-      (when expandable? "▾")]
-     [:td {:class ["font-mono" "font-semibold" "text-trading-text"]}
-      [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
-       (allocation-asset-icon asset labels-by-instrument rows)
-       [:span {:data-role (str "portfolio-optimizer-target-exposure-group-"
-                               (data-role-token asset))}
-        asset]]
-      (when binding?
-        [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
-                        "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
-                        "tracking-[0.08em]" "text-warning"]}
-         "capped"])]
-     [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-     [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-     [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                   "font-mono" "text-right" "font-semibold" "tabular-nums"]}
-      (format-delta-pct delta)]
-     [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                   "font-mono" "text-right" "font-semibold" "tabular-nums"]}
-      (format-compact-usdc (* (or capital-usd 0) delta))]]))
+  [{:keys [asset current-weight target-weight delta delta-notional binding?
+           expandable? target-sign] :as group}]
+  [:tr {:class ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
+        :data-role (str "portfolio-optimizer-target-exposure-asset-"
+                        (data-role-token asset))
+        :data-target-sign target-sign}
+   [:td {:class ["w-5" "font-mono" "text-trading-muted/70"]}
+    (when expandable? "▾")]
+   [:td {:class ["font-mono" "font-semibold" "text-trading-text"]}
+    [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
+     (allocation-asset-icon asset group)
+     [:span {:data-role (str "portfolio-optimizer-target-exposure-group-"
+                             (data-role-token asset))}
+      asset]]
+    (when binding?
+      [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
+                      "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
+                      "tracking-[0.08em]" "text-warning"]}
+       "capped"])]
+   [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
+                 "font-mono" "text-right" "font-semibold" "tabular-nums"]}
+    (format-delta-pct delta)]
+   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
+                 "font-mono" "text-right" "font-semibold" "tabular-nums"]}
+    (format-compact-usdc delta-notional)]])
 
 (defn target-exposure-table
   [result]
-  (let [capital-usd (get-in result [:rebalance-preview :capital-usd])
-        ids (:instrument-ids result)
-        current (:current-weights result)
-        target (:target-weights result)
-        labels-by-instrument (or (:labels-by-instrument result) {})
-        binding-instrument-ids (set (keep :instrument-id
-                                          (get-in result [:diagnostics :binding-constraints])))
-        rows (map-indexed (fn [idx [instrument-id current-weight target-weight]]
-                            {:idx idx
-                             :asset (instrument-group-key labels-by-instrument
-                                                          instrument-id)
-                             :instrument-id instrument-id
-                             :current-weight (or current-weight 0)
-                             :target-weight (or target-weight 0)})
-                          (map vector ids current target))
-        groups (group-by :asset rows)]
+  (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result)]
     [:section {:class ["optimizer-target-exposure-table"
                        "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
                :data-role "portfolio-optimizer-target-exposure-table"}
@@ -244,20 +148,11 @@
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Target"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Δ"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Δ $"]]]
-       (into
-        [:tbody]
-        (mapcat
-         (fn [[asset asset-rows]]
-           (concat
-            [(exposure-group-row asset labels-by-instrument capital-usd binding-instrument-ids asset-rows)]
-            (map (fn [{:keys [idx instrument-id current-weight target-weight]}]
-                   (exposure-row idx
-                                 labels-by-instrument
-                                 binding-instrument-ids
-                                 (= 1 (count asset-rows))
-                                 instrument-id
-                                 capital-usd
-                                 current-weight
-                                 target-weight))
-                 asset-rows)))
-         groups))]]]))
+	       (into
+	        [:tbody]
+	        (mapcat
+	         (fn [{:keys [rows] :as group}]
+	           (concat
+	            [(exposure-group-row group)]
+	            (map exposure-row rows)))
+	         groups))]]]))

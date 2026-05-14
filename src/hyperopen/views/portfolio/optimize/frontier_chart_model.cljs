@@ -1,8 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.frontier-chart-model
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.frontier :as overlay-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
-            [hyperopen.views.portfolio.optimize.frontier-chart-axes :as chart-axes]
-            [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]))
+            [hyperopen.views.portfolio.optimize.frontier-chart-axes :as chart-axes]))
 
 (def chart-width 680)
 (def chart-height 380)

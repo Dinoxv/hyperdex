@@ -1,8 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.frontier-vault-markers
   (:require ["lucide/dist/esm/icons/layers-2.js" :default lucide-layers-2-node]
             [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]))
+            [hyperopen.portfolio.optimizer.application.view-model.frontier :as overlay-model]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def accent "#35d7c7")
 (def border "rgba(53, 215, 199, 0.72)")

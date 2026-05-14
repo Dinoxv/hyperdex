@@ -1,10 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.frontier-chart-layers
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.frontier :as overlay-model]
             [hyperopen.views.portfolio.optimize.frontier-chart-axes :as chart-axes]
             [hyperopen.views.portfolio.optimize.frontier-chart-model :as model]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers :as frontier-overlays]
-            [hyperopen.views.portfolio.optimize.frontier-overlay-model :as overlay-model]
             [hyperopen.views.portfolio.optimize.frontier-target :as frontier-target]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
