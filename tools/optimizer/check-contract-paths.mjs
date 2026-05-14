@@ -11,6 +11,7 @@ const roots = [
 
 const allowedFiles = new Set([
   "src/hyperopen/portfolio/optimizer/contracts.cljs",
+  "src/hyperopen/portfolio/optimizer/contracts/paths.cljs",
 ]);
 
 const patterns = [
