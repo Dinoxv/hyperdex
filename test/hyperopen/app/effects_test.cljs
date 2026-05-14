@@ -1,6 +1,7 @@
 (ns hyperopen.app.effects-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.app.effects :as app-effects]
+            [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
             [hyperopen.runtime.effect-adapters :as effect-adapters]))
 
 (deftest runtime-effect-deps-builds-runtime-bound-handlers-via-factories-test
@@ -10,7 +11,6 @@
         disconnect-handler (fn [& _] nil)
         copy-handler (fn [& _] nil)
         copy-link-handler (fn [& _] nil)
-        optimizer-controller-resolver (fn [_store] nil)
         optimizer-run-handler (fn [& _] nil)
         optimizer-pipeline-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
@@ -36,22 +36,12 @@
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
                     copy-link-handler)
-                  effect-adapters/make-portfolio-optimizer-controller-resolver
+                  optimizer-runtime-catalog/effect-deps
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
-                    optimizer-controller-resolver)
-                  effect-adapters/make-run-portfolio-optimizer
-                  (fn [runtime* controller-resolver*]
-                    (is (identical? runtime runtime*))
-                    (is (identical? optimizer-controller-resolver
-                                    controller-resolver*))
-                    optimizer-run-handler)
-                  effect-adapters/make-run-portfolio-optimizer-pipeline
-                  (fn [runtime* controller-resolver*]
-                    (is (identical? runtime runtime*))
-                    (is (identical? optimizer-controller-resolver
-                                    controller-resolver*))
-                    optimizer-pipeline-handler)
+                    {:portfolio-optimizer
+                     {:run-portfolio-optimizer optimizer-run-handler
+                      :run-portfolio-optimizer-pipeline optimizer-pipeline-handler}})
                   effect-adapters/make-api-submit-order
                   (fn [runtime*]
                     (is (identical? runtime runtime*))

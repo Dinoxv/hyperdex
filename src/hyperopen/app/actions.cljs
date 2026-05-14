@@ -1,5 +1,6 @@
 (ns hyperopen.app.actions
   (:require [hyperopen.api-wallets.actions :as api-wallets-actions]
+            [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.collaborators :as runtime-collaborators]))
 
@@ -31,81 +32,6 @@
    :vaults {:load-vault-route action-adapters/load-vault-route-action}
    :funding-comparison {:load-funding-comparison-route action-adapters/load-funding-comparison-route-action}
    :staking {:load-staking-route action-adapters/load-staking-route-action}
-   :portfolio-optimizer {:run-portfolio-optimizer action-adapters/run-portfolio-optimizer-action
-                         :set-portfolio-optimizer-objective-kind action-adapters/set-portfolio-optimizer-objective-kind-action
-                         :set-portfolio-optimizer-return-model-kind action-adapters/set-portfolio-optimizer-return-model-kind-action
-                         :set-portfolio-optimizer-risk-model-kind action-adapters/set-portfolio-optimizer-risk-model-kind-action
-                         :apply-portfolio-optimizer-setup-preset
-                         action-adapters/apply-portfolio-optimizer-setup-preset-action
-                         :set-portfolio-optimizer-constraint action-adapters/set-portfolio-optimizer-constraint-action
-                         :set-portfolio-optimizer-objective-parameter
-                         action-adapters/set-portfolio-optimizer-objective-parameter-action
-                         :set-portfolio-optimizer-execution-assumption
-                         action-adapters/set-portfolio-optimizer-execution-assumption-action
-                         :add-portfolio-optimizer-black-litterman-view
-                         action-adapters/add-portfolio-optimizer-black-litterman-view-action
-                         :set-portfolio-optimizer-black-litterman-view-parameter
-                         action-adapters/set-portfolio-optimizer-black-litterman-view-parameter-action
-                         :remove-portfolio-optimizer-black-litterman-view
-                         action-adapters/remove-portfolio-optimizer-black-litterman-view-action
-                         :set-portfolio-optimizer-black-litterman-editor-type
-                         action-adapters/set-portfolio-optimizer-black-litterman-editor-type-action
-                         :set-portfolio-optimizer-black-litterman-editor-field
-                         action-adapters/set-portfolio-optimizer-black-litterman-editor-field-action
-                         :save-portfolio-optimizer-black-litterman-editor-view
-                         action-adapters/save-portfolio-optimizer-black-litterman-editor-view-action
-                         :edit-portfolio-optimizer-black-litterman-view
-                         action-adapters/edit-portfolio-optimizer-black-litterman-view-action
-                         :cancel-portfolio-optimizer-black-litterman-edit
-                         action-adapters/cancel-portfolio-optimizer-black-litterman-edit-action
-                         :request-clear-portfolio-optimizer-black-litterman-views
-                         action-adapters/request-clear-portfolio-optimizer-black-litterman-views-action
-                         :cancel-clear-portfolio-optimizer-black-litterman-views
-                         action-adapters/cancel-clear-portfolio-optimizer-black-litterman-views-action
-                         :confirm-clear-portfolio-optimizer-black-litterman-views
-                         action-adapters/confirm-clear-portfolio-optimizer-black-litterman-views-action
-                         :set-portfolio-optimizer-instrument-filter
-                         action-adapters/set-portfolio-optimizer-instrument-filter-action
-                         :set-portfolio-optimizer-asset-override
-                         action-adapters/set-portfolio-optimizer-asset-override-action
-                         :set-portfolio-optimizer-universe-search-query
-                         action-adapters/set-portfolio-optimizer-universe-search-query-action
-                         :handle-portfolio-optimizer-universe-search-keydown
-                         action-adapters/handle-portfolio-optimizer-universe-search-keydown-action
-                         :set-portfolio-optimizer-frontier-overlay-mode
-                         action-adapters/set-portfolio-optimizer-frontier-overlay-mode-action
-                         :set-portfolio-optimizer-constrain-frontier
-                         action-adapters/set-portfolio-optimizer-constrain-frontier-action
-                         :set-portfolio-optimizer-results-tab
-                         action-adapters/set-portfolio-optimizer-results-tab-action
-                         :add-portfolio-optimizer-universe-instrument
-                         action-adapters/add-portfolio-optimizer-universe-instrument-action
-                         :remove-portfolio-optimizer-universe-instrument
-                         action-adapters/remove-portfolio-optimizer-universe-instrument-action
-                         :set-portfolio-optimizer-universe-from-current
-                         action-adapters/set-portfolio-optimizer-universe-from-current-action
-                         :load-portfolio-optimizer-history-from-draft
-                         action-adapters/load-portfolio-optimizer-history-from-draft-action
-                         :save-portfolio-optimizer-scenario-from-current
-                         action-adapters/save-portfolio-optimizer-scenario-from-current-action
-                         :load-portfolio-optimizer-route
-                         action-adapters/load-portfolio-optimizer-route-action
-                         :archive-portfolio-optimizer-scenario
-                         action-adapters/archive-portfolio-optimizer-scenario-action
-                         :duplicate-portfolio-optimizer-scenario
-                         action-adapters/duplicate-portfolio-optimizer-scenario-action
-                         :open-portfolio-optimizer-execution-modal
-                         action-adapters/open-portfolio-optimizer-execution-modal-action
-                         :close-portfolio-optimizer-execution-modal
-                         action-adapters/close-portfolio-optimizer-execution-modal-action
-                         :confirm-portfolio-optimizer-execution
-                         action-adapters/confirm-portfolio-optimizer-execution-action
-                         :refresh-portfolio-optimizer-tracking
-                         action-adapters/refresh-portfolio-optimizer-tracking-action
-                         :enable-portfolio-optimizer-manual-tracking
-                         action-adapters/enable-portfolio-optimizer-manual-tracking-action
-                         :run-portfolio-optimizer-from-draft
-                         action-adapters/run-portfolio-optimizer-from-draft-action}
    :api-wallets {:load-api-wallet-route action-adapters/load-api-wallet-route-action
                  :set-api-wallet-form-field api-wallets-actions/set-api-wallet-form-field
                  :set-api-wallet-sort api-wallets-actions/set-api-wallet-sort
@@ -133,4 +59,5 @@
 (defn runtime-action-deps
   []
   (runtime-collaborators/runtime-action-deps
-   (runtime-action-overrides)))
+   (merge (runtime-action-overrides)
+          (optimizer-runtime-catalog/action-deps))))

@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.wiring-test
   (:require [clojure.set :as set]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
@@ -16,7 +17,9 @@
              (or node {})))
 
 (deftest runtime-effect-deps-uses-extracted-effect-adapter-overrides-test
-  (let [deps (wiring/runtime-effect-deps)]
+  (let [deps (wiring/runtime-effect-deps)
+        optimizer-effect-deps (:portfolio-optimizer
+                               (optimizer-runtime-catalog/effect-deps nil))]
     (is (identical? effect-adapters/save
                     (get-in deps [:storage :save])))
     (is (identical? effect-adapters/persist-leaderboard-preferences-effect
@@ -46,29 +49,31 @@
                     (get-in deps [:api :api-fetch-staking-validator-summaries])))
     (is (fn? (get-in deps [:portfolio-optimizer :run-portfolio-optimizer])))
     (is (fn? (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-pipeline])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-history-effect
+    (is (identical? (:load-portfolio-optimizer-history optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :load-portfolio-optimizer-history])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-scenario-index-effect
+    (is (identical? (:load-portfolio-optimizer-scenario-index optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :load-portfolio-optimizer-scenario-index])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-scenario-effect
+    (is (identical? (:load-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :load-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/archive-portfolio-optimizer-scenario-effect
+    (is (identical? (:archive-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :archive-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/duplicate-portfolio-optimizer-scenario-effect
+    (is (identical? (:duplicate-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :duplicate-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/save-portfolio-optimizer-scenario-effect
+    (is (identical? (:save-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :save-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/execute-portfolio-optimizer-plan-effect
+    (is (identical? (:execute-portfolio-optimizer-plan optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :execute-portfolio-optimizer-plan])))
-    (is (identical? effect-adapters/refresh-portfolio-optimizer-tracking-effect
+    (is (identical? (:refresh-portfolio-optimizer-tracking optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :refresh-portfolio-optimizer-tracking])))
-    (is (identical? effect-adapters/enable-portfolio-optimizer-manual-tracking-effect
+    (is (identical? (:enable-portfolio-optimizer-manual-tracking optimizer-effect-deps)
                     (get-in deps [:portfolio-optimizer :enable-portfolio-optimizer-manual-tracking])))
     (is (identical? action-adapters/enable-agent-trading
                     (get-in deps [:wallet :enable-agent-trading])))))
 
 (deftest runtime-action-deps-uses-extracted-action-adapter-overrides-test
-  (let [deps (wiring/runtime-action-deps)]
+  (let [deps (wiring/runtime-action-deps)
+        optimizer-action-deps (:portfolio-optimizer
+                               (optimizer-runtime-catalog/action-deps))]
     (is (identical? action-adapters/init-websockets
                     (get-in deps [:core :init-websockets])))
     (is (identical? action-adapters/reconnect-websocket-action
@@ -85,60 +90,64 @@
                     (get-in deps [:staking :load-staking-route])))
     (is (identical? action-adapters/navigate
                     (get-in deps [:core :navigate])))
-    (is (identical? action-adapters/run-portfolio-optimizer-action
+    (is (identical? (:run-portfolio-optimizer optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :run-portfolio-optimizer])))
-    (is (identical? action-adapters/set-portfolio-optimizer-objective-kind-action
+    (is (identical? (:set-portfolio-optimizer-objective-kind optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-objective-kind])))
-    (is (identical? action-adapters/set-portfolio-optimizer-objective-parameter-action
+    (is (identical? (:set-portfolio-optimizer-objective-parameter optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-objective-parameter])))
-    (is (identical? action-adapters/set-portfolio-optimizer-execution-assumption-action
+    (is (identical? (:set-portfolio-optimizer-execution-assumption optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-execution-assumption])))
-    (is (identical? action-adapters/set-portfolio-optimizer-instrument-filter-action
+    (is (identical? (:set-portfolio-optimizer-instrument-filter optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-instrument-filter])))
-    (is (identical? action-adapters/set-portfolio-optimizer-asset-override-action
+    (is (identical? (:set-portfolio-optimizer-asset-override optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-asset-override])))
-    (is (identical? action-adapters/set-portfolio-optimizer-universe-search-query-action
+    (is (identical? (:set-portfolio-optimizer-universe-search-query optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-universe-search-query])))
-    (is (identical? action-adapters/handle-portfolio-optimizer-universe-search-keydown-action
+    (is (identical? (:handle-portfolio-optimizer-universe-search-keydown optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :handle-portfolio-optimizer-universe-search-keydown])))
-    (is (identical? action-adapters/set-portfolio-optimizer-frontier-overlay-mode-action
+    (is (identical? (:set-portfolio-optimizer-frontier-overlay-mode optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :set-portfolio-optimizer-frontier-overlay-mode])))
-    (is (identical? action-adapters/set-portfolio-optimizer-constrain-frontier-action
+    (is (identical? (:set-portfolio-optimizer-constrain-frontier optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :set-portfolio-optimizer-constrain-frontier])))
-    (is (identical? action-adapters/add-portfolio-optimizer-universe-instrument-action
+    (is (identical? (:add-portfolio-optimizer-universe-instrument optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :add-portfolio-optimizer-universe-instrument])))
-    (is (identical? action-adapters/remove-portfolio-optimizer-universe-instrument-action
+    (is (identical? (:remove-portfolio-optimizer-universe-instrument optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :remove-portfolio-optimizer-universe-instrument])))
-    (is (identical? action-adapters/set-portfolio-optimizer-universe-from-current-action
+    (is (identical? (:set-portfolio-optimizer-universe-from-current optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-universe-from-current])))
-    (is (identical? action-adapters/load-portfolio-optimizer-history-from-draft-action
+    (is (identical? (:load-portfolio-optimizer-history-from-draft optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :load-portfolio-optimizer-history-from-draft])))
-    (is (identical? action-adapters/save-portfolio-optimizer-scenario-from-current-action
+    (is (identical? (:save-portfolio-optimizer-scenario-from-current optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :save-portfolio-optimizer-scenario-from-current])))
-    (is (identical? action-adapters/load-portfolio-optimizer-route-action
+    (is (identical? (:load-portfolio-optimizer-route optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :load-portfolio-optimizer-route])))
-    (is (identical? action-adapters/archive-portfolio-optimizer-scenario-action
+    (is (identical? (:archive-portfolio-optimizer-scenario optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :archive-portfolio-optimizer-scenario])))
-    (is (identical? action-adapters/duplicate-portfolio-optimizer-scenario-action
+    (is (identical? (:duplicate-portfolio-optimizer-scenario optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :duplicate-portfolio-optimizer-scenario])))
-    (is (identical? action-adapters/open-portfolio-optimizer-execution-modal-action
+    (is (identical? (:open-portfolio-optimizer-execution-modal optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :open-portfolio-optimizer-execution-modal])))
-    (is (identical? action-adapters/close-portfolio-optimizer-execution-modal-action
+    (is (identical? (:close-portfolio-optimizer-execution-modal optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :close-portfolio-optimizer-execution-modal])))
-    (is (identical? action-adapters/confirm-portfolio-optimizer-execution-action
+    (is (identical? (:confirm-portfolio-optimizer-execution optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :confirm-portfolio-optimizer-execution])))
-    (is (identical? action-adapters/refresh-portfolio-optimizer-tracking-action
+    (is (identical? (:refresh-portfolio-optimizer-tracking optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :refresh-portfolio-optimizer-tracking])))
-    (is (identical? action-adapters/enable-portfolio-optimizer-manual-tracking-action
+    (is (identical? (:enable-portfolio-optimizer-manual-tracking optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :enable-portfolio-optimizer-manual-tracking])))
-    (is (identical? action-adapters/run-portfolio-optimizer-from-draft-action
+    (is (identical? (:run-portfolio-optimizer-from-draft optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-from-draft])))))
 
 (deftest runtime-registration-deps-builds-effect-and-action-handlers-test
-  (let [deps (wiring/runtime-registration-deps)]
+  (let [deps (wiring/runtime-registration-deps)
+        optimizer-action-deps (:portfolio-optimizer
+                               (optimizer-runtime-catalog/action-deps))
+        optimizer-effect-deps (:portfolio-optimizer
+                               (optimizer-runtime-catalog/effect-deps nil))]
     (is (fn? (:register-effects! deps)))
     (is (fn? (:register-actions! deps)))
     (is (fn? (:register-system-state! deps)))
@@ -148,27 +157,27 @@
     (is (identical? effect-adapters/save
                     (get-in deps [:effect-handlers :save])))
     (is (fn? (get-in deps [:effect-handlers :load-surface-module])))
-    (is (identical? action-adapters/run-portfolio-optimizer-action
+    (is (identical? (:run-portfolio-optimizer optimizer-action-deps)
                     (get-in deps [:action-handlers :run-portfolio-optimizer])))
     (is (fn? (get-in deps [:effect-handlers :run-portfolio-optimizer])))
     (is (fn? (get-in deps [:effect-handlers :run-portfolio-optimizer-pipeline])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-history-effect
+    (is (identical? (:load-portfolio-optimizer-history optimizer-effect-deps)
                     (get-in deps [:effect-handlers :load-portfolio-optimizer-history])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-scenario-index-effect
+    (is (identical? (:load-portfolio-optimizer-scenario-index optimizer-effect-deps)
                     (get-in deps [:effect-handlers :load-portfolio-optimizer-scenario-index])))
-    (is (identical? effect-adapters/load-portfolio-optimizer-scenario-effect
+    (is (identical? (:load-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:effect-handlers :load-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/archive-portfolio-optimizer-scenario-effect
+    (is (identical? (:archive-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:effect-handlers :archive-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/duplicate-portfolio-optimizer-scenario-effect
+    (is (identical? (:duplicate-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:effect-handlers :duplicate-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/save-portfolio-optimizer-scenario-effect
+    (is (identical? (:save-portfolio-optimizer-scenario optimizer-effect-deps)
                     (get-in deps [:effect-handlers :save-portfolio-optimizer-scenario])))
-    (is (identical? effect-adapters/execute-portfolio-optimizer-plan-effect
+    (is (identical? (:execute-portfolio-optimizer-plan optimizer-effect-deps)
                     (get-in deps [:effect-handlers :execute-portfolio-optimizer-plan])))
-    (is (identical? effect-adapters/refresh-portfolio-optimizer-tracking-effect
+    (is (identical? (:refresh-portfolio-optimizer-tracking optimizer-effect-deps)
                     (get-in deps [:effect-handlers :refresh-portfolio-optimizer-tracking])))
-    (is (identical? effect-adapters/enable-portfolio-optimizer-manual-tracking-effect
+    (is (identical? (:enable-portfolio-optimizer-manual-tracking optimizer-effect-deps)
                     (get-in deps [:effect-handlers :enable-portfolio-optimizer-manual-tracking])))))
 
 (deftest runtime-action-deps-cover-catalog-handler-keys-test

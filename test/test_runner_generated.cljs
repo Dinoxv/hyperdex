@@ -249,6 +249,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
+            [hyperopen.portfolio.optimizer.runtime-catalog-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
             [hyperopen.portfolio.optimizer.universe-keyboard-test]
@@ -895,6 +896,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
+             'hyperopen.portfolio.optimizer.runtime-catalog-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
              'hyperopen.portfolio.optimizer.universe-keyboard-test
