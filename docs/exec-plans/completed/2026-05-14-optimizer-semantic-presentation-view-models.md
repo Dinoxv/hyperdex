@@ -37,7 +37,9 @@ Local scratch refs (non-authoritative):
 - [x] (2026-05-14 02:03Z) Ran `npm test`; it passed with 3898 tests and 21483 assertions after correcting the new results test to match the existing non-vault label contract.
 - [x] (2026-05-14 02:05Z) Ran `npm run check`; it passed all repo checks and Shadow builds with 0 warnings.
 - [x] (2026-05-14 02:08Z) Ran standalone required gates `npm test` and `npm run test:websocket`; both passed.
-- [ ] Browser QA remains blocked: `npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app` cannot start this worktree because another Shadow CLJS server is already bound to port 9632.
+- [x] (2026-05-14 02:13Z) Re-ran governed Browser QA after restoring this worktree's dependencies; `npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app` passed for `portfolio-optimizer-results-route` across `review-375`, `review-768`, `review-1280`, and `review-1440`.
+- [x] (2026-05-14 02:13Z) Ran `npm run browser:cleanup` after Browser QA; no tracked browser-inspection sessions remained.
+- [x] (2026-05-14 02:14Z) Closed the stale active-plan signal by updating Browser QA accounting from blocked to passed and preparing this ExecPlan for `docs/exec-plans/completed/`.
 
 ## Surprises & Discoveries
 
@@ -55,6 +57,12 @@ Local scratch refs (non-authoritative):
   Evidence: the new results test initially expected `"BTC"` for `"perp:BTC"`, but the existing implementation and renderer contract return `"perp:BTC"` for non-vault IDs. The test was corrected to keep the assertion focused on vault label enrichment.
 - Observation: Governed browser QA selected the correct optimizer results target but could not launch a managed app for this worktree.
   Evidence: dry run matched `portfolio-optimizer`; the real run for `portfolio-optimizer-results-route` failed because Shadow CLJS reported `shadow-cljs already running in project on http://localhost:9632`. A process check showed the active Shadow server belonged to another worktree, not this `def8` worktree, so it was not terminated.
+- Observation: The stale Browser QA blocker was environment-specific, not a product or test failure.
+  Evidence: On 2026-05-14 02:11Z in this `9651` worktree, `lsof -nP -iTCP:9632 -sTCP:LISTEN` returned no process. The first cleanup attempt failed only because this worktree lacked installed browser-inspection dependencies: Node could not import `pixelmatch`.
+- Observation: Restoring dependencies made browser-inspection commands available in this worktree.
+  Evidence: `npm ci` installed 335 packages. A follow-up `npm run browser:cleanup` exited 0 with `{"ok": true, "stopped": [], "results": []}`.
+- Observation: The governed optimizer results Browser QA target now passes.
+  Evidence: `npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app` produced `runStatus: "completed"`, `reviewOutcome: "PASS"`, and `state: "PASS"` for `/portfolio/optimize/qa-frontier` at `review-375`, `review-768`, `review-1280`, and `review-1440`. Each viewport reported PASS for visual evidence, native controls, styling consistency, interaction, layout regression, and jank/perf.
 
 ## Decision Log
 
@@ -70,12 +78,15 @@ Local scratch refs (non-authoritative):
 - Decision: Leave `target-exposure-table.cljs` in the view layer, but make it consume `target-exposure-table-model`.
   Rationale: The namespace still owns Hiccup, classes, data-role tokens, cell formatting, and asset-icon rendering, while the application view-model owns grouping, binding flags, signs, notionals, leg labels, and market identity.
   Date/Author: 2026-05-14 / Codex.
+- Decision: Treat the earlier Browser QA block as superseded by the fresh 2026-05-14 governed design-review pass and move this plan to completed.
+  Rationale: Active ExecPlans are for work being executed now. Leaving a stale unchecked blocker would mislead future agents even though the extraction, repository gates, and governed Browser QA have all completed.
+  Date/Author: 2026-05-14 / Codex.
 
 ## Outcomes & Retrospective
 
 Code implementation is complete. The view layer no longer contains the called-out results and frontier model namespaces, and the target exposure table now renders a prepared rebalance model instead of deriving rows inline. Overall complexity decreased because result label enrichment, frontier overlay filtering, and rebalance grouping are now independently testable pure application view-models, while the remaining view files focus on Hiccup, classes, formatting, data-role tokens, and action vectors.
 
-Browser QA is explicitly blocked, not passed. The governed design-review target exists and was selected, but the managed local app cannot start while another Shadow CLJS server owns port 9632. The attempted Browser QA session was cleaned up with `npm run browser:cleanup`, which stopped `sess-1778723634310-5e7724`.
+Browser QA is now complete. The earlier managed-app startup block was superseded on 2026-05-14 by a fresh governed design review of `portfolio-optimizer-results-route`; it passed every configured pass across all checked-in review viewports. The only residual blind spot reported by the tool is the standard state-sampling note that hover, active, disabled, and loading states require targeted route actions when they are not present by default. No browser-inspection sessions remained after cleanup.
 
 ## Context and Orientation
 
@@ -101,9 +112,11 @@ Fourth, update views. `results-panel`, `results-diagnostics-rail`, and `results-
 
 Fifth, remove the obsolete view-local model namespaces once no source or test requires them. Then run focused tests and the required repository gates.
 
+Sixth, close the process debt after implementation. Re-run the governed Browser QA target if the previous environment blocker is gone, record the result in this plan, clean up browser-inspection sessions, and move this file from `docs/exec-plans/active/` to `docs/exec-plans/completed/` so future agents do not treat the finished extraction as still in flight.
+
 ## Concrete Steps
 
-All commands run from `/Users/barry/.codex/worktrees/def8/hyperopen`.
+Initial implementation commands ran from `/Users/barry/.codex/worktrees/def8/hyperopen`. The Browser QA closure commands on 2026-05-14 ran from `/Users/barry/.codex/worktrees/9651/hyperopen`.
 
 Add RED tests and run:
 
@@ -167,6 +180,27 @@ Observed browser QA attempt:
     npm run browser:cleanup
     stopped: ["sess-1778723634310-5e7724"]
 
+Observed Browser QA closure:
+
+    npm ci
+    added 335 packages, and audited 336 packages in 3s
+
+    npm run browser:cleanup
+    {"ok": true, "stopped": [], "results": []}
+
+    npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app
+    runStatus: "completed"
+    reviewOutcome: "PASS"
+    state: "PASS"
+    target: portfolio-optimizer-results-route
+    route: /portfolio/optimize/qa-frontier
+    viewports: review-375, review-768, review-1280, review-1440
+    passes: visual-evidence-captured, native-control, styling-consistency, interaction, layout-regression, jank-perf all PASS with issueCount 0
+    artifacts: tmp/browser-inspection/design-review-2026-05-14T02-12-01-847Z-2f571265
+
+    npm run browser:cleanup
+    {"ok": true, "stopped": [], "results": []}
+
 ## Validation and Acceptance
 
 Acceptance is met when semantic presentation model code no longer lives in the called-out view namespaces, the requested application view-model namespaces exist, and optimizer views continue to render the same Hiccup contracts through existing tests. Existing callers should not need behavior changes. The old view-local model namespaces should be deleted or left unused only if removal would break a documented public API; the default target is deletion.
@@ -175,12 +209,12 @@ The new tests must fail before implementation because the application namespaces
 
 Browser QA accounting for `portfolio-optimizer-results-route`:
 
-- Visual pass: BLOCKED by managed local app startup failure.
-- Native-control pass: BLOCKED by managed local app startup failure.
-- Styling-consistency pass: BLOCKED by managed local app startup failure.
-- Interaction pass: BLOCKED by managed local app startup failure.
-- Layout-regression pass: BLOCKED by managed local app startup failure.
-- Jank/perf pass: BLOCKED by managed local app startup failure.
+- Visual pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`.
+- Native-control pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`.
+- Styling-consistency pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`.
+- Interaction pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`; residual blind spot is limited to hover, active, disabled, and loading states not present by default.
+- Layout-regression pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`.
+- Jank/perf pass: PASS on `review-375`, `review-768`, `review-1280`, and `review-1440`.
 
 ## Idempotence and Recovery
 
@@ -207,7 +241,7 @@ Expected final source layout:
 
 Final implementation touched:
 
-    docs/exec-plans/active/2026-05-14-optimizer-semantic-presentation-view-models.md
+    docs/exec-plans/completed/2026-05-14-optimizer-semantic-presentation-view-models.md
     src/hyperopen/portfolio/optimizer/application/view_model/results.cljs
     src/hyperopen/portfolio/optimizer/application/view_model/frontier.cljs
     src/hyperopen/portfolio/optimizer/application/view_model/rebalance.cljs
@@ -254,3 +288,5 @@ The rebalance model map should contain `:capital-usd`, `:labels-by-instrument`, 
 Plan revision note: 2026-05-14 01:41Z / Codex created the active plan from the maintainer request after inspecting the relevant source, tests, and planning contracts.
 
 Plan revision note: 2026-05-14 02:10Z / Codex updated the plan with implementation details, validation evidence, and the browser-QA block caused by the existing Shadow CLJS port 9632 owner.
+
+Plan revision note: 2026-05-14 02:14Z / Codex restored this worktree's npm dependencies, re-ran governed Browser QA for `portfolio-optimizer-results-route`, recorded the PASS evidence, and moved the plan to completed because no active work remains.
