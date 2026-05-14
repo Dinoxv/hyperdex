@@ -1,4 +1,34 @@
-(ns hyperopen.portfolio.optimizer.contract-fixtures)
+(ns hyperopen.portfolio.optimizer.contract-fixtures
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.fixtures :as optimizer-fixtures]))
+
+(defn valid-draft
+  []
+  (contracts/migrate-draft (optimizer-fixtures/sample-draft)))
+
+(defn valid-engine-request
+  []
+  (optimizer-fixtures/sample-engine-request))
+
+(defn valid-request-signature
+  []
+  (contracts/build-request-signature (valid-engine-request)))
+
+(defn valid-solved-result
+  []
+  (optimizer-fixtures/sample-solved-result))
+
+(defn assoc-contract-in
+  [value path new-value]
+  (assoc-in value path new-value))
+
+(defn dissoc-contract-in
+  [value path]
+  (let [parent-path (vec (butlast path))
+        key* (last path)]
+    (if (seq parent-path)
+      (update-in value parent-path dissoc key*)
+      (dissoc value key*))))
 
 (def v1-draft
   {:schema-version 1

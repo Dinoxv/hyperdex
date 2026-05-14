@@ -86,6 +86,10 @@
 (def ui-black-litterman-editor-path paths/ui-black-litterman-editor-path)
 (def ui-frontier-overlay-mode-path paths/ui-frontier-overlay-mode-path)
 (def ui-constrain-frontier-path paths/ui-constrain-frontier-path)
+(def path-catalog paths/path-catalog)
+(def optimizer-state-path paths/optimizer-state-path)
+(def optimizer-ui-state-path paths/optimizer-ui-state-path)
+(def contract-path paths/contract-path)
 
 (def draft-statuses specs/draft-statuses)
 (def scenario-record-statuses specs/scenario-record-statuses)

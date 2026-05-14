@@ -11,10 +11,33 @@
   (and (map? value)
        (every? #(contains? value %) ks)))
 
+(defn- optional?
+  [pred value]
+  (or (nil? value)
+      (pred value)))
+
 (defn- non-blank-string?
   [value]
   (and (string? value)
        (coercion/non-blank-text value)))
+
+(defn- finite-number-or-nil?
+  [value]
+  (or (nil? value)
+      (coercion/finite-number? value)))
+
+(defn- vector-of?
+  [pred value]
+  (and (vector? value)
+       (every? pred value)))
+
+(defn- finite-number-vector?
+  [value]
+  (vector-of? coercion/finite-number? value))
+
+(defn- allowed-keyword?
+  [allowed value]
+  (contains? allowed value))
 
 (def draft-statuses
   #{:draft :saved :archived :tracking})
@@ -28,6 +51,27 @@
 (def result-payload-statuses
   #{:solved :infeasible :error :failed})
 
+(def objective-kinds
+  #{:minimum-variance :max-sharpe :target-return :target-volatility})
+
+(def return-model-kinds
+  #{:historical-mean :ew-mean :black-litterman})
+
+(def risk-model-kinds
+  #{:diagonal-shrink :ledoit-wolf :sample-covariance})
+
+(def black-litterman-view-kinds
+  #{:absolute :relative})
+
+(def black-litterman-directions
+  #{:outperform :underperform})
+
+(def order-types
+  #{:market :limit})
+
+(def fee-modes
+  #{:taker :maker})
+
 (defn- absent-or-allowed?
   [allowed value]
   (or (nil? value)
@@ -38,6 +82,200 @@
   (and (map? value)
        (every? #(contains? value %) instrument-ids)))
 
+(defn- instrument-map-with-values?
+  [instrument-ids pred value]
+  (and (valid-instrument-map? instrument-ids value)
+       (every? (fn [[instrument-id nested-value]]
+                 (and (non-blank-string? instrument-id)
+                      (pred nested-value)))
+               value)))
+
+(defn- instrument?
+  [value]
+  (and (map? value)
+       (non-blank-string? (:instrument-id value))
+       (optional? #(contains? #{:perp :spot :vault}
+                              (coercion/normalize-keyword-like %))
+                  (:market-type value))))
+
+(defn- instrument-vector?
+  [value]
+  (vector-of? instrument? value))
+
+(defn- id-vector?
+  [value]
+  (vector-of? non-blank-string? value))
+
+(defn- map-or-nil?
+  [value]
+  (or (nil? value)
+      (map? value)))
+
+(defn- finite-field?
+  [value field]
+  (finite-number-or-nil? (get value field)))
+
+(defn- boolean-field?
+  [value field]
+  (optional? boolean? (get value field)))
+
+(defn- id-vector-field?
+  [value field]
+  (optional? id-vector? (get value field)))
+
+(defn- map-field?
+  [value field]
+  (map-or-nil? (get value field)))
+
+(defn- objective?
+  [value]
+  (and (map? value)
+       (allowed-keyword? objective-kinds (:kind value))
+       (case (:kind value)
+         :target-return (coercion/finite-number? (:target-return value))
+         :target-volatility (coercion/finite-number? (:target-volatility value))
+         true)))
+
+(defn- black-litterman-view?
+  [value]
+  (and (map? value)
+       (allowed-keyword? black-litterman-view-kinds (:kind value))
+       (coercion/finite-number? (:return value))
+       (finite-field? value :confidence)
+       (finite-field? value :confidence-variance)
+       (optional? #(allowed-keyword? black-litterman-directions %)
+                  (:direction value))
+       (map-field? value :weights)
+       (case (:kind value)
+         :absolute
+         (or (non-blank-string? (:instrument-id value))
+             (seq (:weights value)))
+
+         :relative
+         (or (and (non-blank-string? (:instrument-id value))
+                  (non-blank-string? (:comparator-instrument-id value))
+                  (not= (:instrument-id value)
+                        (:comparator-instrument-id value)))
+             (and (non-blank-string? (:long-instrument-id value))
+                  (non-blank-string? (:short-instrument-id value))
+                  (not= (:long-instrument-id value)
+                        (:short-instrument-id value)))
+             (seq (:weights value))))))
+
+(defn- return-model?
+  [value]
+  (and (map? value)
+       (allowed-keyword? return-model-kinds (:kind value))
+       (finite-field? value :alpha)
+       (if (= :black-litterman (:kind value))
+         (optional? #(vector-of? black-litterman-view? %) (:views value))
+         (optional? vector? (:views value)))))
+
+(defn- risk-model?
+  [value]
+  (and (map? value)
+       (allowed-keyword? risk-model-kinds (:kind value))
+       (finite-field? value :shrinkage)))
+
+(defn- constraints?
+  [value]
+  (and (map? value)
+       (boolean-field? value :long-only?)
+       (every? #(finite-field? value %)
+               [:gross-max
+                :gross-leverage
+                :net-min
+                :net-max
+                :max-asset-weight
+                :dust-usdc
+                :dust-threshold
+                :max-turnover
+                :rebalance-tolerance])
+       (optional? #(and (map? %)
+                        (finite-field? % :min)
+                        (finite-field? % :max))
+                  (:net-exposure value))
+       (id-vector-field? value :allowlist)
+       (id-vector-field? value :blocklist)
+       (id-vector-field? value :held-locks)
+       (id-vector-field? value :held-position-locks)
+       (every? #(map-field? value %)
+               [:asset-overrides
+                :per-asset-overrides
+                :perp-leverage
+                :per-perp-leverage-caps])))
+
+(defn- execution-assumptions?
+  [value]
+  (and (map? value)
+       (optional? #(allowed-keyword? order-types %) (:default-order-type value))
+       (optional? #(allowed-keyword? fee-modes %) (:fee-mode value))
+       (every? #(finite-field? value %)
+               [:fallback-slippage-bps
+                :slippage-fallback-bps
+                :manual-capital-usdc])
+       (every? #(map-field? value %)
+               [:prices-by-id
+                :fee-bps-by-id
+                :cost-contexts-by-id])))
+
+(defn- draft-metadata?
+  [value]
+  (and (map? value)
+       (finite-field? value :created-at-ms)
+       (finite-field? value :updated-at-ms)
+       (boolean-field? value :dirty?)))
+
+(defn- current-portfolio?
+  [value]
+  (and (map? value)
+       (map-field? value :capital)
+       (map-field? value :by-instrument)))
+
+(defn- warning-vector?
+  [value]
+  (vector-of? map? value))
+
+(defn- freshness?
+  [value]
+  (and (map? value)
+       (finite-field? value :as-of-ms)
+       (finite-field? value :latest-common-ms)
+       (finite-field? value :oldest-common-ms)
+       (finite-field? value :age-ms)
+       (boolean? (:stale? value))))
+
+(defn- instrument-keyed-map?
+  [value]
+  (and (map? value)
+       (every? (fn [[instrument-id _]]
+                 (non-blank-string? instrument-id))
+               value)))
+
+(defn- engine-history?
+  [value]
+  (and (map? value)
+       (contains-keys? value [:calendar
+                              :return-calendar
+                              :eligible-instruments
+                              :excluded-instruments
+                              :price-series-by-instrument
+                              :return-series-by-instrument
+                              :return-intervals
+                              :funding-by-instrument
+                              :warnings
+                              :freshness])
+       (vector? (:calendar value))
+       (vector? (:return-calendar value))
+       (instrument-vector? (:eligible-instruments value))
+       (instrument-vector? (:excluded-instruments value))
+       (instrument-keyed-map? (:price-series-by-instrument value))
+       (instrument-keyed-map? (:return-series-by-instrument value))
+       (vector? (:return-intervals value))
+       (instrument-keyed-map? (:funding-by-instrument value))
+       (warning-vector? (:warnings value))
+       (freshness? (:freshness value))))
+
 (defn- solved-result-payload?
   [value]
   (let [instrument-ids (:instrument-ids value)
@@ -46,41 +284,58 @@
         instrument-count (count instrument-ids)]
     (and (vector? instrument-ids)
          (every? non-blank-string? instrument-ids)
-         (vector? target-weights)
-         (vector? current-weights)
+         (finite-number-vector? target-weights)
+         (finite-number-vector? current-weights)
          (= instrument-count (count target-weights))
          (= instrument-count (count current-weights))
-         (valid-instrument-map? instrument-ids
-                                (:target-weights-by-instrument value))
-         (valid-instrument-map? instrument-ids
-                                (:current-weights-by-instrument value))
-         (valid-instrument-map? instrument-ids
-                                (:expected-returns-by-instrument value))
+         (instrument-map-with-values? instrument-ids
+                                      coercion/finite-number?
+                                      (:target-weights-by-instrument value))
+         (instrument-map-with-values? instrument-ids
+                                      coercion/finite-number?
+                                      (:current-weights-by-instrument value))
+         (instrument-map-with-values? instrument-ids
+                                      coercion/finite-number?
+                                      (:expected-returns-by-instrument value))
+         (finite-field? value :as-of-ms)
+         (optional? warning-vector? (:warnings value))
+         (optional? vector? (:dropped-weights value))
+         (optional? vector? (:solver-results value))
+         (optional? vector? (:frontier value))
+         (optional? map? (:frontiers value))
+         (optional? map? (:frontier-summary value))
+         (optional? map? (:frontier-summaries value))
+         (optional? map? (:frontier-overlays value))
+         (optional? map? (:current-performance value))
+         (optional? map? (:performance value))
          (or (nil? (:return-decomposition-by-instrument value))
              (map? (:return-decomposition-by-instrument value)))
          (or (nil? (:diagnostics value))
              (map? (:diagnostics value)))
          (or (nil? (:rebalance-preview value))
-             (map? (:rebalance-preview value))))))
+             (and (map? (:rebalance-preview value))
+                  (optional? vector? (get-in value [:rebalance-preview :rows]))
+                  (optional? vector? (get-in value [:rebalance-preview :trades]))
+                  (optional? map? (get-in value [:rebalance-preview :summary])))))))
 
 (s/def ::draft
   (s/and map?
          #(= migrations/draft-schema-version (:schema-version %))
-         #(contains-keys? % [:universe
-                             :objective
-                             :return-model
-                             :risk-model
-                             :constraints
-                             :execution-assumptions
-                             :metadata])
-         #(absent-or-allowed? draft-statuses (:status %))
-         #(vector? (:universe %))
-         #(map? (:objective %))
-         #(map? (:return-model %))
-         #(map? (:risk-model %))
-         #(map? (:constraints %))
-         #(map? (:execution-assumptions %))
-         #(map? (:metadata %))))
+	         #(contains-keys? % [:universe
+	                             :objective
+	                             :return-model
+	                             :risk-model
+	                             :constraints
+	                             :execution-assumptions
+	                             :metadata])
+	         #(absent-or-allowed? draft-statuses (:status %))
+	         #(instrument-vector? (:universe %))
+	         #(objective? (:objective %))
+	         #(return-model? (:return-model %))
+	         #(risk-model? (:risk-model %))
+	         #(constraints? (:constraints %))
+	         #(execution-assumptions? (:execution-assumptions %))
+	         #(draft-metadata? (:metadata %))))
 
 (s/def ::engine-request
   (s/and map?
@@ -92,24 +347,27 @@
                              :objective
                              :constraints
                              :execution-assumptions
-                             :history])
-         #(vector? (:universe %))
-         #(vector? (:requested-universe %))
-         #(map? (:current-portfolio %))
-         #(map? (:return-model %))
-         #(map? (:risk-model %))
-         #(map? (:objective %))
-         #(map? (:constraints %))
-         #(map? (:execution-assumptions %))
-         #(map? (:history %))))
+	                             :history])
+	         #(instrument-vector? (:universe %))
+	         #(instrument-vector? (:requested-universe %))
+	         #(current-portfolio? (:current-portfolio %))
+	         #(return-model? (:return-model %))
+	         #(risk-model? (:risk-model %))
+	         #(objective? (:objective %))
+	         #(constraints? (:constraints %))
+	         #(execution-assumptions? (:execution-assumptions %))
+	         #(engine-history? (:history %))
+	         #(optional? coercion/finite-number? (:as-of-ms %))
+	         #(optional? warning-vector? (:warnings %))))
 
 (s/def ::request-signature
   (s/and map?
-         #(= signatures/request-signature-schema-version (:schema-version %))
-         #(contains-keys? % [:request :input-signature])
-         #(map? (:request %))
-         #(= (signatures/optimizer-input-signature (:request %))
-             (:input-signature %))))
+	         #(= signatures/request-signature-schema-version (:schema-version %))
+	         #(contains-keys? % [:request :input-signature])
+	         #(map? (:request %))
+	         #(s/valid? ::engine-request (:request %))
+	         #(= (signatures/optimizer-input-signature (:request %))
+	             (:input-signature %))))
 
 (s/def ::scenario-record
   (s/and map?

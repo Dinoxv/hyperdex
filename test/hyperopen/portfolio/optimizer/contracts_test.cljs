@@ -6,26 +6,7 @@
             [hyperopen.portfolio.optimizer.fixtures :as optimizer-fixtures]))
 
 (def sample-request
-  {:scenario-id "scn_contract"
-   :as-of-ms 2000
-   :requested-universe [{:instrument-id "perp:BTC"}]
-   :universe [{:instrument-id "perp:BTC"}]
-   :current-portfolio {:capital {:nav-usdc 1000}}
-   :return-model {:kind :historical-mean}
-   :risk-model {:kind :diagonal-shrink}
-   :objective {:kind :minimum-variance}
-   :constraints {:max-asset-weight 0.5}
-   :execution-assumptions {:default-order-type :market
-                           :fallback-slippage-bps 25
-                           :fee-mode :taker
-                           :cost-contexts-by-id
-                           {"perp:BTC" {:source :live-orderbook
-                                        :best-bid {:px "100" :sz "1"}
-                                        :best-ask {:px "101" :sz "2"}}}}
-   :history {:return-series-by-instrument {"perp:BTC" [0.01 0.02]}
-             :freshness {:as-of-ms 1000
-                         :age-ms 10
-                         :stale? false}}})
+  (contract-fixtures/valid-engine-request))
 
 (def sample-draft
   {:name "Contract Scenario"
@@ -68,6 +49,19 @@
          contracts/draft-return-model-path))
   (is (= [:portfolio :optimizer :draft :return-model :views]
          contracts/draft-return-model-views-path))
+  (is (= contracts/draft-return-model-path
+         (contracts/contract-path :optimizer/draft-return-model)))
+  (is (= [:portfolio :optimizer :draft :return-model :views "view-1"]
+         (contracts/contract-path :optimizer/draft-return-model-views
+                                  "view-1")))
+  (is (= [:portfolio :optimizer :scenario-index :by-id "scn_contract"]
+         (contracts/contract-path :optimizer/scenario-index
+                                  :by-id
+                                  "scn_contract")))
+  (is (= [:portfolio :optimizer :draft :constraints :max-turnover]
+         (contracts/optimizer-state-path :draft :constraints :max-turnover)))
+  (is (= [:portfolio-ui :optimizer :results-tab]
+         (contracts/optimizer-ui-state-path :results-tab)))
   (is (= [:portfolio :optimizer :draft :metadata :dirty?]
          contracts/draft-dirty-path))
   (is (= [:portfolio :optimizer :run-state]
@@ -168,6 +162,21 @@
     (is (s/valid? ::contracts/tracking-record tracking)
         (s/explain-str ::contracts/tracking-record tracking))))
 
+(deftest generated-contract-fixtures-validate-test
+  (let [draft (contract-fixtures/valid-draft)
+        request (contract-fixtures/valid-engine-request)
+        signature (contract-fixtures/valid-request-signature)
+        result (contract-fixtures/valid-solved-result)]
+    (is (s/valid? ::contracts/draft draft)
+        (s/explain-str ::contracts/draft draft))
+    (is (s/valid? ::contracts/engine-request request)
+        (s/explain-str ::contracts/engine-request request))
+    (is (= request (:request signature)))
+    (is (s/valid? ::contracts/request-signature signature)
+        (s/explain-str ::contracts/request-signature signature))
+    (is (s/valid? ::contracts/result-payload result)
+        (s/explain-str ::contracts/result-payload result))))
+
 (deftest request-signature-canonicalizes-optimizer-inputs-test
   (let [signature (contracts/build-request-signature sample-request)
         changed-volatile (-> sample-request
@@ -222,12 +231,59 @@
                            :as-of-ms 4000
                            :status :missing})))
     (is (false? (s/valid? ::contracts/tracking-record
-                          {:schema-version contracts/tracking-record-schema-version
-                           :scenario-id "scn_contract"
-                           :updated-at-ms 4000
-                           :snapshots [{:scenario-id "scn_contract"
-                                        :as-of-ms 4000
-                                        :status :missing}]})))))
+	                          {:schema-version contracts/tracking-record-schema-version
+	                           :scenario-id "scn_contract"
+	                           :updated-at-ms 4000
+	                           :snapshots [{:scenario-id "scn_contract"
+	                                        :as-of-ms 4000
+	                                        :status :missing}]})))))
+
+(deftest draft-contract-rejects-malformed-nested-shapes-test
+  (let [draft (contract-fixtures/valid-draft)
+        invalid-drafts [(assoc-in draft [:objective :kind] :unknown-objective)
+                        (assoc-in draft [:return-model :kind] :unknown-return-model)
+                        (assoc-in draft [:return-model :views] {})
+                        (assoc-in draft [:risk-model :kind] :unknown-risk-model)
+                        (assoc-in draft [:universe 0] {:coin "BTC"})
+                        (assoc-in draft [:constraints :gross-max] "1.0")
+                        (assoc-in draft [:execution-assumptions
+                                         :default-order-type]
+                                  :iceberg)
+                        (assoc-in draft [:metadata :dirty?] "false")]]
+    (doseq [invalid-draft invalid-drafts]
+      (is (false? (s/valid? ::contracts/draft invalid-draft))
+          (s/explain-str ::contracts/draft invalid-draft)))))
+
+(deftest engine-request-contract-rejects-malformed-nested-shapes-test
+  (let [request (contract-fixtures/valid-engine-request)
+        invalid-requests [(assoc-in request [:objective :kind] :unknown-objective)
+                          (assoc-in request [:history :eligible-instruments 0]
+                                    {:coin "BTC"})
+                          (assoc-in request [:history :return-series-by-instrument]
+                                    [])
+                          (assoc-in request [:execution-assumptions
+                                             :fallback-slippage-bps]
+                                    "25")
+                          (assoc request :warnings {})
+                          (contract-fixtures/dissoc-contract-in request
+                                                                 [:history
+                                                                  :freshness])]]
+    (doseq [invalid-request invalid-requests]
+      (is (false? (s/valid? ::contracts/engine-request invalid-request))
+          (s/explain-str ::contracts/engine-request invalid-request)))))
+
+(deftest request-signature-contract-validates-nested-request-test
+  (let [signature (contract-fixtures/valid-request-signature)
+        malformed-request (assoc-in (:request signature)
+                                    [:return-model :kind]
+                                    :unknown-return-model)
+        malformed-signature (-> signature
+                                (assoc :request malformed-request)
+                                (assoc :input-signature
+                                       (contracts/optimizer-input-signature
+                                        malformed-request)))]
+    (is (false? (s/valid? ::contracts/request-signature malformed-signature))
+        (s/explain-str ::contracts/request-signature malformed-signature))))
 
 (deftest result-payload-contract-validates-solved-payloads-test
   (is (s/valid? ::contracts/result-payload sample-solved-result))
@@ -244,6 +300,17 @@
                         (assoc sample-solved-result
                                :target-weights-by-instrument
                                {"perp:BTC" 0.6})))))
+
+(deftest result-payload-contract-rejects-malformed-solved-nested-shapes-test
+  (let [result (contract-fixtures/valid-solved-result)
+        invalid-results [(assoc-in result [:target-weights 0] js/NaN)
+                         (assoc result :current-weights ["0.45" 0.3 0.05])
+                         (assoc result :warnings {})
+                         (assoc result :frontier {})
+                         (assoc-in result [:rebalance-preview :rows] {})]]
+    (doseq [invalid-result invalid-results]
+      (is (false? (s/valid? ::contracts/result-payload invalid-result))
+          (s/explain-str ::contracts/result-payload invalid-result)))))
 
 (deftest result-payload-contract-accepts-real-solved-fixture-test
   (let [payload (optimizer-fixtures/get-optimizer-in
