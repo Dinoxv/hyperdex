@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.set :as set]
             [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as api-v2]))
 
@@ -166,6 +167,122 @@
     (is (= #{:funding-history-missing}
            (set (map :code (:warnings aligned)))))))
 
+(deftest align-api-v2-history-accepts-aligned-returns-with-sparse-or-missing-points-test
+  (let [universe [{:instrument-id "perp:ETH"
+                   :market-type :perp
+                   :coin "ETH"
+                   :optimizer-history/instrument-id "hl:perp:ETH"}
+                  {:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}]
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-aligned-sparse"
+                     :dataset_version "dv-return-first"
+                     :status "partial"
+                     :common_calendar [1000 2000 3000]
+                     :return_calendar [2000 3000]
+                     :aligned_returns_by_instrument
+                     {"perp:ETH" {:instrument_id "hl:perp:ETH"
+                                  :returns [0.02 0.03]}
+                      "perp:BTC" {:instrument_id "hl:perp:BTC"
+                                  :returns [-0.01 0.04]}}
+                     :series_by_instrument
+                     {"perp:ETH" {:instrument_id "hl:perp:ETH"
+                                  :lineage_kind "native"
+                                  :series_kind "market_price"
+                                  :points [{:time_ms 3000
+                                            :close 2200
+                                            :return 0.03}]
+                                  :funding {:status "available"
+                                            :annualized_carry 0.01}
+                                  :warnings [{:code "insufficient-candle-history"
+                                              :instrument_id "hl:perp:ETH"}]}
+                      "perp:BTC" {:instrument_id "hl:perp:BTC"
+                                  :lineage_kind "stitched_native_proxy"
+                                  :series_kind "market_price"
+                                  :points []
+                                  :funding {:status "available"
+                                            :annualized_carry 0.002}
+                                  :warnings [{:code "missing-candle-history"
+                                              :instrument_id "hl:perp:BTC"}]}}
+                     :warnings []})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= ["perp:ETH" "perp:BTC"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (empty? (:excluded-instruments aligned)))
+    (is (= [2000 3000] (:return-calendar aligned)))
+    (is (= [0.02 0.03]
+           (get-in aligned [:return-series-by-instrument "perp:ETH"])))
+    (is (= [-0.01 0.04]
+           (get-in aligned [:return-series-by-instrument "perp:BTC"])))
+    (is (= :api-v2-aligned-returns
+           (get-in aligned [:alignment-source :kind])))
+    (is (empty? (set/intersection
+                 #{:missing-candle-history :insufficient-candle-history}
+                 (set (map :code (:warnings aligned))))))))
+
+(deftest align-api-v2-history-reports-return-history-warning-when-aligned-returns-are-missing-test
+  (let [universe [{:instrument-id "perp:ETH"
+                   :market-type :perp
+                   :coin "ETH"
+                   :optimizer-history/instrument-id "hl:perp:ETH"}
+                  {:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}]
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-missing-return"
+                     :dataset_version "dv-return-first"
+                     :status "partial"
+                     :common_calendar [1000 2000 3000]
+                     :return_calendar [2000 3000]
+                     :aligned_returns_by_instrument
+                     {"perp:ETH" {:instrument_id "hl:perp:ETH"
+                                  :returns [0.02 0.03]}}
+                     :series_by_instrument
+                     {"perp:ETH" {:instrument_id "hl:perp:ETH"
+                                  :lineage_kind "native"
+                                  :series_kind "market_price"
+                                  :points [{:time_ms 1000
+                                            :close 2100
+                                            :return nil}
+                                           {:time_ms 2000
+                                            :close 2142
+                                            :return 0.02}
+                                           {:time_ms 3000
+                                            :close 2206.26
+                                            :return 0.03}]
+                                  :funding {:status "available"
+                                            :annualized_carry 0.01}
+                                  :warnings []}
+                      "perp:BTC" {:instrument_id "hl:perp:BTC"
+                                  :lineage_kind "native"
+                                  :series_kind "market_price"
+                                  :points []
+                                  :funding {:status "available"
+                                            :annualized_carry 0.002}
+                                  :warnings [{:code "missing-candle-history"
+                                              :instrument_id "hl:perp:BTC"}]}}
+                     :warnings []})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= ["perp:ETH"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (= ["perp:BTC"]
+           (mapv :instrument-id (:excluded-instruments aligned))))
+    (is (= #{:missing-return-history}
+           (set (map :code (:warnings aligned)))))))
+
 (deftest align-api-v2-history-blocks-missing-and-ambiguous-series-test
   (let [universe [{:instrument-id "perp:BTC"
                    :market-type :perp
@@ -211,5 +328,5 @@
            (mapv :instrument-id (:eligible-instruments aligned))))
     (is (= ["perp:MISSING" "perp:UNKNOWN"]
            (mapv :instrument-id (:excluded-instruments aligned))))
-    (is (= #{:missing-candle-history :identity-ambiguous}
+    (is (= #{:missing-return-history :identity-ambiguous}
            (set (map :code (:warnings aligned)))))))

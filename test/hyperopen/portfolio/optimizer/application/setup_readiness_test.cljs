@@ -198,7 +198,9 @@
   (let [readiness {:request {:requested-universe [{:instrument-id "vault:aligned"}
                                                   {:instrument-id "vault:misaligned"}
                                                   {:instrument-id "vault:missing"}
-                                                  {:instrument-id "perp:short"}]
+                                                  {:instrument-id "perp:short"}
+                                                  {:instrument-id "perp:return-missing"}
+                                                  {:instrument-id "perp:return-short"}]
                              :universe [{:instrument-id "vault:aligned"}]
                              :warnings [{:code :insufficient-common-history
                                          :observations 1
@@ -208,12 +210,42 @@
                                         {:code :insufficient-candle-history
                                          :instrument-id "perp:short"
                                          :observations 1
+                                         :required 2}
+                                        {:code :missing-return-history
+                                         :instrument-id "perp:return-missing"}
+                                        {:code :insufficient-return-history
+                                         :instrument-id "perp:return-short"
+                                         :observations 1
                                          :required 2}]}}]
     (is (= {"vault:aligned" :aligned
             "vault:misaligned" :loaded-but-misaligned
             "vault:missing" :missing
-            "perp:short" :insufficient}
+            "perp:short" :insufficient
+            "perp:return-missing" :missing
+            "perp:return-short" :insufficient}
            (setup-readiness/history-status-by-instrument readiness)))))
+
+(deftest warning-display-message-describes-api-v2-return-history-test
+  (let [request {:requested-universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"
+                                       :name "Bitcoin"}
+                                      {:instrument-id "perp:ETH"
+                                       :market-type :perp
+                                       :coin "ETH"
+                                       :name "Ether"}]}]
+    (is (= "Bitcoin: no optimizer return history returned."
+           (setup-readiness/warning-display-message
+            request
+            {:code :missing-return-history
+             :instrument-id "perp:BTC"})))
+    (is (= "Ether: only 1 usable optimizer return observations; 2 required."
+           (setup-readiness/warning-display-message
+            request
+            {:code :insufficient-return-history
+             :instrument-id "perp:ETH"
+             :observations 1
+             :required 2})))))
 
 (deftest build-readiness-blocks-api-v2-missing-and-rejected-history-test
   (let [readiness (setup-readiness/build-readiness

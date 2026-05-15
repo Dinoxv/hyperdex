@@ -11,7 +11,9 @@
 (def ^:private history-blocking-warning-codes
   #{:missing-history-coin
     :missing-candle-history
+    :missing-return-history
     :insufficient-candle-history
+    :insufficient-return-history
     :missing-vault-address
     :missing-vault-history
     :insufficient-vault-history
@@ -25,6 +27,7 @@
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
     :missing-candle-history
+    :missing-return-history
     :missing-vault-address
     :missing-vault-history
     :identity-ambiguous
@@ -32,6 +35,7 @@
 
 (def ^:private insufficient-history-warning-codes
   #{:insufficient-candle-history
+    :insufficient-return-history
     :insufficient-vault-history
     :insufficient-common-history})
 
@@ -161,8 +165,14 @@
              (str " for " coin ".")
              "."))
 
+      :missing-return-history
+      (str label ": no optimizer return history returned.")
+
       :insufficient-candle-history
       (str label ": " (observation-count-message warning "candle"))
+
+      :insufficient-return-history
+      (str label ": " (observation-count-message warning "optimizer return"))
 
       :missing-vault-address
       (str label ": missing vault address needed to fetch vault details.")

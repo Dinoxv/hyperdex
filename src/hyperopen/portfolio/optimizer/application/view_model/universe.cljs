@@ -13,11 +13,13 @@
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
     :missing-candle-history
+    :missing-return-history
     :missing-vault-address
     :missing-vault-history})
 
 (def ^:private insufficient-history-warning-codes
   #{:insufficient-candle-history
+    :insufficient-return-history
     :insufficient-vault-history})
 
 (def ^:private history-status-labels

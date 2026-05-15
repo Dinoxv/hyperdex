@@ -275,6 +275,26 @@
             {"perp:BTC" :insufficient}
             btc-instrument)))))
 
+(deftest selected-history-label-projects-api-v2-return-history-warning-state-test
+  (is (= "missing"
+         (view-model/selected-history-label
+          {}
+          {:blocking-warnings [{:code :missing-return-history
+                                :instrument-id "perp:BTC"}]}
+          {:status :succeeded
+           :request-signature {:universe [btc-instrument]}}
+          {}
+          btc-instrument)))
+  (is (= "insufficient"
+         (view-model/selected-history-label
+          {}
+          {:blocking-warnings [{:code :insufficient-return-history
+                                :instrument-id "perp:BTC"}]}
+          {:status :succeeded
+           :request-signature {:universe [btc-instrument]}}
+          {}
+          btc-instrument))))
+
 (deftest selected-history-label-projects-vault-gap-and-cache-state-test
   (testing "vault shared gaps are surfaced before generic readiness labels"
     (is (= "shared gap"

@@ -152,3 +152,182 @@ test("optimizer history API v2 loads rows without legacy history fanout @regress
   ]);
   expect(legacyHistoryRequests).toEqual([]);
 });
+
+test("optimizer history API v2 uses aligned returns when point rows are sparse @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.addInitScript(() => {
+    globalThis.__HYPEROPEN_OPTIMIZER_HISTORY_API__ = {
+      enabled: true,
+      baseUrl: "https://price-history.hyperopen.xyz",
+      proxyPolicy: "approved-proxy-allowed",
+      includeAlignedReturns: true,
+      fallbackToLegacy: false
+    };
+  });
+
+  const legacyHistoryRequests = [];
+  const v2Requests = [];
+
+  await page.route("https://price-history.hyperopen.xyz/v1/optimizer/instruments", async (route) => {
+    v2Requests.push({ type: "instruments" });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "optimizer-history-api-v2",
+        request_id: "rid-discovery-return-first",
+        dataset_version: "dv-return-first",
+        status: "ok",
+        instruments: [
+          {
+            instrument_id: "hl:perp:ETH",
+            display_symbol: "ETH",
+            instrument_kind: "hl_perp",
+            funding_enabled: true,
+            aliases: { hyperopen_market_key: "perp:ETH" },
+            history: { status: "available", quality_status: "passed", observation_count: 2 }
+          },
+          {
+            instrument_id: "hl:perp:BTC",
+            display_symbol: "BTC",
+            instrument_kind: "hl_perp",
+            funding_enabled: true,
+            aliases: { hyperopen_market_key: "perp:BTC" },
+            history: { status: "available", quality_status: "passed", observation_count: 2 },
+            proxy: {
+              available: true,
+              proxy_mapping_id: "proxy-review:hl:perp:BTC",
+              mapping_kind: "stitched_native_proxy",
+              provider: "coingecko",
+              confidence: "high"
+            }
+          }
+        ],
+        warnings: []
+      })
+    });
+  });
+
+  const seriesDefinitions = {
+    "perp:ETH": {
+      instrument_id: "hl:perp:ETH",
+      lineage_kind: "native",
+      series_kind: "market_price",
+      points: [{ time_ms: 3000, close: 2200, return: 0.03 }],
+      funding: { status: "available", annualized_carry: 0.01 },
+      warnings: [{ code: "insufficient-candle-history", instrument_id: "hl:perp:ETH" }]
+    },
+    "perp:BTC": {
+      instrument_id: "hl:perp:BTC",
+      lineage_kind: "stitched_native_proxy",
+      series_kind: "market_price",
+      points: [],
+      funding: { status: "available", annualized_carry: 0.002 },
+      warnings: [{ code: "missing-candle-history", instrument_id: "hl:perp:BTC" }]
+    }
+  };
+  const returnDefinitions = {
+    "perp:ETH": { instrument_id: "hl:perp:ETH", returns: [0.02, 0.03] },
+    "perp:BTC": { instrument_id: "hl:perp:BTC", returns: [-0.01, 0.04] }
+  };
+
+  await page.route("https://price-history.hyperopen.xyz/v1/optimizer/history-bundle", async (route) => {
+    const payload = route.request().postDataJSON();
+    v2Requests.push({ type: "history-bundle", payload });
+    const requestedIds = payload.instruments.map((instrument) => instrument.client_instrument_id);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "optimizer-history-api-v2",
+        request_id: "rid-history-return-first",
+        dataset_version: "dv-return-first",
+        status: "partial",
+        common_calendar: [1000, 2000, 3000],
+        return_calendar: [2000, 3000],
+        aligned_returns_by_instrument: Object.fromEntries(
+          requestedIds.map((instrumentId) => [instrumentId, returnDefinitions[instrumentId]])
+        ),
+        series_by_instrument: Object.fromEntries(
+          requestedIds.map((instrumentId) => [instrumentId, seriesDefinitions[instrumentId]])
+        ),
+        warnings: []
+      })
+    });
+  });
+
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "candleSnapshot" || payload?.type === "fundingHistory") {
+          legacyHistoryRequests.push(payload);
+        }
+      } catch {
+        // Let non-JSON requests continue.
+      }
+    }
+    await route.continue();
+  });
+
+  await visitRoute(page, "/portfolio/optimize/new");
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
+    .toBeVisible({ timeout: 60_000 });
+
+  await seedOptimizerMarkets(page, [
+    {
+      key: "perp:ETH",
+      "market-type": "perp",
+      coin: "ETH",
+      symbol: "ETH-USDC",
+      name: "Ether"
+    },
+    {
+      key: "perp:BTC",
+      "market-type": "perp",
+      coin: "BTC",
+      symbol: "BTC-USDC",
+      name: "Bitcoin"
+    }
+  ]);
+  legacyHistoryRequests.length = 0;
+
+  await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("eth");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
+    .toContainText("sufficient", { timeout: 10_000 });
+
+  await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("btc");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await page.locator("[data-role='portfolio-optimizer-universe-add-perp:BTC']").click();
+
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
+    .toContainText("sufficient", { timeout: 10_000 });
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
+    .toContainText("sufficient", { timeout: 10_000 });
+  await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
+    .not.toContainText("candle history", { timeout: 10_000 });
+
+  const historyRequests = v2Requests.filter((entry) => entry.type === "history-bundle");
+  expect(historyRequests.length).toBeGreaterThan(0);
+  for (const historyRequest of historyRequests) {
+    expect(historyRequest.payload.proxy_policy).toBe("approved_proxy_allowed");
+    expect(historyRequest.payload.include_aligned_returns).toBe(true);
+  }
+  expect(historyRequests.flatMap((entry) => entry.payload.instruments)).toEqual(
+    expect.arrayContaining([
+      {
+        client_instrument_id: "perp:ETH",
+        instrument_id: "hl:perp:ETH"
+      },
+      {
+        client_instrument_id: "perp:BTC",
+        instrument_id: "hl:perp:BTC"
+      }
+    ])
+  );
+  expect(legacyHistoryRequests).toEqual([]);
+});
