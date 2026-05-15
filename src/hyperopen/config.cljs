@@ -26,7 +26,7 @@
              :startup-summary-delay-ms 5000}
    :optimizer-history-api {:enabled? true
                            :base-url "https://price-history.hyperopen.xyz"
-                           :proxy-policy :native-only
+                           :proxy-policy :approved-proxy-allowed
                            :include-aligned-returns? true
                            :fallback-to-legacy? true}
    :diagnostics {:timeline-limit 50}

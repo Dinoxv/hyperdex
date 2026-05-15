@@ -61,7 +61,7 @@
            {:fetch-fn fetch-fn
             :base-url "https://history.test"
             :request-id (fn [] "rid-2")
-            :proxy-policy :native-only
+            :proxy-policy :approved-proxy-allowed
             :include-aligned-returns? true}
            {:bars 90
             :interval :1d
@@ -79,7 +79,7 @@
                       (get init "headers")))
                (is (= {"lookback_days" 90
                        "interval" "1d"
-                       "proxy_policy" "native_only"
+                       "proxy_policy" "approved_proxy_allowed"
                        "include_aligned_returns" true
                        "instruments" [{"client_instrument_id" "perp:BTC"
                                        "instrument_id" "hl:perp:BTC"}]}

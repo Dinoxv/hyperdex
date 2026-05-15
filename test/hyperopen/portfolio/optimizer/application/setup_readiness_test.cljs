@@ -320,3 +320,56 @@
     (is (= {"perp:BTC" :aligned
             vault-id :aligned}
            (setup-readiness/history-status-by-instrument readiness)))))
+
+(deftest build-readiness-deduplicates-api-v2-warning-copies-test
+  (let [warning {:code :proxy-history-used
+                 :instrument-id "perp:BTC"
+                 :proxy-mapping-id "proxy-review:hl:perp:BTC"}
+        readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft {:universe [{:instrument-id "perp:BTC"
+                                           :market-type :perp
+                                           :coin "BTC"
+                                           :name "Bitcoin"}]}
+                       :history-data
+                       {:api-v2-history
+                        {:status :ok
+                         :warnings [warning]
+                         :common-calendar [1000 2000]
+                         :return-calendar [2000]
+                         :aligned-returns-by-instrument
+                         {"perp:BTC" {:returns [0.1]}}
+                         :series-by-instrument
+                         {"perp:BTC" {:local-instrument-id "perp:BTC"
+                                      :instrument-id "hl:perp:BTC"
+                                      :lineage-kind :stitched-native-proxy
+                                      :points [{:time-ms 1000
+                                                :close 100
+                                                :return nil}
+                                               {:time-ms 2000
+                                                :close 110
+                                                :return 0.1}]
+                                      :funding {:status :available
+                                                :annualized-carry 0}
+                                      :warnings [warning]}}}}}}}))]
+    (is (= :ready (:status readiness)))
+    (is (= [{:code :proxy-history-used
+             :instrument-id "perp:BTC"
+             :proxy-mapping-id "proxy-review:hl:perp:BTC"}]
+           (mapv #(select-keys % [:code :instrument-id :proxy-mapping-id])
+                 (:warnings readiness))))))
+
+(deftest warning-display-message-labels-backend-api-v2-warning-with-selected-asset-test
+  (let [request {:requested-universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"
+                                       :name "Bitcoin"
+                                       :optimizer-history/instrument-id "hl:perp:BTC"}]}
+        message (setup-readiness/warning-display-message
+                 request
+                 {:code :proxy-history-used
+                  :instrument-id "hl:perp:BTC"})]
+    (is (= "Bitcoin: approved proxy history is included."
+           message))))

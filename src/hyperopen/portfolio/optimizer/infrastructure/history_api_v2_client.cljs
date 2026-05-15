@@ -29,7 +29,7 @@
 
 (defn- proxy-policy-wire
   [proxy-policy]
-  (str/replace (keyword-name proxy-policy "native-only") #"-" "_"))
+  (str/replace (keyword-name proxy-policy "approved-proxy-allowed") #"-" "_"))
 
 (defn- interval-wire
   [interval]

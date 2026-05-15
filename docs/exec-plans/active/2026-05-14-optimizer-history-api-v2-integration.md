@@ -86,13 +86,13 @@ Local scratch refs, non-authoritative:
   Rationale: The API supports explicit proxy use, but the optimizer UI must be able to disclose proxy lineage before proxied data becomes the default user path.
   Date/Author: 2026-05-14 / Codex
 
-- Decision: Enable the optimizer history API by default with `:proxy-policy :native-only`.
-  Rationale: The Hyperopen history API is the intended production path, supports batched history requests, and avoids Hyperliquid `/info` fanout/rate-limit pressure. Keeping `native-only` preserves the conservative proxy-disclosure posture while still moving price/funding history loading to the optimizer endpoint.
+- Decision: Enable the optimizer history API by default with `:proxy-policy :approved-proxy-allowed`.
+  Rationale: The Hyperopen history API is the intended production path, supports batched history requests, and avoids Hyperliquid `/info` fanout/rate-limit pressure. The service uses approved proxy history for assets such as BTC, so `native-only` rejects valid optimizer history. The UI already surfaces approved proxy lineage warnings.
   Date/Author: 2026-05-15 / Codex
 
 ## Outcomes & Retrospective
 
-The implementation adds the API v2 client, optimizer-owned ACL, discovery state, runtime adapter wiring, history-client dispatch/fallback, API v2 alignment, readiness and prefetch policy, and route-mocked browser coverage. The API v2 path is enabled by default with `:proxy-policy :native-only`; legacy browser-side history remains only as an explicit fallback for API transport/HTTP/contract failures.
+The implementation adds the API v2 client, optimizer-owned ACL, discovery state, runtime adapter wiring, history-client dispatch/fallback, API v2 alignment, readiness and prefetch policy, and route-mocked browser coverage. The API v2 path is enabled by default with `:proxy-policy :approved-proxy-allowed`; legacy browser-side history remains only as an explicit fallback for API transport/HTTP/contract failures.
 
 Validation results:
 
@@ -127,7 +127,7 @@ The phrase "legacy fallback" means the existing browser-side Hyperliquid and vau
 
 ### Milestone 1: Add the Gated API v2 Client Path
 
-Add an optimizer history API config entry in `/hyperopen/src/hyperopen/config.cljs`. The config should include `:enabled? true`, `:base-url "https://price-history.hyperopen.xyz"`, `:proxy-policy :native-only`, `:include-aligned-returns? true`, and `:fallback-to-legacy? true`. The endpoint is the default optimizer history path; legacy browser-side fanout remains available only as fallback.
+Add an optimizer history API config entry in `/hyperopen/src/hyperopen/config.cljs`. The config should include `:enabled? true`, `:base-url "https://price-history.hyperopen.xyz"`, `:proxy-policy :approved-proxy-allowed`, `:include-aligned-returns? true`, and `:fallback-to-legacy? true`. The endpoint is the default optimizer history path; legacy browser-side fanout remains available only as fallback.
 
 Create `/hyperopen/src/hyperopen/portfolio/optimizer/infrastructure/history_api_v2_client.cljs`. This file owns network access to `GET /v1/optimizer/instruments` and `POST /v1/optimizer/history-bundle`. It should accept an injected `fetch-fn`, a base URL, a request ID generator, the proxy policy, and the `include-aligned-returns?` setting. It should send `content-type: application/json` for POST and `x-request-id` for GET and POST. It should parse JSON into keywordized ClojureScript maps. HTTP 400 should reject without retry. Retry, if added, should be bounded to transient status codes 429, 500, 502, 503, and 504 only.
 

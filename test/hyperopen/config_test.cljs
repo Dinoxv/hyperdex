@@ -19,7 +19,7 @@
     (is (= 5000 (get-in cfg [:startup :startup-summary-delay-ms])))
     (is (= {:enabled? true
             :base-url "https://price-history.hyperopen.xyz"
-            :proxy-policy :native-only
+            :proxy-policy :approved-proxy-allowed
             :include-aligned-returns? true
             :fallback-to-legacy? true}
            (:optimizer-history-api cfg)))

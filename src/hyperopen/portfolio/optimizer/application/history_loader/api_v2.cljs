@@ -95,6 +95,21 @@
   [warnings]
   (mapv normalize-warning (or warnings [])))
 
+(defn- warning-key
+  [warning]
+  [(:code warning)
+   (:instrument-id warning)
+   (:proxy-mapping-id warning)
+   (:source-id warning)
+   (:message warning)])
+
+(defn- distinct-warnings
+  [warnings]
+  (vec (vals (reduce (fn [acc warning]
+                       (assoc acc (warning-key warning) warning))
+                     {}
+                     warnings))))
+
 (defn- normalize-proxy
   [proxy]
   (when (map? proxy)
@@ -533,14 +548,15 @@
         excluded-instruments (vec (concat (map :instrument (filter :excluded? prepared))
                                           (when common-gap?
                                             (map :instrument eligible))))
-        warnings (vec (concat (:warnings api-v2-history)
-                              (keep :warning prepared)
-                              (mapcat (fn [{:keys [instrument series]}]
-                                        (cond-> (vec (:warnings series))
-                                          (funding-warning instrument series)
-                                          (conj (funding-warning instrument series))))
-                                      eligible)
-                              (when history-warning [history-warning])))
+        warnings (distinct-warnings
+                  (concat (:warnings api-v2-history)
+                          (keep :warning prepared)
+                          (mapcat (fn [{:keys [instrument series]}]
+                                    (cond-> (vec (:warnings series))
+                                      (funding-warning instrument series)
+                                      (conj (funding-warning instrument series))))
+                                  eligible)
+                          (when history-warning [history-warning])))
         price-series-by-instrument (into {}
                                          (map (fn [{:keys [instrument-id series]}]
                                                 [instrument-id

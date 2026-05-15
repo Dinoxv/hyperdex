@@ -117,8 +117,11 @@
 (defn- requested-instrument-by-id
   [request]
   (into {}
-        (map (fn [instrument]
-               [(:instrument-id instrument) instrument]))
+        (mapcat (fn [instrument]
+                  (cond-> [[(:instrument-id instrument) instrument]]
+                    (:optimizer-history/instrument-id instrument)
+                    (conj [(:optimizer-history/instrument-id instrument)
+                           instrument]))))
         (:requested-universe request)))
 
 (defn- warning-instrument
