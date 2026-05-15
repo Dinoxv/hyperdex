@@ -182,3 +182,71 @@
                     :instrument-id])))
     (is (= "perp:ETH"
            (get-in result [:state :portfolio :optimizer :history-prefetch :active-instrument-id])))))
+
+(deftest merge-history-bundle-preserves-existing-api-v2-instrument-maps-test
+  (let [merged (workflow/merge-history-bundle
+                {:api-v2-history
+                 {:status :partial
+                  :common-calendar [1000 2000 3000 4000]
+                  :return-calendar [2000 3000 4000]
+                  :series-by-instrument
+                  {"perp:BTC" {:instrument-id "hl:perp:BTC"
+                               :points []}}
+                  :aligned-returns-by-instrument
+                  {"perp:BTC" {:instrument-id "hl:perp:BTC"
+                               :returns [0.01 -0.02 0.03]}}
+                  :warnings []}}
+                {:api-v2-history
+                 {:status :partial
+                  :common-calendar [1000 2000 3000]
+                  :return-calendar [2000 3000]
+                  :series-by-instrument
+                  {"perp:ETH" {:instrument-id "hl:perp:ETH"
+                               :points []}}
+                  :aligned-returns-by-instrument
+                  {"perp:ETH" {:instrument-id "hl:perp:ETH"
+                               :returns [0.02 0.03]}}
+                  :warnings []}
+                 :warnings []}
+                5000)]
+    (is (= #{"perp:BTC" "perp:ETH"}
+           (set (keys (get-in merged
+                              [:api-v2-history
+                               :series-by-instrument])))))
+    (is (= #{"perp:BTC" "perp:ETH"}
+           (set (keys (get-in merged
+                              [:api-v2-history
+                               :aligned-returns-by-instrument])))))))
+
+(deftest begin-selection-prefetch-requests-current-universe-after-api-v2-cache-test
+  (let [state (-> (prefetch-state)
+                  (assoc-in [:portfolio
+                             :optimizer
+                             :history-data
+                             :api-v2-history]
+                            {:status :partial
+                             :series-by-instrument
+                             {"perp:BTC" {:instrument-id "hl:perp:BTC"}}
+                             :aligned-returns-by-instrument
+                             {"perp:BTC" {:instrument-id "hl:perp:BTC"
+                                          :returns [0.01]}}})
+                  (assoc-in [:portfolio
+                             :optimizer
+                             :history-prefetch
+                             :queue]
+                            [eth-instrument])
+                  (assoc-in [:portfolio
+                             :optimizer
+                             :history-prefetch
+                             :by-instrument-id]
+                            {"perp:BTC" {:status :succeeded}
+                             "perp:ETH" queued-status}))
+        result (workflow/begin-selection-prefetch
+                {:state state
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}
+                 :now-ms 2000})]
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id
+                 (get-in result [:commands 0 :request :universe]))))))

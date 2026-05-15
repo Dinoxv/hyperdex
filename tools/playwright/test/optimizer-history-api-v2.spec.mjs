@@ -227,15 +227,24 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
       warnings: [{ code: "missing-candle-history", instrument_id: "hl:perp:BTC" }]
     }
   };
-  const returnDefinitions = {
+  const batchedReturnDefinitions = {
     "perp:ETH": { instrument_id: "hl:perp:ETH", returns: [0.02, 0.03] },
     "perp:BTC": { instrument_id: "hl:perp:BTC", returns: [-0.01, 0.04] }
+  };
+  const singleAssetReturnDefinitions = {
+    "perp:ETH": { instrument_id: "hl:perp:ETH", returns: [0.02, 0.03] },
+    "perp:BTC": { instrument_id: "hl:perp:BTC", returns: [0.01, -0.01, 0.04] }
   };
 
   await page.route("https://price-history.hyperopen.xyz/v1/optimizer/history-bundle", async (route) => {
     const payload = route.request().postDataJSON();
     v2Requests.push({ type: "history-bundle", payload });
     const requestedIds = payload.instruments.map((instrument) => instrument.client_instrument_id);
+    const batched = requestedIds.length > 1;
+    const returnDefinitions = batched ? batchedReturnDefinitions : singleAssetReturnDefinitions;
+    const returnCalendar = batched || requestedIds[0] !== "perp:BTC"
+      ? [2000, 3000]
+      : [1000, 2000, 3000];
     const responseKey = (instrumentId) => (
       instrumentId === "perp:BTC" ? seriesDefinitions[instrumentId].instrument_id : instrumentId
     );
@@ -247,8 +256,10 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
         request_id: "rid-history-return-first",
         dataset_version: "dv-return-first",
         status: "partial",
-        common_calendar: [1000, 2000, 3000],
-        return_calendar: [2000, 3000],
+        common_calendar: batched || requestedIds[0] !== "perp:BTC"
+          ? [1000, 2000, 3000]
+          : [0, 1000, 2000, 3000],
+        return_calendar: returnCalendar,
         aligned_returns_by_instrument: Object.fromEntries(
           requestedIds.map((instrumentId) => [responseKey(instrumentId), returnDefinitions[instrumentId]])
         ),
@@ -297,22 +308,24 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
   ]);
   legacyHistoryRequests.length = 0;
 
-  await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("eth");
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
-  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
-
   await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("btc");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:BTC']").click();
-
-  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
+    .toContainText("sufficient", { timeout: 10_000 });
+
+  await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("eth");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
+
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
+    .toContainText("sufficient", { timeout: 10_000 });
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
     .toContainText("sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
     .not.toContainText("candle history", { timeout: 10_000 });
+  await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
+    .not.toContainText("return history", { timeout: 10_000 });
 
   const historyRequests = v2Requests.filter((entry) => entry.type === "history-bundle");
   expect(historyRequests.length).toBeGreaterThan(0);
@@ -332,5 +345,15 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
       }
     ])
   );
+  expect(historyRequests.at(-1).payload.instruments).toEqual([
+    {
+      client_instrument_id: "perp:BTC",
+      instrument_id: "hl:perp:BTC"
+    },
+    {
+      client_instrument_id: "perp:ETH",
+      instrument_id: "hl:perp:ETH"
+    }
+  ]);
   expect(legacyHistoryRequests).toEqual([]);
 });

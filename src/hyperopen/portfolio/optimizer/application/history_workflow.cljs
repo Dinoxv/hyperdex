@@ -105,16 +105,23 @@
       (update :api-v2-history
               (fn [existing]
                 (if-let [api-v2-history (:api-v2-history bundle)]
-                  (-> (merge (or existing {}) api-v2-history)
-                      (update :series-by-instrument
-                              merge
-                              (or (:series-by-instrument api-v2-history) {}))
-                      (update :aligned-returns-by-instrument
-                              merge
-                              (or (:aligned-returns-by-instrument api-v2-history) {}))
-                      (update :warnings
-                              #(vec (concat (or (:warnings existing) [])
-                                            (or (:warnings api-v2-history) [])))))
+                  (let [existing* (or existing {})]
+                    (-> (merge existing* api-v2-history)
+                        (assoc :series-by-instrument
+                               (merge (or (:series-by-instrument existing*) {})
+                                      (or (:series-by-instrument api-v2-history)
+                                          {})))
+                        (assoc :aligned-returns-by-instrument
+                               (merge (or (:aligned-returns-by-instrument
+                                           existing*)
+                                          {})
+                                      (or (:aligned-returns-by-instrument
+                                           api-v2-history)
+                                          {})))
+                        (update :warnings
+                                #(vec (concat (or (:warnings existing) [])
+                                              (or (:warnings api-v2-history)
+                                                  []))))))
                   existing)))
       (update :warnings
               #(vec (concat (or % []) (or (:warnings bundle) []))))
@@ -175,9 +182,13 @@
        :commands []}
 
       :else
-      (let [request (history-request state
+      (let [prefetch-universe (if (get-in state (conj contracts/history-data-path
+                                                       :api-v2-history))
+                                (vec (get-in state contracts/draft-universe-path))
+                                [instrument])
+            request (history-request state
                                      (assoc (request-opts opts)
-                                            :universe [instrument]
+                                            :universe prefetch-universe
                                             :now-ms now-ms))
             signature (request-signature request)
             started-at-ms* (or started-at-ms now-ms)
