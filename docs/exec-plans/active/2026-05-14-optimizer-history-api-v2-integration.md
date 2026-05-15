@@ -31,12 +31,14 @@ Local scratch refs, non-authoritative:
 
 - [x] (2026-05-14 20:14Z) Reviewed the updated API guide, API contract, live production behavior, optimizer boundary files, history loader, request builder, runtime effect adapter, universe candidate code, readiness code, and focused test surfaces.
 - [x] (2026-05-14 20:14Z) Decided to record the work in `/hyperopen/docs/exec-plans/deferred/` because active ExecPlans are only for work being executed now.
-- [ ] Move this file to `/hyperopen/docs/exec-plans/active/` before implementation starts, and update this progress section with the activation timestamp.
-- [ ] Milestone 1: Add a gated API v2 client path and keep the legacy history path unchanged by default.
-- [ ] Milestone 2: Add API v2 discovery normalization and carry backend strict instrument IDs through optimizer universe rows without replacing local optimizer IDs.
-- [ ] Milestone 3: Normalize API v2 history bundles into optimizer history inputs, using API-provided aligned returns instead of recomputing stitched returns from close prices.
-- [ ] Milestone 4: Extend readiness, warnings, and UI-facing diagnostics for API v2 lineage, funding, stale, rejected, missing, and proxy states.
-- [ ] Milestone 5: Add route-mocked browser coverage and run focused optimizer tests plus required validation gates.
+- [x] (2026-05-14 21:08Z) Moved this file to `/hyperopen/docs/exec-plans/active/` for implementation in the current Codex worktree.
+- [x] (2026-05-15) Milestone 1: Added a gated API v2 client path and kept the legacy history path unchanged by default.
+- [x] (2026-05-15) Milestone 2: Added API v2 discovery normalization and carried backend strict instrument IDs through optimizer universe rows without replacing local optimizer IDs.
+- [x] (2026-05-15) Milestone 3: Normalized API v2 history bundles into optimizer history inputs, using API-provided aligned returns instead of recomputing stitched returns from close prices.
+- [x] (2026-05-15) Milestone 4: Extended readiness, warnings, and UI-facing diagnostics for API v2 lineage, funding, stale, rejected, missing, and proxy states.
+- [x] (2026-05-15) Milestone 5: Added route-mocked browser coverage and ran focused optimizer tests plus required validation gates.
+- [x] (2026-05-15) Live REPL follow-up: enabled the API v2 path by default and enriched already-selected or queued optimizer rows from discovery at history-request time.
+- [ ] (2026-05-15) Completion blocked by the repo docs-review gate: `npm run check` fails in `npm run lint:docs` because unchanged canonical docs are 91 days old with a 90-day review cycle. `npm test`, `npm run test:websocket`, focused CLJS tests, and the route-mocked Playwright spec pass.
 
 ## Surprises & Discoveries
 
@@ -54,6 +56,9 @@ Local scratch refs, non-authoritative:
 
 - Observation: Backend instrument identity must not replace current optimizer identity in one step.
   Evidence: current app IDs such as `perp:BTC` and `spot:PURR/USDC` key constraints, Black-Litterman views, worker maps, result payloads, UI row state, and orderbook cost contexts.
+
+- Observation: In the live app, an optimizer row can already be selected before discovery has populated backend IDs.
+  Evidence: CLJS nREPL inspection on 2026-05-15 showed the live draft universe contained `{:instrument-id "perp:BTC"}` without `:optimizer-history/instrument-id`, while discovery later mapped `"perp:BTC"` to `"hl:perp:BTC"`. `history-request` now enriches full-load and selection-prefetch request universes from discovery so already-selected rows still use the v2 endpoint.
 
 ## Decision Log
 
@@ -81,9 +86,26 @@ Local scratch refs, non-authoritative:
   Rationale: The API supports explicit proxy use, but the optimizer UI must be able to disclose proxy lineage before proxied data becomes the default user path.
   Date/Author: 2026-05-14 / Codex
 
+- Decision: Enable the optimizer history API by default with `:proxy-policy :native-only`.
+  Rationale: The Hyperopen history API is the intended production path, supports batched history requests, and avoids Hyperliquid `/info` fanout/rate-limit pressure. Keeping `native-only` preserves the conservative proxy-disclosure posture while still moving price/funding history loading to the optimizer endpoint.
+  Date/Author: 2026-05-15 / Codex
+
 ## Outcomes & Retrospective
 
-This plan has been authored but not executed. It intentionally increases planned implementation structure by adding a v2 client and normalizer alongside the legacy history path, but that added complexity is temporary and risk-reducing: it allows a reversible rollout, focused tests, and direct comparison between legacy and API v2 behavior. When implementation completes, update this section with the actual files changed, validation results, and whether the legacy fallback remains necessary.
+The implementation adds the API v2 client, optimizer-owned ACL, discovery state, runtime adapter wiring, history-client dispatch/fallback, API v2 alignment, readiness and prefetch policy, and route-mocked browser coverage. The API v2 path is enabled by default with `:proxy-policy :native-only`; legacy browser-side history remains only as an explicit fallback for API transport/HTTP/contract failures.
+
+Validation results:
+
+- `npm run test:runner:generate && npx shadow-cljs --force-spawn compile test && node out/test.js --test=hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test --test=hyperopen.portfolio.optimizer.infrastructure.history-client-test --test=hyperopen.portfolio.optimizer.application.history-loader-api-v2-test --test=hyperopen.portfolio.optimizer.application.universe-candidates-test --test=hyperopen.portfolio.optimizer.application.setup-readiness-test --test=hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test --test=hyperopen.portfolio.optimizer.application.history-workflow-test` passed: 39 tests, 156 assertions.
+- `node out/test.js --test=hyperopen.config-test --test=hyperopen.portfolio.optimizer.contracts-test --test=hyperopen.portfolio.optimizer.defaults-test --test=hyperopen.portfolio.optimizer.actions-test --test=hyperopen.portfolio.optimizer.universe-actions-test --test=hyperopen.portfolio.optimizer.application.history-loader-test --test=hyperopen.portfolio.optimizer.application.history-loader-vaults-test --test=hyperopen.portfolio.optimizer.application.request-builder-test --test=hyperopen.portfolio.optimizer.application.history-prefetch-test` passed: 67 tests, 341 assertions.
+- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:18080 PLAYWRIGHT_WEB_SERVER_COMMAND='PLAYWRIGHT_WEB_PORT=18080 node tools/playwright/static_server.mjs' npx playwright test tools/playwright/test/optimizer-history-api-v2.spec.mjs --workers=1` passed: 1 test.
+- `npm test` passed: 3924 tests, 21593 assertions.
+- `npm run test:websocket` passed: 524 tests, 3043 assertions.
+- Live CLJS nREPL probe on port `65161` after the default-enabled follow-up showed `:optimizer-history-api {:enabled? true ...}`, discovery loaded `613` local-to-backend IDs, and a direct history bundle request posted to `https://price-history.hyperopen.xyz/v1/optimizer/history-bundle` with body `{"instruments":[{"client_instrument_id":"perp:BTC","instrument_id":"hl:perp:BTC"}], ...}` and `legacy-count 0`.
+- After the default-enabled follow-up, focused tests passed: 20 tests, 95 assertions; route-mocked Playwright passed: 1 test; `npm test` passed: 3925 tests, 21596 assertions; `npm run test:websocket` passed: 524 tests, 3043 assertions.
+- `npm run check` failed in `npm run lint:docs` after earlier check subcommands passed. The failing diagnostics are unrelated stale-doc review-cycle failures for unchanged docs including `docs/PRODUCT_SENSE.md`, `docs/RELIABILITY.md`, `docs/SECURITY.md`, product-spec index/docs, and reference index/docs. These docs are 91 days old against a 90-day `review_cycle_days` policy.
+
+Do not move this plan to `completed/` until the docs-review gate is resolved or the platform owner explicitly accepts that blocker.
 
 ## Context and Orientation
 
@@ -105,7 +127,7 @@ The phrase "legacy fallback" means the existing browser-side Hyperliquid and vau
 
 ### Milestone 1: Add the Gated API v2 Client Path
 
-Add an optimizer history API config entry in `/hyperopen/src/hyperopen/config.cljs`. The config should include `:enabled? false`, `:base-url "https://price-history.hyperopen.xyz"`, `:proxy-policy :native-only`, `:include-aligned-returns? true`, and `:fallback-to-legacy? true`. The flag is deliberately off so this milestone does not alter runtime behavior.
+Add an optimizer history API config entry in `/hyperopen/src/hyperopen/config.cljs`. The config should include `:enabled? true`, `:base-url "https://price-history.hyperopen.xyz"`, `:proxy-policy :native-only`, `:include-aligned-returns? true`, and `:fallback-to-legacy? true`. The endpoint is the default optimizer history path; legacy browser-side fanout remains available only as fallback.
 
 Create `/hyperopen/src/hyperopen/portfolio/optimizer/infrastructure/history_api_v2_client.cljs`. This file owns network access to `GET /v1/optimizer/instruments` and `POST /v1/optimizer/history-bundle`. It should accept an injected `fetch-fn`, a base URL, a request ID generator, the proxy policy, and the `include-aligned-returns?` setting. It should send `content-type: application/json` for POST and `x-request-id` for GET and POST. It should parse JSON into keywordized ClojureScript maps. HTTP 400 should reject without retry. Retry, if added, should be bounded to transient status codes 429, 500, 502, 503, and 504 only.
 
@@ -237,7 +259,7 @@ Expected: all three commands exit with code 0. Record exact command outcomes in 
 
 Acceptance is met when all of the following are true.
 
-The optimizer history API feature flag defaults off and the existing legacy history-client tests pass unchanged. When the flag is enabled in tests, the runtime uses `GET /v1/optimizer/instruments` and `POST /v1/optimizer/history-bundle` through the optimizer-owned client and ACL. Local optimizer IDs such as `perp:BTC` remain the keys for constraints, views, results, and UI rows, while backend IDs such as `hl:perp:BTC` are sent only to the API as `instrument_id`.
+The optimizer history API defaults on and the existing legacy history-client tests pass unchanged through explicit disabled/fallback cases. At runtime, the optimizer uses `GET /v1/optimizer/instruments` and `POST /v1/optimizer/history-bundle` through the optimizer-owned client and ACL. Local optimizer IDs such as `perp:BTC` remain the keys for constraints, views, results, and UI rows, while backend IDs such as `hl:perp:BTC` are sent only to the API as `instrument_id`.
 
 API v2 history bundles normalize into the existing optimizer engine request shape. The optimizer uses API-provided aligned returns when present and does not compute returns across API `return: nil` boundaries. Missing or rejected series block optimizer runs. Usable partial responses preserve usable rows and surface warnings. Proxy and vault-derived lineages are visible to users. Funding missing is shown separately from price history and does not block non-funding instruments.
 
@@ -245,7 +267,7 @@ The route-mocked Playwright test proves the user-facing flow with API v2 respons
 
 ## Idempotence and Recovery
 
-This plan is designed for additive implementation. The API v2 client, normalizer, discovery state, and browser test can be added while the legacy path remains the default. If a milestone fails, leave the feature flag off and fix the focused failing tests before broadening validation.
+This plan is designed for additive implementation. The API v2 client, normalizer, discovery state, and browser test can be added while the legacy path remains available as fallback. If a milestone fails, temporarily disable the feature flag and fix the focused failing tests before broadening validation.
 
 If API v2 returns unexpected contract data, the client should reject with a clear error that includes status, `contract_version` when present, and `request_id` when present. If fallback is enabled, fallback should be explicit through a warning code and should be limited to transport, HTTP, malformed JSON, or contract-version failures. Fallback must not run for successful partial responses.
 
@@ -328,3 +350,5 @@ The returned bundle may include API v2 metadata, but the legacy shape must remai
 ## Revision Notes
 
 2026-05-14 / Codex: Initial deferred plan authored from maintainer request, API contract review, live endpoint smoke findings, local optimizer boundary inspection, and read-only subagent findings. The plan is deferred because implementation is not starting in this session.
+2026-05-15 / Codex: Implemented API v2 integration in the active worktree. Focused CLJS tests, adjacent optimizer tests, route-mocked Playwright coverage, `npm test`, and `npm run test:websocket` pass. `npm run check` is blocked by unrelated stale canonical docs in `lint:docs`.
+2026-05-15 / Codex: Follow-up from live CLJS nREPL inspection: defaulted API v2 on and enriched already-selected/queued rows from discovery when building history requests. Live probe confirmed a batched `POST /v1/optimizer/history-bundle` for `perp:BTC -> hl:perp:BTC` and no legacy history fetcher calls.

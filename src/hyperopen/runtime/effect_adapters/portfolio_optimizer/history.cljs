@@ -12,6 +12,9 @@
    {:request-candle-snapshot! (partial request-candle-snapshot! env)
     :request-market-funding-history! (:request-market-funding-history! env)
     :request-vault-details! (:request-vault-details! env)
+    :optimizer-history-api (:optimizer-history-api env)
+    :fetch-fn (:fetch-fn env)
+    :request-id (:request-id env)
     :on-progress on-progress}
    request))
 

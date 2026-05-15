@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-workflow
-  (:require [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
+  (:require [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
+            [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def default-funding-window-ms
@@ -21,23 +22,30 @@
   [state]
   (get-in state contracts/runtime-path))
 
+(defn- enrich-universe-from-discovery
+  [state universe]
+  (let [discovery (get-in state contracts/history-discovery-path)]
+    (mapv #(history-api-v2/with-discovery-metadata % discovery)
+          (or universe []))))
+
 (defn history-request
   [state opts]
   (let [opts* (or opts {})
         runtime (optimizer-runtime state)
         now-ms (or (:now-ms opts*)
-                   (:as-of-ms runtime))]
-    (merge {:universe (get-in state contracts/draft-universe-path)
-            :interval :1d
-            :bars 365
-            :priority :high
-            :now-ms now-ms
-            :funding-window-ms default-funding-window-ms}
-           (select-keys runtime
-                        [:stale-after-ms
-                         :funding-periods-per-year
-                         :funding-window-ms])
-           (dissoc opts* :now-ms))))
+                   (:as-of-ms runtime))
+        request (merge {:universe (get-in state contracts/draft-universe-path)
+                        :interval :1d
+                        :bars 365
+                        :priority :high
+                        :now-ms now-ms
+                        :funding-window-ms default-funding-window-ms}
+                       (select-keys runtime
+                                    [:stale-after-ms
+                                     :funding-periods-per-year
+                                     :funding-window-ms])
+                       (dissoc opts* :now-ms))]
+    (update request :universe #(enrich-universe-from-discovery state %))))
 
 (defn begin-history-load-state
   [signature started-at-ms]
@@ -94,6 +102,20 @@
       (update :vault-details-by-address
               merge
               (or (:vault-details-by-address bundle) {}))
+      (update :api-v2-history
+              (fn [existing]
+                (if-let [api-v2-history (:api-v2-history bundle)]
+                  (-> (merge (or existing {}) api-v2-history)
+                      (update :series-by-instrument
+                              merge
+                              (or (:series-by-instrument api-v2-history) {}))
+                      (update :aligned-returns-by-instrument
+                              merge
+                              (or (:aligned-returns-by-instrument api-v2-history) {}))
+                      (update :warnings
+                              #(vec (concat (or (:warnings existing) [])
+                                            (or (:warnings api-v2-history) [])))))
+                  existing)))
       (update :warnings
               #(vec (concat (or % []) (or (:warnings bundle) []))))
       (assoc :loaded-at-ms completed-at-ms)))

@@ -15,17 +15,25 @@
     :missing-vault-address
     :missing-vault-history
     :insufficient-vault-history
-    :insufficient-common-history})
+    :insufficient-common-history
+    :identity-ambiguous
+    :instrument-kind-mismatch
+    :proxy-mapping-unapproved
+    :proxy-validation-failed
+    :validation-failed})
 
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
     :missing-candle-history
     :missing-vault-address
-    :missing-vault-history})
+    :missing-vault-history
+    :identity-ambiguous
+    :validation-failed})
 
 (def ^:private insufficient-history-warning-codes
   #{:insufficient-candle-history
-    :insufficient-vault-history})
+    :insufficient-vault-history
+    :insufficient-common-history})
 
 (defn- current-as-of-ms
   [state]
@@ -165,6 +173,33 @@
       :insufficient-common-history
       (observation-count-message warning "shared return")
 
+      :identity-ambiguous
+      (str label ": missing backend optimizer history identity.")
+
+      :instrument-kind-mismatch
+      (str label ": backend optimizer history identity does not match the selected asset type.")
+
+      :proxy-mapping-unapproved
+      (str label ": proxy history is not approved for optimizer use.")
+
+      :proxy-validation-failed
+      (str label ": proxy history failed backend validation.")
+
+      :validation-failed
+      (str label ": backend validation rejected optimizer history.")
+
+      :proxy-history-used
+      (str label ": approved proxy history is included.")
+
+      :vault-derived-history-used
+      (str label ": row uses vault return-index history, not market candles.")
+
+      :funding-history-missing
+      (str label ": funding history is missing; price history availability is separate.")
+
+      :stale-history
+      (str label ": optimizer history may be stale.")
+
       (or (some-> (:code warning) name)
           "Optimizer warning."))))
 
@@ -193,6 +228,13 @@
 
     (contains? insufficient-history-warning-codes (:code warning))
     :insufficient
+
+    (contains? #{:validation-failed
+                 :instrument-kind-mismatch
+                 :proxy-mapping-unapproved
+                 :proxy-validation-failed}
+               (:code warning))
+    :missing
 
     :else
     nil))

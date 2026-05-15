@@ -46,6 +46,16 @@
           :warnings []}
          (:history-load-state (defaults/default-optimizer-state))))
   (is (= {:status :idle
+          :contract-version nil
+          :request-id nil
+          :dataset-version nil
+          :loaded-at-ms nil
+          :instruments-by-backend-id {}
+          :backend-id-by-local-id {}
+          :warnings []
+          :error nil}
+         (:history-discovery (defaults/default-optimizer-state))))
+  (is (= {:status :idle
           :run-id nil
           :scenario-id nil
           :started-at-ms nil

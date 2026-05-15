@@ -241,6 +241,8 @@
 (def make-run-portfolio-optimizer-pipeline portfolio-optimizer-adapters/make-run-portfolio-optimizer-pipeline)
 (def run-portfolio-optimizer-effect portfolio-optimizer-adapters/run-portfolio-optimizer-effect)
 (def load-portfolio-optimizer-history-effect portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect)
+(def load-portfolio-optimizer-history-discovery-effect
+  portfolio-optimizer-adapters/load-portfolio-optimizer-history-discovery-effect)
 (def run-portfolio-optimizer-pipeline-effect portfolio-optimizer-adapters/run-portfolio-optimizer-pipeline-effect)
 (def load-portfolio-optimizer-scenario-index-effect portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-index-effect)
 (def load-portfolio-optimizer-scenario-effect portfolio-optimizer-adapters/load-portfolio-optimizer-scenario-effect)

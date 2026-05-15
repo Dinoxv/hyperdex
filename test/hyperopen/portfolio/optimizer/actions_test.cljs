@@ -123,6 +123,39 @@
     (is (= [[:effects/run-portfolio-optimizer request signature]]
            (actions/run-portfolio-optimizer {} request signature)))))
 
+(deftest universe-instrument-builders-preserve-optimizer-history-metadata-test
+  (let [history-metadata {:optimizer-history/instrument-id "hl:perp:BTC"
+                          :optimizer-history/display-symbol "BTC"
+                          :optimizer-history/instrument-kind :hl-perp
+                          :optimizer-history/history-status :available
+                          :optimizer-history/proxy {:available true}}
+        market (merge {:key "perp:BTC"
+                       :market-type :perp
+                       :coin "BTC"
+                       :symbol "BTC-USDC"
+                       :name "Bitcoin"}
+                      history-metadata)
+        exposure (merge {:instrument-id "perp:BTC"
+                         :market-type :perp
+                         :coin "BTC"
+                         :symbol "BTC-USDC"}
+                        history-metadata)]
+    (is (= (merge {:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :shortable? true
+                   :symbol "BTC-USDC"
+                   :name "Bitcoin"}
+                  history-metadata)
+           (action-common/market->universe-instrument market)))
+    (is (= (merge {:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :shortable? true
+                   :symbol "BTC-USDC"}
+                  history-metadata)
+           (action-common/exposure->universe-instrument exposure)))))
+
 (deftest run-portfolio-optimizer-from-ready-draft-builds-request-and-signature-test
   (let [state {:portfolio {:optimizer {:draft {:id "draft-1"
                                                :universe [{:instrument-id "perp:BTC"
@@ -278,17 +311,19 @@
            (actions/save-portfolio-optimizer-scenario-from-current state*)))))
 
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
-  (is (= [[:effects/load-portfolio-optimizer-scenario-index]]
+  (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize")))
-  (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]]
+  (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
+          [:effects/load-portfolio-optimizer-history-discovery]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/scn_01")))
-  (is (= []
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -299,12 +334,14 @@
           "/trade"))))
 
 (deftest load-portfolio-optimizer-route-fetches-vault-metadata-for-universe-search-test
-  (is (= [[:effects/api-fetch-vault-index-with-cache]
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}}
           "/portfolio/optimize/new")))
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
@@ -312,20 +349,22 @@
            :vaults {}}
           "/portfolio/optimize")))
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize/scn_01")))
-  (is (= []
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/new"))))
 
 (deftest load-portfolio-optimizer-route-refreshes-cache-only-selector-markets-test
-  (is (= [[:effects/fetch-asset-selector-markets {:phase :full}]]
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/fetch-asset-selector-markets {:phase :full}]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:cache-hydrated? true
                             :phase :bootstrap

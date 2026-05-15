@@ -49,6 +49,7 @@
 (def runtime-funding-periods-per-year-path paths/runtime-funding-periods-per-year-path)
 (def runtime-orderbook-stale-after-ms-path paths/runtime-orderbook-stale-after-ms-path)
 (def history-data-path paths/history-data-path)
+(def history-discovery-path paths/history-discovery-path)
 (def market-cap-by-coin-path paths/market-cap-by-coin-path)
 (def history-load-state-path paths/history-load-state-path)
 (def history-load-state-status-path paths/history-load-state-status-path)

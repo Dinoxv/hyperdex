@@ -195,6 +195,7 @@
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
             [hyperopen.portfolio.optimizer.application.history-workflow-test]
@@ -239,6 +240,7 @@
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
             [hyperopen.portfolio.optimizer.ids-test]
+            [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
@@ -842,6 +844,7 @@
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
+             'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
              'hyperopen.portfolio.optimizer.application.history-workflow-test
@@ -886,6 +889,7 @@
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test
              'hyperopen.portfolio.optimizer.ids-test
+             'hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test

@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.actions.universe
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.black-litterman-actions.views :as black-litterman-views]
@@ -35,6 +36,14 @@
     (conj [contracts/history-prefetch-path
            (:state prefetch-plan)])))
 
+(defn- with-history-discovery
+  [state market]
+  (if (map? market)
+    (history-api-v2/with-discovery-metadata
+     market
+     (get-in state contracts/history-discovery-path))
+    market))
+
 (defn add-portfolio-optimizer-universe-instrument
   [state market-key]
   (let [market-key* (common/non-blank-text market-key)
@@ -48,7 +57,8 @@
                                        (:vault-address row)))
                                (universe-candidates/vault-row->candidate row)))
                            (get-in state [:vaults :merged-index-rows]))))
-        instrument (common/market->universe-instrument market)
+        instrument (common/market->universe-instrument
+                    (with-history-discovery state market))
         instrument-id (:instrument-id instrument)]
     (if (and instrument
              (not (common/instrument-present? universe instrument-id)))

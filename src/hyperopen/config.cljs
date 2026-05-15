@@ -24,6 +24,11 @@
              :funding-history-lookback-ms 604800000
              :per-dex-stagger-ms 120
              :startup-summary-delay-ms 5000}
+   :optimizer-history-api {:enabled? true
+                           :base-url "https://price-history.hyperopen.xyz"
+                           :proxy-policy :native-only
+                           :include-aligned-returns? true
+                           :fallback-to-legacy? true}
    :diagnostics {:timeline-limit 50}
    :messages {:agent-storage-mode-reset "Trading persistence updated. Enable Trading again."
               :agent-protection-mode-reset "Trading session protection updated. Enable Trading again."}})

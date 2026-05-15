@@ -134,6 +134,47 @@
             state
             "spot:PURR/USDC")))))
 
+(deftest add-draft-universe-instrument-preserves-history-discovery-backend-id-test
+  (let [eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true
+                        :optimizer-history/instrument-id "hl:perp:ETH"
+                        :optimizer-history/display-symbol "ETH"
+                        :optimizer-history/instrument-kind :hl-perp
+                        :optimizer-history/history-status :available
+                        :optimizer-history/quality-status :passed}
+        state {:portfolio {:optimizer
+                           {:draft {:universe []}
+                            :history-discovery
+                            {:backend-id-by-local-id {"perp:ETH" "hl:perp:ETH"}
+                             :instruments-by-backend-id
+                             {"hl:perp:ETH"
+                              {:instrument-id "hl:perp:ETH"
+                               :display-symbol "ETH"
+                               :instrument-kind :hl-perp
+                               :history {:status :available
+                                         :quality-status :passed}}}}}}
+               :asset-selector {:market-by-key
+                                {"perp:ETH" {:key "perp:ETH"
+                                             :market-type :perp
+                                             :coin "ETH"}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :universe]
+               [eth-instrument]]
+              [[:portfolio-ui :optimizer :universe-search-query]
+               ""]
+              [[:portfolio-ui :optimizer :universe-search-active-index]
+               0]
+              [[:portfolio :optimizer :history-prefetch]
+               (queued-prefetch-state [eth-instrument])]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]
+            selection-prefetch-effect]
+           (actions/add-portfolio-optimizer-universe-instrument
+            state
+            "perp:ETH")))))
+
 (deftest add-draft-universe-instrument-from-vault-row-test
   (let [vault-address "0x1111111111111111111111111111111111111111"
         vault-instrument {:instrument-id (str "vault:" vault-address)

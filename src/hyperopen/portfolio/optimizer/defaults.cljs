@@ -58,6 +58,18 @@
    :active-instrument-id nil
    :by-instrument-id {}})
 
+(defn default-history-discovery-state
+  []
+  {:status :idle
+   :contract-version nil
+   :request-id nil
+   :dataset-version nil
+   :loaded-at-ms nil
+   :instruments-by-backend-id {}
+   :backend-id-by-local-id {}
+   :warnings []
+   :error nil})
+
 (defn default-optimization-progress-state
   []
   {:status :idle
@@ -145,6 +157,7 @@
                   :funding-history-by-coin {}
                   :vault-details-by-address {}
                   :warnings []}
+   :history-discovery (default-history-discovery-state)
    :history-prefetch (default-history-prefetch-state)
    :history-load-state (default-history-load-state)
    :optimization-progress (default-optimization-progress-state)

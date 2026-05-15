@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.universe-candidates
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.query :as asset-query]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.ids :as ids]))
@@ -247,6 +248,14 @@
                        idx]))
            (mapv :market)))))
 
+(defn- with-history-discovery
+  [state candidates]
+  (let [discovery (get-in state contracts/history-discovery-path)]
+    (if (seq (:backend-id-by-local-id discovery))
+      (mapv #(history-api-v2/with-discovery-metadata % discovery)
+            candidates)
+      candidates)))
+
 (defn candidate-markets
   ([state universe query]
    (candidate-markets state universe query nil))
@@ -268,6 +277,7 @@
          vaults (candidate-vaults state selected-ids query* opts)
          candidates (into (vec markets) vaults)]
      (->> (rank-candidates candidates query* ranking)
+          (with-history-discovery state)
           (take default-candidate-limit)
           vec))))
 

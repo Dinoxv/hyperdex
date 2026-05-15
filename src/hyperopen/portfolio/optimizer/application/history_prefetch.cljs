@@ -30,10 +30,22 @@
   [value]
   (boolean (seq value)))
 
+(defn- usable-api-v2-series?
+  [series]
+  (and (map? series)
+       (seq (:points series))
+       (not (contains? #{:missing :rejected}
+                       (:lineage-kind series)))))
+
 (defn required-history-loaded?
   [state instrument]
   (let [history-data* (history-data state)]
-    (cond
+    (if-let [series (get-in history-data*
+                            [:api-v2-history
+                             :series-by-instrument
+                             (instrument-id instrument)])]
+      (usable-api-v2-series? series)
+      (cond
       (instruments/vault-instrument? instrument)
       (boolean
        (when-let [address (instruments/vault-address instrument)]
@@ -49,7 +61,7 @@
       :else
       (rows-present?
        (get-in history-data* [:candle-history-by-coin
-                              (instruments/normalize-coin instrument)])))))
+                              (instruments/normalize-coin instrument)]))))))
 
 (defn active?
   [prefetch-state* instrument-id*]

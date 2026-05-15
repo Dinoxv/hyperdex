@@ -29,6 +29,7 @@
 (def runtime-orderbook-stale-after-ms-path
   (conj runtime-path :orderbook-stale-after-ms))
 (def history-data-path (conj optimizer-path :history-data))
+(def history-discovery-path (conj optimizer-path :history-discovery))
 (def market-cap-by-coin-path (conj optimizer-path :market-cap-by-coin))
 (def history-load-state-path (conj optimizer-path :history-load-state))
 (def history-load-state-status-path (conj history-load-state-path :status))
@@ -98,6 +99,7 @@
    :optimizer/runtime-funding-periods-per-year runtime-funding-periods-per-year-path
    :optimizer/runtime-orderbook-stale-after-ms runtime-orderbook-stale-after-ms-path
    :optimizer/history-data history-data-path
+   :optimizer/history-discovery history-discovery-path
    :optimizer/market-cap-by-coin market-cap-by-coin-path
    :optimizer/history-load-state history-load-state-path
    :optimizer/history-load-state-status history-load-state-status-path

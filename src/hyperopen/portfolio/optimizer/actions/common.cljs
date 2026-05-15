@@ -17,6 +17,18 @@
 
 (def non-blank-text coercion/non-blank-text)
 
+(def ^:private optimizer-history-keys
+  [:optimizer-history/instrument-id
+   :optimizer-history/display-symbol
+   :optimizer-history/instrument-kind
+   :optimizer-history/history-status
+   :optimizer-history/proxy
+   :optimizer-history/quality-status])
+
+(defn- with-optimizer-history-metadata
+  [instrument source]
+  (merge instrument (select-keys source optimizer-history-keys)))
+
 (defn exposure->universe-instrument
   [exposure]
   (let [instrument-id (non-blank-text (:instrument-id exposure))
@@ -25,16 +37,18 @@
     (when (and instrument-id
                coin
                (keyword? market-type))
-      (cond-> {:instrument-id instrument-id
-               :market-type market-type
-               :coin coin
-               :shortable? (= :perp market-type)}
-        (non-blank-text (:dex exposure))
-        (assoc :dex (non-blank-text (:dex exposure)))
-        (non-blank-text (:symbol exposure)) (assoc :symbol (non-blank-text (:symbol exposure)))
-        (non-blank-text (:base exposure)) (assoc :base (non-blank-text (:base exposure)))
-        (non-blank-text (:quote exposure)) (assoc :quote (non-blank-text (:quote exposure)))
-        (contains? exposure :hip3?) (assoc :hip3? (boolean (:hip3? exposure)))))))
+      (with-optimizer-history-metadata
+        (cond-> {:instrument-id instrument-id
+                 :market-type market-type
+                 :coin coin
+                 :shortable? (= :perp market-type)}
+          (non-blank-text (:dex exposure))
+          (assoc :dex (non-blank-text (:dex exposure)))
+          (non-blank-text (:symbol exposure)) (assoc :symbol (non-blank-text (:symbol exposure)))
+          (non-blank-text (:base exposure)) (assoc :base (non-blank-text (:base exposure)))
+          (non-blank-text (:quote exposure)) (assoc :quote (non-blank-text (:quote exposure)))
+          (contains? exposure :hip3?) (assoc :hip3? (boolean (:hip3? exposure))))
+        exposure))))
 
 (defn market->universe-instrument
   [market]
@@ -47,20 +61,22 @@
                (contains? supported-universe-market-types market-type)
                (or (not= :vault market-type)
                    vault-address))
-      (cond-> {:instrument-id instrument-id
-               :market-type market-type
-               :coin coin
-               :shortable? (= :perp market-type)}
-        (= :vault market-type)
-        (assoc :vault-address vault-address)
-        (non-blank-text (:dex market))
-        (assoc :dex (non-blank-text (:dex market)))
-        (non-blank-text (:symbol market)) (assoc :symbol (non-blank-text (:symbol market)))
-        (non-blank-text (:name market)) (assoc :name (non-blank-text (:name market)))
-        (non-blank-text (:base market)) (assoc :base (non-blank-text (:base market)))
-        (non-blank-text (:quote market)) (assoc :quote (non-blank-text (:quote market)))
-        (contains? market :tvl) (assoc :tvl (:tvl market))
-        (contains? market :hip3?) (assoc :hip3? (boolean (:hip3? market)))))))
+      (with-optimizer-history-metadata
+        (cond-> {:instrument-id instrument-id
+                 :market-type market-type
+                 :coin coin
+                 :shortable? (= :perp market-type)}
+          (= :vault market-type)
+          (assoc :vault-address vault-address)
+          (non-blank-text (:dex market))
+          (assoc :dex (non-blank-text (:dex market)))
+          (non-blank-text (:symbol market)) (assoc :symbol (non-blank-text (:symbol market)))
+          (non-blank-text (:name market)) (assoc :name (non-blank-text (:name market)))
+          (non-blank-text (:base market)) (assoc :base (non-blank-text (:base market)))
+          (non-blank-text (:quote market)) (assoc :quote (non-blank-text (:quote market)))
+          (contains? market :tvl) (assoc :tvl (:tvl market))
+          (contains? market :hip3?) (assoc :hip3? (boolean (:hip3? market))))
+        market))))
 
 (defn dedupe-instruments
   [instruments]

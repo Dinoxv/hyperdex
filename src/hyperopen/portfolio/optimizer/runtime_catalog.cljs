@@ -102,6 +102,8 @@
        optimizer-controller-resolver)
       :load-portfolio-optimizer-history
       effect-adapters/load-portfolio-optimizer-history-effect
+      :load-portfolio-optimizer-history-discovery
+      effect-adapters/load-portfolio-optimizer-history-discovery-effect
       :load-portfolio-optimizer-scenario-index
       effect-adapters/load-portfolio-optimizer-scenario-index-effect
       :load-portfolio-optimizer-scenario

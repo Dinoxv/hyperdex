@@ -133,6 +133,44 @@
     (is (= ["spot:HYPE" "perp:HYPE" "spot:@232" "perp:SUPERHYPE"]
            (market-keys candidates)))))
 
+(deftest candidate-markets-merges-optimizer-history-discovery-metadata-test
+  (let [markets [{:key "perp:BTC"
+                  :market-type :perp
+                  :coin "BTC"
+                  :symbol "BTC-USDC"
+                  :volume24h 1200}]
+        state {:asset-selector {:markets markets}
+               :portfolio {:optimizer
+                           {:history-discovery
+                            {:backend-id-by-local-id {"perp:BTC" "hl:perp:BTC"}
+                             :instruments-by-backend-id
+                             {"hl:perp:BTC"
+                              {:instrument-id "hl:perp:BTC"
+                               :display-symbol "BTC"
+                               :instrument-kind :hl-perp
+                               :history {:status :available
+                                         :quality-status :passed}
+                               :proxy {:available true
+                                       :proxy-mapping-id "proxy-review:btc"}}}}}}}
+        candidates (universe-candidates/candidate-markets state [] "btc")]
+    (is (= ["perp:BTC"] (market-keys candidates)))
+    (is (= {:key "perp:BTC"
+            :optimizer-history/instrument-id "hl:perp:BTC"
+            :optimizer-history/display-symbol "BTC"
+            :optimizer-history/instrument-kind :hl-perp
+            :optimizer-history/history-status :available
+            :optimizer-history/quality-status :passed
+            :optimizer-history/proxy {:available true
+                                      :proxy-mapping-id "proxy-review:btc"}}
+           (select-keys (first candidates)
+                        [:key
+                         :optimizer-history/instrument-id
+                         :optimizer-history/display-symbol
+                         :optimizer-history/instrument-kind
+                         :optimizer-history/history-status
+                         :optimizer-history/quality-status
+                         :optimizer-history/proxy])))))
+
 (deftest candidate-markets-includes-eligible-vault-rows-by-name-address-and-type-test
   (let [state {:asset-selector {:markets []}
                :vaults {:merged-index-rows [{:name "Alpha Yield"

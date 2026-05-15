@@ -66,6 +66,31 @@
     (is (= ["perp:BTC"]
            (mapv :instrument-id (get-in result [:commands 0 :request :universe]))))))
 
+(deftest begin-selection-prefetch-enriches-queued-instrument-from-discovery-test
+  (let [state (assoc-in
+               (prefetch-state)
+               [:portfolio :optimizer :history-discovery]
+               {:status :partial
+                :backend-id-by-local-id {"perp:BTC" "hl:perp:BTC"}
+                :instruments-by-backend-id
+                {"hl:perp:BTC" {:instrument-id "hl:perp:BTC"
+                                :display-symbol "BTC"
+                                :instrument-kind :hl-perp
+                                :history {:status :available
+                                          :quality-status :passed}}}})
+        result (workflow/begin-selection-prefetch
+                {:state state
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}
+                 :now-ms 1000})
+        request-instrument (get-in result [:commands 0 :request :universe 0])]
+    (is (= "perp:BTC" (:instrument-id request-instrument)))
+    (is (= "hl:perp:BTC"
+           (:optimizer-history/instrument-id request-instrument)))
+    (is (= :hl-perp
+           (:optimizer-history/instrument-kind request-instrument)))))
+
 (deftest complete-selection-prefetch-failure-continues-with-next-queued-instrument-test
   (let [started (workflow/begin-selection-prefetch
                  {:state (prefetch-state)
@@ -109,3 +134,51 @@
     (is (= {"SOL" [{:time 1000 :close "20"}]}
            (get-in result
                    [:state :portfolio :optimizer :history-data :candle-history-by-coin])))))
+
+(deftest complete-selection-prefetch-success-merges-api-v2-history-by-local-id-test
+  (let [started (workflow/begin-selection-prefetch
+                 {:state (prefetch-state)
+                  :opts {:source :selection-prefetch
+                         :queue? true
+                         :merge? true}
+                  :now-ms 1000})
+        signature (get-in started
+                          [:state
+                           :portfolio
+                           :optimizer
+                           :history-load-state
+                           :request-signature])
+        result (workflow/complete-selection-prefetch
+                {:state (:state started)
+                 :instrument-id "perp:BTC"
+                 :request-signature signature
+                 :completed-at-ms 1100
+                 :bundle {:api-v2-history
+                          {:status :ok
+                           :series-by-instrument
+                           {"perp:BTC" {:local-instrument-id "perp:BTC"
+                                        :instrument-id "hl:perp:BTC"
+                                        :lineage-kind :native
+                                        :points [{:time-ms 1000
+                                                  :close 100
+                                                  :return nil}
+                                                 {:time-ms 2000
+                                                  :close 110
+                                                  :return 0.1}]}}
+                           :warnings []}
+                          :warnings []}
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}})]
+    (is (= "hl:perp:BTC"
+           (get-in result
+                   [:state
+                    :portfolio
+                    :optimizer
+                    :history-data
+                    :api-v2-history
+                    :series-by-instrument
+                    "perp:BTC"
+                    :instrument-id])))
+    (is (= "perp:ETH"
+           (get-in result [:state :portfolio :optimizer :history-prefetch :active-instrument-id])))))

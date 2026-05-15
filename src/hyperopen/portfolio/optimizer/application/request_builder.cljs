@@ -267,6 +267,7 @@
         constraints (normalize-constraints (:constraints draft*))
         history (history-loader/align-history-inputs
                  {:universe requested-universe
+                  :api-v2-history (:api-v2-history history-data)
                   :candle-history-by-coin (:candle-history-by-coin history-data)
                   :funding-history-by-coin (:funding-history-by-coin history-data)
                   :vault-details-by-address (:vault-details-by-address history-data)

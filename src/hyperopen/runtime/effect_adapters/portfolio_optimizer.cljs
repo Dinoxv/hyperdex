@@ -2,6 +2,12 @@
   (:require [nexus.registry :as nxr]
             [hyperopen.api.default :as api]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.config :as app-config]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client :as history-api-v2-client]
             [hyperopen.portfolio.optimizer.infrastructure.history-client :as history-client]
             [hyperopen.portfolio.optimizer.infrastructure.persistence :as persistence]
             [hyperopen.portfolio.optimizer.infrastructure.run-bridge :as run-bridge]
@@ -16,6 +22,15 @@
 (def ^:dynamic *request-candle-snapshot!* api/request-candle-snapshot!)
 (def ^:dynamic *request-market-funding-history!* api/request-market-funding-history!)
 (def ^:dynamic *request-vault-details!* api/request-vault-details!)
+(def ^:dynamic *optimizer-history-api-config*
+  (:optimizer-history-api app-config/config))
+(def ^:dynamic *optimizer-history-api-fetch* js/fetch)
+(def ^:dynamic *optimizer-history-api-request-id*
+  (fn []
+    (str "optimizer-history-"
+         (.now js/Date)
+         "-"
+         (js/Math.floor (* 1000000000 (js/Math.random))))))
 (def ^:dynamic *load-scenario-index!* persistence/load-scenario-index!)
 (def ^:dynamic *load-scenario!* persistence/load-scenario!)
 (def ^:dynamic *save-scenario!* persistence/save-scenario!)
@@ -26,6 +41,47 @@
 (def ^:dynamic *now-ms* #(.now js/Date))
 (def ^:dynamic *submit-order!* trading-api/submit-order!)
 (def ^:dynamic *dispatch!* nxr/dispatch)
+
+(defn- override-bool
+  [m key-a key-b fallback]
+  (let [value (if (contains? m key-a)
+                (get m key-a)
+                (get m key-b))]
+    (if (boolean? value)
+      value
+      fallback)))
+
+(defn- optimizer-history-api-browser-override
+  []
+  (when-let [raw (aget js/globalThis "__HYPEROPEN_OPTIMIZER_HISTORY_API__")]
+    (let [m (js->clj raw :keywordize-keys true)]
+      (cond-> {}
+        (or (contains? m :enabled?) (contains? m :enabled))
+        (assoc :enabled? (override-bool m :enabled? :enabled false))
+        (or (:base-url m) (:baseUrl m))
+        (assoc :base-url (or (:base-url m) (:baseUrl m)))
+        (or (:proxy-policy m) (:proxyPolicy m))
+        (assoc :proxy-policy (coercion/normalize-keyword-like
+                              (or (:proxy-policy m) (:proxyPolicy m))))
+        (or (contains? m :include-aligned-returns?)
+            (contains? m :includeAlignedReturns))
+        (assoc :include-aligned-returns?
+               (override-bool m
+                              :include-aligned-returns?
+                              :includeAlignedReturns
+                              true))
+        (or (contains? m :fallback-to-legacy?)
+            (contains? m :fallbackToLegacy))
+        (assoc :fallback-to-legacy?
+               (override-bool m
+                              :fallback-to-legacy?
+                              :fallbackToLegacy
+                              true))))))
+
+(defn- optimizer-history-api-config
+  []
+  (merge *optimizer-history-api-config*
+         (optimizer-history-api-browser-override)))
 
 (defn- request-candle-snapshot!
   [coin opts]
@@ -40,7 +96,10 @@
    :request-history-bundle! *request-history-bundle!*
    :request-candle-snapshot! request-candle-snapshot!
    :request-market-funding-history! *request-market-funding-history!*
-   :request-vault-details! *request-vault-details!*})
+   :request-vault-details! *request-vault-details!*
+   :optimizer-history-api (optimizer-history-api-config)
+   :fetch-fn *optimizer-history-api-fetch*
+   :request-id *optimizer-history-api-request-id*})
 
 (defn- scenario-env
   []
@@ -113,6 +172,56 @@
     nil
     store
     opts)))
+
+(defn- discovery-loading-state
+  [request-id started-at-ms]
+  (assoc (optimizer-defaults/default-history-discovery-state)
+         :status :loading
+         :request-id request-id
+         :loaded-at-ms started-at-ms))
+
+(defn- discovery-failed-state
+  [current err completed-at-ms]
+  (assoc (merge (optimizer-defaults/default-history-discovery-state)
+                current)
+         :status :failed
+         :loaded-at-ms completed-at-ms
+         :error {:message (or (some-> err .-message)
+                              (str err))}))
+
+(defn- apply-discovery!
+  [store value]
+  (swap! store assoc-in contracts/history-discovery-path value)
+  value)
+
+(defn load-portfolio-optimizer-history-discovery-effect
+  [_ store]
+  (let [config (optimizer-history-api-config)
+        fetch-fn *optimizer-history-api-fetch*
+        request-id-fn *optimizer-history-api-request-id*
+        now-ms-fn *now-ms*]
+    (if-not (:enabled? config)
+      (js/Promise.resolve nil)
+      (let [request-id (request-id-fn)
+            started-at-ms (now-ms-fn)]
+        (apply-discovery! store (discovery-loading-state request-id started-at-ms))
+        (-> (history-api-v2-client/request-instruments!
+             {:fetch-fn fetch-fn
+              :base-url (:base-url config)
+              :request-id request-id})
+            (.then (fn [body]
+                     (let [discovery (assoc (history-api-v2/normalize-discovery body)
+                                            :loaded-at-ms (now-ms-fn)
+                                            :error nil)]
+                       (apply-discovery! store discovery)
+                       discovery)))
+            (.catch (fn [err]
+                      (apply-discovery!
+                       store
+                        (discovery-failed-state
+                         (get-in @store contracts/history-discovery-path)
+                         err
+                         (now-ms-fn))))))))))
 
 (defn- run-portfolio-optimizer-pipeline-effect*
   [controller-resolver _ store]

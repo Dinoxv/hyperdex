@@ -214,3 +214,109 @@
             "vault:missing" :missing
             "perp:short" :insufficient}
            (setup-readiness/history-status-by-instrument readiness)))))
+
+(deftest build-readiness-blocks-api-v2-missing-and-rejected-history-test
+  (let [readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft {:universe [{:instrument-id "perp:BTC"
+                                           :market-type :perp
+                                           :coin "BTC"
+                                           :name "Bitcoin"}
+                                          {:instrument-id "perp:BAD"
+                                           :market-type :perp
+                                           :coin "BAD"
+                                           :name "Bad Perp"}]}
+                       :history-data
+                       {:api-v2-history
+                        {:status :partial
+                         :common-calendar [1000 2000]
+                         :return-calendar [2000]
+                         :aligned-returns-by-instrument
+                         {"perp:BTC" {:returns [0.1]}}
+                         :series-by-instrument
+                         {"perp:BTC" {:local-instrument-id "perp:BTC"
+                                      :instrument-id "hl:perp:BTC"
+                                      :lineage-kind :native
+                                      :points [{:time-ms 1000
+                                                :close 100
+                                                :return nil}
+                                               {:time-ms 2000
+                                                :close 110
+                                                :return 0.1}]
+                                      :funding {:status :available
+                                                :annualized-carry 0}}
+                          "perp:BAD" {:local-instrument-id "perp:BAD"
+                                      :instrument-id "hl:perp:BAD"
+                                      :lineage-kind :rejected
+                                      :points []
+                                      :warnings [{:code :validation-failed
+                                                  :instrument-id "perp:BAD"}]}}}}}}}))]
+    (is (= :blocked (:status readiness)))
+    (is (= :incomplete-history (:reason readiness)))
+    (is (= ["perp:BAD"]
+           (mapv :instrument-id (:blocking-warnings readiness))))
+    (is (= "Bad Perp: backend validation rejected optimizer history."
+           (get-in readiness [:blocking-warnings 0 :message])))))
+
+(deftest build-readiness-keeps-api-v2-proxy-vault-and-funding-warnings-nonblocking-test
+  (let [vault-id "vault:0x1111111111111111111111111111111111111111"
+        readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft {:universe [{:instrument-id "perp:BTC"
+                                           :market-type :perp
+                                           :coin "BTC"
+                                           :name "Bitcoin"}
+                                          {:instrument-id vault-id
+                                           :market-type :vault
+                                           :coin vault-id
+                                           :vault-address "0x1111111111111111111111111111111111111111"
+                                           :name "Basis Vault"}]}
+                       :history-data
+                       {:api-v2-history
+                        {:status :partial
+                         :common-calendar [1000 2000]
+                         :return-calendar [2000]
+                         :aligned-returns-by-instrument
+                         {"perp:BTC" {:returns [0.1]}
+                          vault-id {:returns [0.02]}}
+                         :series-by-instrument
+                         {"perp:BTC" {:local-instrument-id "perp:BTC"
+                                      :instrument-id "hl:perp:BTC"
+                                      :lineage-kind :stitched-native-proxy
+                                      :points [{:time-ms 1000
+                                                :close 100
+                                                :return nil}
+                                               {:time-ms 2000
+                                                :close 110
+                                                :return 0.1}]
+                                      :funding {:status :missing}
+                                      :warnings [{:code :proxy-history-used
+                                                  :instrument-id "perp:BTC"}
+                                                 {:code :funding-history-missing
+                                                  :instrument-id "perp:BTC"}]}
+                          vault-id {:local-instrument-id vault-id
+                                    :instrument-id "hl:vault:basis"
+                                    :lineage-kind :vault-derived
+                                    :series-kind :return-index
+                                    :points [{:time-ms 1000
+                                              :close 100
+                                              :return nil}
+                                             {:time-ms 2000
+                                              :close 102
+                                              :return 0.02}]
+                                    :funding {:status :not-applicable}
+                                    :warnings [{:code :vault-derived-history-used
+                                                :instrument-id vault-id}]}}}}}}}))]
+    (is (= :ready (:status readiness)))
+    (is (= true (:runnable? readiness)))
+    (is (= #{:proxy-history-used
+             :funding-history-missing
+             :vault-derived-history-used}
+           (set (map :code (:warnings readiness)))))
+    (is (= {"perp:BTC" :aligned
+            vault-id :aligned}
+           (setup-readiness/history-status-by-instrument readiness)))))

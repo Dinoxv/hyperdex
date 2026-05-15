@@ -17,4 +17,10 @@
     (is (= 1200 (get-in cfg [:startup :deferred-bootstrap-delay-ms])))
     (is (= 120 (get-in cfg [:startup :per-dex-stagger-ms])))
     (is (= 5000 (get-in cfg [:startup :startup-summary-delay-ms])))
+    (is (= {:enabled? true
+            :base-url "https://price-history.hyperopen.xyz"
+            :proxy-policy :native-only
+            :include-aligned-returns? true
+            :fallback-to-legacy? true}
+           (:optimizer-history-api cfg)))
     (is (= 50 (get-in cfg [:diagnostics :timeline-limit])))))

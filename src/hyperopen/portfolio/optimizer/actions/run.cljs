@@ -83,6 +83,13 @@
     []
     [[:effects/fetch-asset-selector-markets {:phase :full}]]))
 
+(defn- history-discovery-effects
+  [route]
+  (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
+                 (:kind route))
+    [[:effects/load-portfolio-optimizer-history-discovery]]
+    []))
+
 (defn load-portfolio-optimizer-route
   [state path]
   (let [route (portfolio-routes/parse-portfolio-route path)]
@@ -94,8 +101,9 @@
        [])
       (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
                     (:kind route))
-       (into (asset-selector-market-fetch-effects state)
-             (action-common/vault-list-metadata-fetch-effects state))
+       (into (history-discovery-effects route)
+             (into (asset-selector-market-fetch-effects state)
+                   (action-common/vault-list-metadata-fetch-effects state)))
        []))))
 
 (defn archive-portfolio-optimizer-scenario

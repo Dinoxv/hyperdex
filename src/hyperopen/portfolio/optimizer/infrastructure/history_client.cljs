@@ -1,5 +1,7 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.history-client
-  (:require [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]))
+  (:require [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as api-v2]
+            [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client :as history-api-v2-client]))
 
 (defn- promise-all
   [promises]
@@ -70,7 +72,7 @@
                                   total
                                   request)])
 
-(defn request-history-bundle!
+(defn- request-legacy-history-bundle!
   [{:keys [request-candle-snapshot!
            request-market-funding-history!
            request-vault-details!
@@ -108,5 +110,53 @@
                    {:candle-history-by-coin candle-history-by-coin
                     :funding-history-by-coin funding-history-by-coin
                     :vault-details-by-address vault-details-by-address
-                    :warnings (:warnings plan)
+                   :warnings (:warnings plan)
                     :request-plan plan}))))))
+
+(defn- fallback-warning
+  [err]
+  (let [message (some-> err .-message)
+        status (aget err "status")
+        request-id (aget err "requestId")
+        contract-version (aget err "contractVersion")]
+    (cond-> {:code :optimizer-history-api-fallback
+             :message "Optimizer history API failed; legacy history loader was used."}
+      message (assoc :error-message message)
+      status (assoc :status status)
+      request-id (assoc :request-id request-id)
+      contract-version (assoc :contract-version contract-version))))
+
+(defn- with-fallback-warning
+  [bundle err]
+  (update bundle :warnings
+          #(vec (cons (fallback-warning err)
+                      (or % [])))))
+
+(defn- request-api-v2-history-bundle!
+  [{:keys [optimizer-history-api
+           fetch-fn
+           request-id]
+    :as deps}
+   request]
+  (-> (history-api-v2-client/request-history-bundle!
+       {:fetch-fn fetch-fn
+        :base-url (:base-url optimizer-history-api)
+        :request-id request-id
+        :proxy-policy (:proxy-policy optimizer-history-api)
+        :include-aligned-returns? (:include-aligned-returns? optimizer-history-api)}
+       request)
+      (.then (fn [body]
+               (let [normalized (api-v2/normalize-history-bundle request body)]
+                 {:api-v2-history normalized
+                  :warnings (:warnings normalized)})))
+      (.catch (fn [err]
+                (if (:fallback-to-legacy? optimizer-history-api)
+                  (-> (request-legacy-history-bundle! deps request)
+                      (.then #(with-fallback-warning % err)))
+                  (js/Promise.reject err))))))
+
+(defn request-history-bundle!
+  [{:keys [optimizer-history-api] :as deps} request]
+  (if (:enabled? optimizer-history-api)
+    (request-api-v2-history-bundle! deps request)
+    (request-legacy-history-bundle! deps request)))

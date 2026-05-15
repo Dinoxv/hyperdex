@@ -70,6 +70,10 @@
          contracts/last-successful-run-result-path))
   (is (= [:portfolio :optimizer :history-load-state :request-signature]
          contracts/history-load-state-request-signature-path))
+  (is (= [:portfolio :optimizer :history-discovery]
+         contracts/history-discovery-path))
+  (is (= contracts/history-discovery-path
+         (contracts/contract-path :optimizer/history-discovery)))
   (is (= [:portfolio :optimizer :execution-modal :error]
          contracts/execution-modal-error-path))
   (is (= [:portfolio :optimizer :tracking]

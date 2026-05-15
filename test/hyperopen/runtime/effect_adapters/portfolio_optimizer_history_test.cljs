@@ -63,6 +63,107 @@
                        (done)))
               (.catch (async-support/unexpected-error done))))))))
 
+(deftest load-portfolio-optimizer-history-effect-passes-api-v2-deps-through-test
+  (async done
+    (let [captured (atom nil)
+          api-config {:enabled? true
+                      :base-url "https://history.test"
+                      :proxy-policy :native-only
+                      :include-aligned-returns? true
+                      :fallback-to-legacy? false}
+          fetch-fn (fn [& _] nil)
+          store (atom {:portfolio {:optimizer
+                                    {:draft {:universe [{:instrument-id "perp:BTC"
+                                                         :market-type :perp
+                                                         :coin "BTC"
+                                                         :optimizer-history/instrument-id "hl:perp:BTC"}]}
+                                     :runtime {:as-of-ms 3000}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*optimizer-history-api-config*
+                    api-config
+                    portfolio-optimizer-adapters/*optimizer-history-api-fetch*
+                    fetch-fn
+                    portfolio-optimizer-adapters/*optimizer-history-api-request-id*
+                    (fn [] "rid-runtime")
+                    portfolio-optimizer-adapters/*request-history-bundle!*
+                    (fn [deps _request]
+                      (reset! captured deps)
+                      (js/Promise.resolve
+                       {:api-v2-history {:status :ok
+                                         :series-by-instrument {}}
+                        :warnings []}))
+                    portfolio-optimizer-adapters/*now-ms* (fn [] 12345)]
+        (-> (portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect
+             nil
+             store
+             {:bars 90})
+            (.then
+             (fn [_]
+               (is (= api-config (:optimizer-history-api @captured)))
+               (is (identical? fetch-fn (:fetch-fn @captured)))
+               (is (= "rid-runtime" ((:request-id @captured))))
+               (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(defn- discovery-response
+  [payload]
+  #js {:ok true
+       :status 200
+       :json (fn []
+               (js/Promise.resolve (clj->js payload)))})
+
+(deftest load-portfolio-optimizer-history-discovery-effect-populates-optimizer-state-test
+  (async done
+    (let [calls (atom [])
+          store (atom {:portfolio {:optimizer {:history-discovery {:status :idle}}}})
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url (js->clj init)])
+                     (js/Promise.resolve
+                      (discovery-response
+                       {:contract_version "optimizer-history-api-v2"
+                        :request_id "rid-discovery"
+                        :dataset_version "dv-1"
+                        :status "ok"
+                        :instruments [{:instrument_id "hl:perp:BTC"
+                                       :display_symbol "BTC"
+                                       :instrument_kind "hl_perp"
+                                       :aliases {:hyperopen_market_key "perp:BTC"}
+                                       :history {:status "available"
+                                                 :quality_status "passed"}}]
+                        :warnings []})))]
+      (with-redefs [portfolio-optimizer-adapters/*optimizer-history-api-config*
+                    {:enabled? true
+                     :base-url "https://history.test"}
+                    portfolio-optimizer-adapters/*optimizer-history-api-fetch*
+                    fetch-fn
+                    portfolio-optimizer-adapters/*optimizer-history-api-request-id*
+                    (fn [] "rid-discovery")
+                    portfolio-optimizer-adapters/*now-ms* (fn [] 5000)]
+        (-> (portfolio-optimizer-adapters/load-portfolio-optimizer-history-discovery-effect
+             nil
+             store)
+            (.then
+             (fn [discovery]
+               (is (= [["https://history.test/v1/optimizer/instruments"
+                        {"method" "GET"
+                         "headers" {"x-request-id" "rid-discovery"}}]]
+                      @calls))
+               (is (= :ok (:status discovery)))
+               (is (= "hl:perp:BTC"
+                      (get-in @store
+                              [:portfolio
+                               :optimizer
+                               :history-discovery
+                               :backend-id-by-local-id
+                               "perp:BTC"])))
+               (is (= 5000
+                      (get-in @store
+                              [:portfolio
+                               :optimizer
+                               :history-discovery
+                               :loaded-at-ms])))
+               (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest load-portfolio-optimizer-history-selection-prefetch-drains-queue-and-merges-test
   (async done
     (let [btc-instrument {:instrument-id "perp:BTC"
