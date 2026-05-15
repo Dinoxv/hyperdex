@@ -236,6 +236,9 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
     const payload = route.request().postDataJSON();
     v2Requests.push({ type: "history-bundle", payload });
     const requestedIds = payload.instruments.map((instrument) => instrument.client_instrument_id);
+    const responseKey = (instrumentId) => (
+      instrumentId === "perp:BTC" ? seriesDefinitions[instrumentId].instrument_id : instrumentId
+    );
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -247,10 +250,10 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
         common_calendar: [1000, 2000, 3000],
         return_calendar: [2000, 3000],
         aligned_returns_by_instrument: Object.fromEntries(
-          requestedIds.map((instrumentId) => [instrumentId, returnDefinitions[instrumentId]])
+          requestedIds.map((instrumentId) => [responseKey(instrumentId), returnDefinitions[instrumentId]])
         ),
         series_by_instrument: Object.fromEntries(
-          requestedIds.map((instrumentId) => [instrumentId, seriesDefinitions[instrumentId]])
+          requestedIds.map((instrumentId) => [responseKey(instrumentId), seriesDefinitions[instrumentId]])
         ),
         warnings: []
       })

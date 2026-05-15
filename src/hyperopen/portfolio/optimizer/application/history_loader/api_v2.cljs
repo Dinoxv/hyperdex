@@ -248,6 +248,48 @@
     (cond-> entry*
       (:returns entry*) (update :returns #(mapv parse-number %)))))
 
+(defn- local-id-by-backend-id
+  [universe]
+  (into {}
+        (keep (fn [instrument]
+                (let [local-id (instruments/normalize-instrument-id instrument)
+                      backend-id (non-blank-text
+                                  (:optimizer-history/instrument-id instrument))]
+                  (when (and local-id backend-id)
+                    [backend-id local-id]))))
+        (or universe [])))
+
+(defn- canonical-response-id
+  [local-id-by-backend raw-id entry]
+  (or (get local-id-by-backend raw-id)
+      (get local-id-by-backend (:instrument-id entry))
+      raw-id))
+
+(defn- normalize-series-by-instrument
+  [raw-series universe]
+  (let [local-id-by-backend (local-id-by-backend-id universe)]
+    (into {}
+          (map (fn [[raw-id series]]
+                 (let [raw-id* (keyed-map-id raw-id)
+                       series* (normalize-series raw-id* series)
+                       local-id (canonical-response-id local-id-by-backend
+                                                       raw-id*
+                                                       series*)]
+                   [local-id
+                    (assoc series* :local-instrument-id local-id)])))
+          (or raw-series {}))))
+
+(defn- normalize-aligned-returns-by-instrument
+  [raw-aligned-returns universe]
+  (let [local-id-by-backend (local-id-by-backend-id universe)]
+    (into {}
+          (map (fn [[raw-id entry]]
+                 (let [raw-id* (keyed-map-id raw-id)
+                       entry* (aligned-entry entry)]
+                   [(canonical-response-id local-id-by-backend raw-id* entry*)
+                    entry*])))
+          (or raw-aligned-returns {}))))
+
 (defn- identity-ambiguous-warnings
   [universe]
   (into []
@@ -262,7 +304,9 @@
         (or universe [])))
 
 (defn normalize-history-body
-  [api-body]
+  ([api-body]
+   (normalize-history-body nil api-body))
+  ([request api-body]
   (let [body (normalize-api-map (apply dissoc api-body history-keyed-fields))
         raw-series (keyed-map-field api-body
                                     "series_by_instrument"
@@ -270,17 +314,12 @@
         raw-aligned-returns (keyed-map-field api-body
                                              "aligned_returns_by_instrument"
                                              "aligned-returns-by-instrument")
-        series-by-instrument (into {}
-                                   (map (fn [[local-id series]]
-                                          (let [local-id* (keyed-map-id local-id)]
-                                            [local-id*
-                                             (normalize-series local-id* series)])))
-                                   (or raw-series {}))
-        aligned-returns-by-instrument (into {}
-                                            (map (fn [[local-id entry]]
-                                                   [(keyed-map-id local-id)
-                                                    (aligned-entry entry)]))
-                                            (or raw-aligned-returns {}))]
+        universe (:universe request)
+        series-by-instrument (normalize-series-by-instrument raw-series
+                                                             universe)
+        aligned-returns-by-instrument (normalize-aligned-returns-by-instrument
+                                       raw-aligned-returns
+                                       universe)]
     {:contract-version (:contract-version body)
      :request-id (:request-id body)
      :dataset-version (:dataset-version body)
@@ -291,11 +330,11 @@
      :return-calendar (mapv parse-ms (or (:return-calendar body) []))
      :aligned-returns-by-instrument aligned-returns-by-instrument
      :series-by-instrument series-by-instrument
-     :warnings (normalize-warnings (:warnings body))}))
+     :warnings (normalize-warnings (:warnings body))})))
 
 (defn normalize-history-bundle
   [request api-body]
-  (update (normalize-history-body api-body)
+  (update (normalize-history-body request api-body)
           :warnings
           #(vec (concat (or % [])
                         (identity-ambiguous-warnings (:universe request))))))
