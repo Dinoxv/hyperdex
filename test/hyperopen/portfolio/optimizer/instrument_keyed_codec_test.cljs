@@ -26,6 +26,8 @@
                      :payload {:future-result
                                {:weights-by-instrument {btc 0.4
                                                        purr 0.6}
+                                :labels-by-instrument {btc "BTC"
+                                                       purr "PURR"}
                                 :nested [{:target-weights-by-instrument
                                           {btc 0.5}}]}}
                      :diagnostics {:custom
@@ -36,6 +38,9 @@
     (is (= {"perp:BTC" 0.4
             "spot:PURR/USDC" 0.6}
            (get-in normalized [:payload :future-result :weights-by-instrument])))
+    (is (= {"perp:BTC" "BTC"
+            "spot:PURR/USDC" "PURR"}
+           (get-in normalized [:payload :future-result :labels-by-instrument])))
     (is (= {"perp:BTC" 0.5}
            (get-in normalized
                    [:payload :future-result :nested 0 :target-weights-by-instrument])))

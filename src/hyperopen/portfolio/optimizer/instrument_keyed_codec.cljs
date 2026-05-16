@@ -35,7 +35,8 @@
     :expected-returns-by-instrument
     :current-weights-by-instrument
     :target-weights-by-instrument
-    :weight-sensitivity-by-instrument})
+    :weight-sensitivity-by-instrument
+    :labels-by-instrument})
 
 ;; Compatibility only. Normalization is key-driven and does not depend on this
 ;; list when new request or result payloads add another nesting level.
