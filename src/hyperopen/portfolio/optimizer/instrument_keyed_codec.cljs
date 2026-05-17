@@ -24,6 +24,10 @@
   #{:by-instrument
     :return-series-by-instrument
     :price-series-by-instrument
+    :raw-price-series-by-instrument
+    :cadence-by-instrument
+    :expected-return-series-by-instrument
+    :expected-return-intervals-by-instrument
     :funding-by-instrument
     :weights-by-instrument
     :per-asset-overrides
@@ -36,6 +40,7 @@
     :current-weights-by-instrument
     :target-weights-by-instrument
     :weight-sensitivity-by-instrument
+    :pair-metadata
     :labels-by-instrument})
 
 ;; Compatibility only. Normalization is key-driven and does not depend on this
@@ -44,6 +49,10 @@
   [[:current-portfolio :by-instrument]
    [:history :return-series-by-instrument]
    [:history :price-series-by-instrument]
+   [:history :raw-price-series-by-instrument]
+   [:history :cadence-by-instrument]
+   [:history :expected-return-series-by-instrument]
+   [:history :expected-return-intervals-by-instrument]
    [:history :funding-by-instrument]
    [:black-litterman-prior :weights-by-instrument]
    [:constraints :per-asset-overrides]
@@ -56,11 +65,13 @@
    [:payload :current-weights-by-instrument]
    [:payload :target-weights-by-instrument]
    [:payload :diagnostics :weight-sensitivity-by-instrument]
+   [:payload :diagnostics :pair-metadata]
    [:return-decomposition-by-instrument]
    [:expected-returns-by-instrument]
    [:current-weights-by-instrument]
    [:target-weights-by-instrument]
-   [:diagnostics :weight-sensitivity-by-instrument]])
+   [:diagnostics :weight-sensitivity-by-instrument]
+   [:diagnostics :pair-metadata]])
 
 (defn- keyword-value
   [value]

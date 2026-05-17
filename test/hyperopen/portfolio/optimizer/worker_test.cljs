@@ -125,6 +125,16 @@
                    :history {:return-series-by-instrument {decoded-id [0.01 0.02]}
                              :price-series-by-instrument {decoded-id [{:close 100}
                                                                       {:close 101}]}
+                             :raw-price-series-by-instrument {decoded-id [{:time-ms 1000
+                                                                           :close 100}
+                                                                          {:time-ms 2000
+                                                                           :close 101}]}
+                             :cadence-by-instrument {decoded-id {:kind :dense
+                                                                 :sparse? false}}
+                             :expected-return-series-by-instrument {decoded-id [0.01]}
+                             :expected-return-intervals-by-instrument {decoded-id [{:start-ms 1000
+                                                                                    :end-ms 2000
+                                                                                    :dt-years 0.01}]}
                              :funding-by-instrument {decoded-id {:annualized-carry 0.01}}}
                    :black-litterman-prior {:weights-by-instrument {decoded-id 1}}
                    :constraints {:per-asset-overrides {decoded-id {:max-weight 0.5}}
@@ -143,6 +153,20 @@
                             (get-in @captured [:current-portfolio :by-instrument])))
                      (is (= {"perp:BTC" [0.01 0.02]}
                             (get-in @captured [:history :return-series-by-instrument])))
+                     (is (= {"perp:BTC" [{:time-ms 1000
+                                           :close 100}
+                                          {:time-ms 2000
+                                           :close 101}]}
+                            (get-in @captured [:history :raw-price-series-by-instrument])))
+                     (is (= {"perp:BTC" {:kind :dense
+                                          :sparse? false}}
+                            (get-in @captured [:history :cadence-by-instrument])))
+                     (is (= {"perp:BTC" [0.01]}
+                            (get-in @captured [:history :expected-return-series-by-instrument])))
+                     (is (= {"perp:BTC" [{:start-ms 1000
+                                           :end-ms 2000
+                                           :dt-years 0.01}]}
+                            (get-in @captured [:history :expected-return-intervals-by-instrument])))
                      (is (= {"perp:BTC" {:annualized-carry 0.01}}
                             (get-in @captured [:history :funding-by-instrument])))
                      (is (= {"perp:BTC" 1}
