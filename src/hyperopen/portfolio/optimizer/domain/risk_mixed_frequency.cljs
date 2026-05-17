@@ -63,8 +63,7 @@
                      :interval-count (:interval-count cadence)
                      :elapsed-days (:elapsed-days cadence)
                      :policy :pairwise-interval-aggregation
-                     :message (str instrument-id
-                                   ": sparse history uses mixed-frequency covariance with "
+                     :message (str "sparse history uses mixed-frequency covariance with "
                                    (:interval-count cadence)
                                    " intervals across "
                                    (js/Math.round (or (:elapsed-days cadence) 0))
@@ -223,6 +222,7 @@
   {:code :insufficient-pairwise-history
    :left-instrument-id left-id
    :right-instrument-id right-id
+   :instrument-ids [left-id right-id]
    :observations observations
    :required 2
    :message (str left-id " / " right-id

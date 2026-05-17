@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-diagnostics-rail
-  (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]))
 
@@ -21,13 +22,78 @@
          " / Down " (opt-format/format-pct (:down-expected-return row))
          " / Up " (opt-format/format-pct (:up-expected-return row)))]])
 
-(defn warning-row
+(defn- replace-all-text
+  [text needle replacement]
+  (let [needle* (str needle)
+        replacement* (str replacement)]
+    (if (or (not (string? text))
+            (empty? needle*)
+            (= needle* replacement*))
+      text
+      (loop [remaining text
+             out ""]
+        (if-let [idx (str/index-of remaining needle*)]
+          (recur (subs remaining (+ idx (count needle*)))
+                 (str out (subs remaining 0 idx) replacement*))
+          (str out remaining))))))
+
+(defn- warning-instrument-ids
   [warning]
+  (vec (distinct (concat (keep warning
+                               [:instrument-id
+                                :left-instrument-id
+                                :right-instrument-id
+                                :comparator-instrument-id
+                                :long-instrument-id
+                                :short-instrument-id])
+                         (:instrument-ids warning)))))
+
+(defn- warning-label
+  [labels-by-instrument warning instrument-id]
+  (or (when (= instrument-id (:instrument-id warning))
+        (:instrument-label warning))
+      (results-model/instrument-label labels-by-instrument instrument-id)))
+
+(defn- human-warning-label
+  [instrument-id label]
+  (when (and (string? label)
+             (seq label)
+             (not= label (str instrument-id)))
+    label))
+
+(defn- warning-primary-label
+  [labels-by-instrument warning]
+  (when-let [instrument-id (:instrument-id warning)]
+    (human-warning-label instrument-id
+                         (warning-label labels-by-instrument warning instrument-id))))
+
+(defn- prepend-warning-label
+  [message label]
+  (if (and (string? message)
+           (seq label)
+           (not (str/includes? message label)))
+    (str label ": " message)
+    message))
+
+(defn- warning-message
+  [labels-by-instrument warning]
+  (let [message (reduce (fn [message instrument-id]
+                          (replace-all-text message
+                                            instrument-id
+                                            (warning-label labels-by-instrument
+                                                           warning
+                                                           instrument-id)))
+                        (:message warning)
+                        (warning-instrument-ids warning))]
+    (prepend-warning-label message (warning-primary-label labels-by-instrument warning))))
+
+(defn warning-row
+  [labels-by-instrument warning]
   [:p {:class ["rounded-md" "border" "border-warning/40" "bg-warning/10" "p-2" "text-xs" "text-warning"]
        :data-role "portfolio-optimizer-result-warning"}
    [:span {:class ["font-semibold"]} (opt-format/keyword-label (:code warning))]
-   (when-let [message (:message warning)]
-     [:span {:class ["ml-2"]} message])])
+   (when-let [message (warning-message labels-by-instrument warning)]
+     [:span {:class ["ml-2"]} (str " " message)])])
 
 (defn warnings-panel
   [result]
@@ -36,7 +102,7 @@
      "portfolio-optimizer-result-warnings"
      "Result Warnings"
      "Warnings explain assumptions or mathematically valid outcomes that may require a rerun with different controls."
-     (map warning-row (:warnings result)))))
+     (map (partial warning-row (:labels-by-instrument result)) (:warnings result)))))
 
 (defn diagnostics-panel
   [result]
@@ -159,7 +225,8 @@
          [:p {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-warning"]}
           "Warnings"]
          (into [:div {:class ["mt-2" "space-y-2"]}]
-               (map warning-row (:warnings result)))])
+               (map (partial warning-row (:labels-by-instrument result))
+                    (:warnings result)))])
       [:details {:class ["border-b" "border-base-300"]}
        [:summary {:class ["cursor-pointer" "px-4" "py-3" "font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "More Diagnostics"]

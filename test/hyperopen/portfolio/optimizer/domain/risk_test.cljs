@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.risk-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.string :as str]
             [hyperopen.portfolio.optimizer.domain.risk :as risk]))
 
 (def day-ms
@@ -221,7 +222,8 @@
     (is (not= :not-positive-semidefinite (:status conditioning)))
     (is (some #(and (= :sparse-history-risk-estimation (:code %))
                     (= vault-id (:instrument-id %))
-                    (= 2 (:interval-count %)))
+                    (= 2 (:interval-count %))
+                    (not (str/includes? (:message %) vault-id)))
               (:warnings result)))))
 
 (deftest mixed-frequency-risk-applies-final-diagonal-shrink-when-requested-test

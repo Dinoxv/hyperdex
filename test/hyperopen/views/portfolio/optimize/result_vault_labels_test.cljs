@@ -76,7 +76,17 @@
                 :expected-return 0.12
                 :volatility 0.24
                 :sharpe 0.5
-                :weights [0.5 0.5]}]}))
+                :weights [0.5 0.5]}]
+    :warnings [{:code :sparse-history-risk-estimation
+                :instrument-id vault-id
+                :message (str vault-id
+                              ": sparse history uses mixed-frequency covariance.")}
+               {:code :insufficient-pairwise-history
+                :left-instrument-id "perp:BTC"
+                :right-instrument-id vault-id
+                :instrument-ids ["perp:BTC" vault-id]
+                :message (str "perp:BTC / " vault-id
+                              ": mixed-frequency covariance only had 1 shared interval; 2 required.")}]}))
 
 (deftest results-panel-renders-vault-result-labels-by-name-test
   (let [vault-address "0x1e37a337ed460039d1b15bd3bc489de789768d5e"

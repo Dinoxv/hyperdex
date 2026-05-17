@@ -15,6 +15,7 @@
 ## Usability and Interaction Baseline (MUST)
 - MUST provide timely status feedback for user actions (pending, success, failure).
 - MUST use user-facing language and avoid internal jargon in UI copy.
+- MUST render instruments and vaults with human-readable labels in user-facing copy; raw instrument IDs, vault addresses, and backend IDs are metadata unless the user explicitly asks for them.
 - MUST provide clear cancel or undo paths for recoverable/destructive actions where feasible.
 - MUST keep component behavior and terminology consistent across views.
 - MUST prevent errors before submit with constraints, sensible defaults, and inline validation.

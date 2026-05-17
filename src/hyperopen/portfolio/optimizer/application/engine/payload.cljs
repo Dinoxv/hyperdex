@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.engine.payload
-  (:require [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
             [hyperopen.portfolio.optimizer.application.engine.target-selection :as target-selection]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.domain.diagnostics :as diagnostics]
@@ -92,7 +93,88 @@
 
 (defn- labels-by-instrument
   [request instrument-ids]
-  (instrument-labels/labels-by-instrument (:universe request) instrument-ids))
+  (instrument-labels/labels-by-instrument (vec (concat (:universe request)
+                                                       (:requested-universe request)))
+                                          instrument-ids))
+
+(defn- replace-all-text
+  [text needle replacement]
+  (let [needle* (str needle)
+        replacement* (str replacement)]
+    (if (or (not (string? text))
+            (empty? needle*)
+            (= needle* replacement*))
+      text
+      (loop [remaining text
+             out ""]
+        (if-let [idx (str/index-of remaining needle*)]
+          (recur (subs remaining (+ idx (count needle*)))
+                 (str out (subs remaining 0 idx) replacement*))
+          (str out remaining))))))
+
+(defn- warning-instrument-ids
+  [warning]
+  (vec (distinct (concat (keep warning
+                               [:instrument-id
+                                :left-instrument-id
+                                :right-instrument-id
+                                :comparator-instrument-id
+                                :long-instrument-id
+                                :short-instrument-id])
+                         (:instrument-ids warning)))))
+
+(defn- warning-label-pairs
+  [labels-by-instrument warning]
+  (keep (fn [instrument-id]
+          (when-let [label (get labels-by-instrument instrument-id)]
+            [instrument-id label]))
+        (warning-instrument-ids warning)))
+
+(defn- human-warning-label
+  [instrument-id label]
+  (when (and (string? label)
+             (seq label)
+             (not= label (str instrument-id)))
+    label))
+
+(defn- prepend-warning-label
+  [message label]
+  (if (and (string? message)
+           (seq label)
+           (not (str/includes? message label)))
+    (str label ": " message)
+    message))
+
+(defn- user-facing-warning
+  [labels-by-instrument warning]
+  (let [label-pairs (vec (warning-label-pairs labels-by-instrument warning))
+        primary-label (when-let [instrument-id (:instrument-id warning)]
+                        (human-warning-label instrument-id
+                                             (get labels-by-instrument instrument-id)))
+        warning* (if (:message warning)
+                   (reduce (fn [acc [instrument-id label]]
+                             (update acc :message replace-all-text instrument-id label))
+                           warning
+                           label-pairs)
+                   warning)]
+    (cond-> warning*
+      (and primary-label (:message warning*))
+      (update :message prepend-warning-label primary-label)
+
+      primary-label
+      (assoc :instrument-label primary-label)
+
+      (and (seq (:instrument-ids warning)) (seq label-pairs))
+      (assoc :instrument-labels (mapv second label-pairs)))))
+
+(defn- user-facing-warnings
+  [labels-by-instrument warnings]
+  (mapv (partial user-facing-warning labels-by-instrument) warnings))
+
+(defn- request-instrument-ids
+  [request]
+  (vec (distinct (concat (keep :instrument-id (:universe request))
+                         (keep :instrument-id (:requested-universe request))))))
 
 (defn- sharpe-summary
   [expected-return volatility]
@@ -174,13 +256,24 @@
                                                           (:covariance risk-result)))
         expected-return (math/portfolio-return target-weights expected-returns)
         volatility (sqrt (math/portfolio-variance target-weights (:covariance risk-result)))
-        labels-by-instrument* (labels-by-instrument request instrument-ids)
+        labels-by-instrument* (labels-by-instrument
+                               request
+                               (vec (distinct (concat instrument-ids
+                                                      (request-instrument-ids request)))))
         overlay-payload (frontier-overlays/overlay-series
                          {:instrument-ids instrument-ids
                           :target-weights target-weights
                           :expected-returns expected-returns
                           :covariance (:covariance risk-result)
-                          :labels-by-instrument labels-by-instrument*})]
+                          :labels-by-instrument labels-by-instrument*})
+        warnings* (user-facing-warnings
+                   labels-by-instrument*
+                   (vec (concat (:warnings request)
+                                (:warnings risk-result)
+                                (:warnings return-result)
+                                (:warnings default-frontier)
+                                (when cash-warning [cash-warning])
+                                (when sparse-warning [sparse-warning]))))]
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)
@@ -221,12 +314,7 @@
      :pair-metadata (:pair-metadata risk-result)
      :return-decomposition-by-instrument (:decomposition-by-instrument return-result)
      :black-litterman-diagnostics (:diagnostics return-result)
-     :warnings (vec (concat (:warnings request)
-                            (:warnings risk-result)
-                            (:warnings return-result)
-                            (:warnings default-frontier)
-                            (when cash-warning [cash-warning])
-                            (when sparse-warning [sparse-warning])))
+     :warnings warnings*
      :rebalance-preview (rebalance-preview request
                                            instrument-ids
                                            current-weights*
@@ -234,11 +322,18 @@
 
 (defn infeasible-payload
   [request risk-result return-result solver-plan]
-  (assoc solver-plan
-         :scenario-id (:scenario-id request)
-         :warnings (vec (concat (:warnings request)
+  (let [labels-by-instrument* (labels-by-instrument
+                               request
+                               (vec (distinct (concat (:instrument-ids risk-result)
+                                                      (request-instrument-ids request)))))
+        warnings* (user-facing-warnings
+                   labels-by-instrument*
+                   (vec (concat (:warnings request)
                                 (:warnings risk-result)
-                                (:warnings return-result)))))
+                                (:warnings return-result))))]
+    (assoc solver-plan
+           :scenario-id (:scenario-id request)
+           :warnings warnings*)))
 
 (defn result-from-solver-results
   [request
