@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.risk
-  (:require [hyperopen.portfolio.optimizer.domain.math :as math]))
+  (:require [hyperopen.portfolio.optimizer.domain.math :as math]
+            [hyperopen.portfolio.optimizer.domain.risk-mixed-frequency :as mixed-frequency]))
 
 (def default-periods-per-year
   365)
@@ -7,9 +8,16 @@
 (def default-shrinkage
   0.1)
 
+(def ^:private psd-epsilon
+  1e-8)
+
 (defn- sorted-instrument-ids
   [history]
-  (sort (keys (:return-series-by-instrument history))))
+  (->> [(keys (:return-series-by-instrument history))
+        (keys (:raw-price-series-by-instrument history))]
+       (apply concat)
+       set
+       sort))
 
 (defn- series-by-id
   [history instrument-ids]
@@ -42,6 +50,7 @@
     :ledoit-wolf :diagonal-shrink
     :diagonal-shrink :diagonal-shrink
     :sample-covariance :sample-covariance
+    :mixed-frequency :mixed-frequency
     kind))
 
 (defn- matrix->mutable-array
@@ -110,31 +119,6 @@
             (recur (inc sweep))
             (mutable-diagonal mutable)))))))
 
-(defn estimate-risk-model
-  [{:keys [risk-model periods-per-year history]}]
-  (let [risk-model* (or risk-model {:kind :diagonal-shrink})
-        model-kind (normalize-risk-model-kind (:kind risk-model*))
-        periods-per-year* (or periods-per-year default-periods-per-year)
-        instrument-ids (vec (sorted-instrument-ids history))
-        series (series-by-id history instrument-ids)
-        sample (covariance-matrix series periods-per-year*)
-        shrinkage (or (:shrinkage risk-model*) default-shrinkage)
-        covariance (case model-kind
-                     :diagonal-shrink (diagonal-shrink sample shrinkage)
-                     :sample-covariance sample
-                     sample)]
-    (cond-> {:model model-kind
-             :instrument-ids instrument-ids
-             :covariance covariance
-             :warnings (cond-> []
-                         (= :ledoit-wolf (:kind risk-model*))
-                         (conj {:code :risk-model-renamed
-                                :from :ledoit-wolf
-                                :to :diagonal-shrink}))}
-      (= :diagonal-shrink model-kind)
-      (assoc :shrinkage {:kind :diagonal
-                         :shrinkage shrinkage}))))
-
 (defn covariance-conditioning
   [covariance]
   (let [eigenvalues (filter math/finite-number? (symmetric-eigenvalues covariance))
@@ -156,3 +140,86 @@
                (> condition-number 1000000) :ill-conditioned
                (> condition-number 10000) :watch
                :else :ok)}))
+
+(defn- diagonal-load
+  [matrix amount]
+  (mapv (fn [row idx]
+          (update row idx #(+ (or % 0) amount)))
+        matrix
+        (range)))
+
+(defn- repair-psd
+  [covariance]
+  (let [conditioning (covariance-conditioning covariance)
+        min-eigenvalue (:min-eigenvalue conditioning)]
+    (if (and (math/finite-number? min-eigenvalue)
+             (< min-eigenvalue 0))
+      (let [loading (+ (- min-eigenvalue) psd-epsilon)]
+        {:covariance (diagonal-load covariance loading)
+         :warning {:code :psd-repair-applied
+                   :diagonal-loading loading
+                   :min-eigenvalue min-eigenvalue
+                   :message "Covariance matrix was repaired with diagonal loading to keep it positive semidefinite."}})
+      {:covariance covariance
+       :warning nil})))
+
+(defn estimate-risk-model
+  [{:keys [risk-model periods-per-year history]}]
+  (let [risk-model* (or risk-model {:kind :diagonal-shrink})
+        requested-kind (:kind risk-model*)
+        model-kind (normalize-risk-model-kind requested-kind)
+        periods-per-year* (or periods-per-year default-periods-per-year)
+        instrument-ids (vec (sorted-instrument-ids history))
+        cadence-by-instrument (mixed-frequency/cadence-by-instrument
+                               history
+                               instrument-ids)
+        warnings* (mixed-frequency/warnings requested-kind
+                                            cadence-by-instrument)
+        mixed-frequency? (mixed-frequency/mixed-frequency? model-kind
+                                                            history
+                                                            instrument-ids)]
+    (if mixed-frequency?
+      (let [risk-instrument-ids (mixed-frequency/instrument-ids history
+                                                                instrument-ids)
+            missing-native-warnings (mixed-frequency/missing-native-risk-history-warnings
+                                     history
+                                     instrument-ids
+                                     risk-instrument-ids)
+            override-warning (mixed-frequency/override-warning model-kind)
+            {:keys [covariance pair-metadata warnings]}
+            (mixed-frequency/matrix history risk-instrument-ids)
+            shrinkage (or (:shrinkage risk-model*) default-shrinkage)
+            {covariance* :covariance psd-warning :warning}
+            (repair-psd covariance)
+            covariance** (if (= :diagonal-shrink model-kind)
+                           (diagonal-shrink covariance* shrinkage)
+                           covariance*)
+            warnings** (vec (concat warnings*
+                                    missing-native-warnings
+                                    (when override-warning [override-warning])
+                                    warnings
+                                    (when psd-warning [psd-warning])))]
+        (cond-> {:model :mixed-frequency
+                 :requested-model model-kind
+                 :instrument-ids risk-instrument-ids
+                 :covariance covariance**
+                 :pair-metadata pair-metadata
+                 :risk-estimation (mixed-frequency/risk-estimation history)
+                 :warnings warnings**}
+          (= :diagonal-shrink model-kind)
+          (assoc :shrinkage {:kind :diagonal
+                             :shrinkage shrinkage})))
+      (let [series (series-by-id history instrument-ids)
+            sample (covariance-matrix series periods-per-year*)
+            shrinkage (or (:shrinkage risk-model*) default-shrinkage)
+            covariance (case model-kind
+                         :diagonal-shrink (diagonal-shrink sample shrinkage)
+                         :sample-covariance sample
+                         sample)]
+        (cond-> {:model model-kind
+                 :instrument-ids instrument-ids
+                 :covariance covariance
+                 :warnings warnings*}
+          (= :diagonal-shrink model-kind)
+          (assoc :shrinkage {:kind :diagonal
+                             :shrinkage shrinkage}))))))

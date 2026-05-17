@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.returns-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]
             [hyperopen.portfolio.optimizer.domain.returns :as returns]))
 
 (defn- near?
@@ -8,6 +9,9 @@
 
 (def ^:private year-days
   365.2425)
+
+(def ^:private day-ms
+  (* 24 60 60 1000))
 
 (deftest historical-mean-annualizes-return-series-and-adds-funding-carry-test
   (let [result (returns/estimate-expected-returns
@@ -109,6 +113,28 @@
     (is (near? 0.2
                (get-in result
                        [:decomposition-by-instrument "vault:HLP" :return-component])))))
+
+(deftest historical-mean-uses-native-metadata-with-subdaily-expected-return-anchor-test
+  (let [end-ms (* year-days day-ms)
+        native-history (history-series/native-history-metadata
+                        {"vault:HLP" [{:time-ms 0 :close 100}
+                                      {:time-ms (* 0.5 day-ms) :close 120}
+                                      {:time-ms end-ms :close 120}]})
+        result (returns/estimate-expected-returns
+                {:return-model {:kind :black-litterman}
+                 :periods-per-year 365
+                 :history (assoc native-history
+                                 :return-series-by-instrument {"vault:HLP" [0.2 0]}
+                                 :funding-by-instrument
+                                 {"vault:HLP" {:annualized-carry 0
+                                               :source :not-applicable}})})]
+    (is (every? true?
+                (map near?
+                     [0.2 0]
+                     (get-in native-history
+                             [:expected-return-series-by-instrument "vault:HLP"]))))
+    (is (near? 0.2
+               (get-in result [:expected-returns-by-instrument "vault:HLP"])))))
 
 (deftest historical-mean-preserves-daily-arithmetic-estimator-test
   (let [result (returns/estimate-expected-returns

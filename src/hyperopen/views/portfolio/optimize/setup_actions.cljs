@@ -26,6 +26,7 @@
   [return-kind risk-kind]
   (cond
     (= :black-litterman return-kind) "posterior views"
+    (= :mixed-frequency risk-kind) "mixed-frequency covariance"
     (= :sample-covariance risk-kind) "sample historical returns"
     :else "stabilized historical returns"))
 

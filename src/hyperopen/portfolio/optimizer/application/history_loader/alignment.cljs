@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.alignment
   (:require [clojure.set :as set]
             [hyperopen.portfolio.metrics.history :as metrics-history]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
             [hyperopen.portfolio.optimizer.application.history-loader.normalization :as normalization]))
 
@@ -163,26 +164,6 @@
              :dt-years (/ dt-days 365.2425)}))
         (partition 2 1 calendar)))
 
-(defn- expected-return-series-map
-  [eligible]
-  (into {}
-        (keep (fn [{:keys [instrument-id expected-return-history]}]
-                (let [history (vec expected-return-history)
-                      series (return-series history)]
-                  (when (seq series)
-                    [instrument-id series]))))
-        eligible))
-
-(defn- expected-return-intervals-map
-  [eligible]
-  (into {}
-        (keep (fn [{:keys [instrument-id expected-return-history]}]
-                (let [calendar (mapv :time-ms expected-return-history)
-                      intervals (return-intervals calendar)]
-                  (when (seq intervals)
-                    [instrument-id intervals]))))
-        eligible))
-
 (defn- funding-summary
   [instrument funding-history-by-coin funding-periods-per-year]
   (if-not (instruments/perp-instrument? instrument)
@@ -201,6 +182,12 @@
          :rows []
          :average-rate nil
          :annualized-carry 0}))))
+
+(defn- native-risk-history
+  [{:keys [history expected-return-history]}]
+  (if (seq expected-return-history)
+    (vec expected-return-history)
+    history))
 
 (defn- freshness
   [calendar as-of-ms stale-after-ms]
@@ -336,13 +323,25 @@
                                                 [instrument-id
                                                  (prices-for-calendar history effective-calendar)]))
                                          effective-eligible)
+        raw-price-series-by-instrument (into {}
+                                             (map (fn [{:keys [instrument-id]
+                                                       :as entry}]
+                                                    [instrument-id
+                                                     (native-risk-history entry)]))
+                                             effective-eligible)
+        expected-return-rows-by-instrument (into {}
+                                                 (map (fn [{:keys [instrument-id]
+                                                           :as entry}]
+                                                        [instrument-id
+                                                         (native-risk-history entry)]))
+                                                 effective-eligible)
         return-series-by-instrument (into {}
                                           (map (fn [[instrument-id prices]]
                                                  [instrument-id (return-series prices)]))
                                           price-series-by-instrument)
-        expected-return-series-by-instrument (expected-return-series-map effective-eligible)
-        expected-return-intervals-by-instrument (expected-return-intervals-map
-                                                 effective-eligible)
+        native-history (history-series/native-history-metadata
+                        raw-price-series-by-instrument
+                        expected-return-rows-by-instrument)
         funding-by-instrument (into {}
                                     (map (fn [instrument]
                                            [(instruments/normalize-instrument-id instrument)
@@ -357,8 +356,13 @@
      :price-series-by-instrument price-series-by-instrument
      :return-series-by-instrument return-series-by-instrument
      :return-intervals (return-intervals effective-calendar)
-     :expected-return-series-by-instrument expected-return-series-by-instrument
-     :expected-return-intervals-by-instrument expected-return-intervals-by-instrument
+     :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
+     :cadence-by-instrument (:cadence-by-instrument native-history)
+     :expected-return-series-by-instrument
+     (:expected-return-series-by-instrument native-history)
+     :expected-return-intervals-by-instrument
+     (:expected-return-intervals-by-instrument native-history)
+     :risk-estimation (:risk-estimation native-history)
      :funding-by-instrument funding-by-instrument
      :warnings warnings
      :freshness (freshness effective-calendar as-of-ms stale-after-ms)

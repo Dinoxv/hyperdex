@@ -20,7 +20,8 @@
 (def risk-models
   {:diagonal-shrink {:kind :diagonal-shrink}
    :ledoit-wolf {:kind :diagonal-shrink}
-   :sample-covariance {:kind :sample-covariance}})
+   :sample-covariance {:kind :sample-covariance}
+   :mixed-frequency {:kind :mixed-frequency}})
 
 (def setup-presets
   {:conservative {:objective {:kind :minimum-variance}

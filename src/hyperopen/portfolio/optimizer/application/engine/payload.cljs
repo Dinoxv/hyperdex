@@ -79,6 +79,17 @@
        :invested-exposure gross-exposure
        :message "Minimum variance selected a near-cash signed portfolio. Use Target Return, Target Volatility, or an explicit Net Min floor if you want invested exposure."})))
 
+(defn- sparse-history-objective-warning
+  [request risk-result]
+  (let [objective-kind (get-in request [:objective :kind])
+        sparse-warning? (some #(= :sparse-history-risk-estimation (:code %))
+                              (:warnings risk-result))]
+    (when (and sparse-warning?
+               (contains? #{:max-sharpe :minimum-variance} objective-kind))
+      {:code :sparse-history-objective-sensitivity
+       :objective-kind objective-kind
+       :message "Sparse-history assets are using mixed-frequency covariance. Maximum Sharpe and Minimum Variance can be more sensitive to those pairwise estimates than target-based objectives."})))
+
 (defn- labels-by-instrument
   [request instrument-ids]
   (instrument-labels/labels-by-instrument (:universe request) instrument-ids))
@@ -157,6 +168,7 @@
                        :covariance (:covariance risk-result)
                        :expected-returns expected-returns})
         cash-warning (min-variance-cash-warning request encoded diagnostics*)
+        sparse-warning (sparse-history-objective-warning request risk-result)
         current-expected-return (math/portfolio-return current-weights* expected-returns)
         current-volatility (sqrt (math/portfolio-variance current-weights*
                                                           (:covariance risk-result)))
@@ -204,13 +216,17 @@
      :diagnostics diagnostics*
      :return-model (:model return-result)
      :risk-model (:model risk-result)
+     :requested-risk-model (:requested-model risk-result)
+     :risk-estimation (:risk-estimation risk-result)
+     :pair-metadata (:pair-metadata risk-result)
      :return-decomposition-by-instrument (:decomposition-by-instrument return-result)
      :black-litterman-diagnostics (:diagnostics return-result)
      :warnings (vec (concat (:warnings request)
                             (:warnings risk-result)
                             (:warnings return-result)
                             (:warnings default-frontier)
-                            (when cash-warning [cash-warning])))
+                            (when cash-warning [cash-warning])
+                            (when sparse-warning [sparse-warning])))
      :rebalance-preview (rebalance-preview request
                                            instrument-ids
                                            current-weights*

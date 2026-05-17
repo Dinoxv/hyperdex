@@ -59,7 +59,14 @@
                                 true]]]]
          (actions/set-portfolio-optimizer-risk-model-kind
           {}
-          "sampleCovariance"))))
+          "sampleCovariance")))
+  (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :risk-model]
+                                {:kind :mixed-frequency}]
+                               [[:portfolio :optimizer :draft :metadata :dirty?]
+                                true]]]]
+         (actions/set-portfolio-optimizer-risk-model-kind
+          {}
+          :mixed-frequency))))
 
 (deftest set-draft-model-layer-actions-ignore-invalid-kinds-test
   (is (= []

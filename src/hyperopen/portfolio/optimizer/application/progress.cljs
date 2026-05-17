@@ -34,6 +34,7 @@
   (case (:kind risk-model)
     :ledoit-wolf "shrinkage estimator"
     :diagonal-shrink "shrinkage estimator"
+    :mixed-frequency "mixed-frequency estimator"
     :sample-covariance "sample covariance"
     "risk estimator"))
 

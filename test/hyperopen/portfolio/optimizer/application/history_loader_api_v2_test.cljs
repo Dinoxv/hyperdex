@@ -8,6 +8,13 @@
   [expected actual]
   (< (js/Math.abs (- expected actual)) 0.000001))
 
+(def day-ms
+  (* 24 60 60 1000))
+
+(defn- day-start-ms
+  [day]
+  (.getTime (js/Date. (str day "T00:00:00.000Z"))))
+
 (deftest normalize-discovery-preserves-backend-and-local-identities-test
   (let [discovery (api-v2/normalize-discovery
                    {:contract_version "optimizer-history-api-v2"
@@ -132,6 +139,84 @@
            (get-in aligned [:funding-by-instrument "spot:PURR/USDC" :source])))
     (is (= #{:proxy-history-used :stale-history}
            (set (map :code (:warnings aligned)))))))
+
+(deftest align-api-v2-history-preserves-native-raw-history-for-mixed-frequency-risk-test
+  (let [d0 (day-start-ms "2025-05-28")
+        vault-id "vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+        daily-points (mapv (fn [idx]
+                             {:time_ms (+ d0 (* idx day-ms))
+                              :close (+ 100 idx)
+                              :return (when (pos? idx)
+                                        (/ 1 (+ 99 idx)))})
+                           (range 29))
+        universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id vault-id
+                   :market-type :vault
+                   :coin vault-id
+                   :vault-address "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                   :optimizer-history/instrument-id "hl:vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"}]
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-mixed-frequency"
+                     :dataset_version "dv-mixed-frequency"
+                     :status "partial"
+                     :common_calendar [d0
+                                       (+ d0 (* 14 day-ms))
+                                       (+ d0 (* 28 day-ms))]
+                     :return_calendar [(+ d0 (* 14 day-ms))
+                                       (+ d0 (* 28 day-ms))]
+                     :aligned_returns_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :returns [0.14 0.1228070175438596]}
+                      "hl:vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                      {:instrument_id "hl:vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                       :returns [0.02 0.02941176470588225]}}
+                     :series_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :lineage_kind "native"
+                                     :series_kind "market_price"
+                                     :points daily-points
+                                     :funding {:status "available"
+                                               :annualized_carry 0.01}
+                                     :warnings []}
+                      "hl:vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                      {:instrument_id "hl:vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                       :lineage_kind "native"
+                       :series_kind "vault_return_index"
+                       :points [{:time_ms d0 :close 100 :return nil}
+                                {:time_ms (+ d0 (* 14 day-ms)) :close 102 :return 0.02}
+                                {:time_ms (+ d0 (* 28 day-ms)) :close 105 :return 0.02941176470588225}]
+                       :funding {:status "not_applicable"}
+                       :warnings []}}
+                     :warnings []})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= :api-v2-aligned-returns
+           (get-in aligned [:alignment-source :kind])))
+    (is (= 29
+           (count (get-in aligned [:raw-price-series-by-instrument "perp:BTC"]))))
+    (is (= 3
+           (count (get-in aligned [:raw-price-series-by-instrument vault-id]))))
+    (is (= :dense
+           (get-in aligned [:cadence-by-instrument "perp:BTC" :kind])))
+    (is (= :sparse
+           (get-in aligned [:cadence-by-instrument vault-id :kind])))
+    (is (= 28
+           (count (get-in aligned [:expected-return-series-by-instrument "perp:BTC"]))))
+    (is (= 2
+           (count (get-in aligned [:expected-return-series-by-instrument vault-id]))))
+    (is (= 28
+           (count (get-in aligned [:expected-return-intervals-by-instrument "perp:BTC"]))))
+    (is (= 2
+           (count (get-in aligned [:expected-return-intervals-by-instrument vault-id]))))
+    (is (= :mixed-frequency
+           (get-in aligned [:risk-estimation :kind])))))
 
 (deftest align-api-v2-history-does-not-recompute-nil-boundary-returns-test
   (let [universe [{:instrument-id "perp:NEW"

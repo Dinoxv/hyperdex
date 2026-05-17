@@ -120,6 +120,8 @@
            (click-actions (node-by-role view-node "portfolio-optimizer-risk-model-sample-covariance"))))
     (is (= [[:actions/set-portfolio-optimizer-risk-model-kind :diagonal-shrink]]
            (click-actions (node-by-role view-node "portfolio-optimizer-risk-model-diagonal-shrink"))))
+    (is (= [[:actions/set-portfolio-optimizer-risk-model-kind :mixed-frequency]]
+           (click-actions (node-by-role view-node "portfolio-optimizer-risk-model-mixed-frequency"))))
     (doseq [role ["portfolio-optimizer-objective-target-return-input" "portfolio-optimizer-objective-target-volatility-input"]]
       (is (nil? (node-by-role view-node role))))
     (is (some? (node-by-role view-node "portfolio-optimizer-advanced-overrides-shell")))

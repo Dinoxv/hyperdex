@@ -6,6 +6,7 @@
    :ew-mean "Uses exponentially weighted historical returns so recent observations count more."
    :black-litterman "Combines market-implied returns with your Black-Litterman views and confidence inputs."
    :diagonal-shrink "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."
+   :mixed-frequency "Keeps dense assets on daily history while aggregating them over sparse asset intervals when needed."
    :sample-covariance "Uses the raw historical covariance matrix from the selected asset return history."})
 
 (defn model-section
@@ -41,11 +42,14 @@
        [:div {:class ["optimizer-model-panel"]
               :data-role "portfolio-optimizer-risk-model-panel"}
         [:p {:class controls/eyebrow-class} "Risk model"]
-        [:div {:class ["optimizer-model-segment-group" "mt-2" "grid" "grid-cols-2" "border"
+        [:div {:class ["optimizer-model-segment-group" "mt-2" "grid" "grid-cols-3" "border"
                        "border-base-300"]}
          (controls/segmented-button "Stabilized Covariance" "Diagonal Shrink" (:diagonal-shrink model-help) :start (= :diagonal-shrink risk-kind)
                                     "portfolio-optimizer-risk-model-diagonal-shrink"
                                     [:actions/set-portfolio-optimizer-risk-model-kind :diagonal-shrink])
+         (controls/segmented-button "Mixed Frequency" nil (:mixed-frequency model-help) :center (= :mixed-frequency risk-kind)
+                                    "portfolio-optimizer-risk-model-mixed-frequency"
+                                    [:actions/set-portfolio-optimizer-risk-model-kind :mixed-frequency])
          (controls/segmented-button "Sample Covariance" nil (:sample-covariance model-help) :end (= :sample-covariance risk-kind)
                                     "portfolio-optimizer-risk-model-sample-covariance"
                                     [:actions/set-portfolio-optimizer-risk-model-kind :sample-covariance])]]]])))

@@ -2,6 +2,7 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [hyperopen.portfolio.metrics.history :as metrics-history]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
@@ -744,31 +745,30 @@
                                                     (prices-for-calendar (:points series)
                                                                          effective-calendar)])))
                                          effective-eligible)
+        native-history (history-series/native-history-metadata-for-series effective-eligible)
         funding-by-instrument (into {}
                                     (map (fn [instrument]
                                            (let [local-id (instruments/normalize-instrument-id
                                                            instrument)
                                                  series (get series-by-instrument local-id)]
-                                             [local-id
-                                              (funding-summary instrument series)])))
+                                             [local-id (funding-summary instrument series)])))
                                     (or universe []))]
     {:calendar effective-calendar
      :return-calendar effective-return-calendar
      :eligible-instruments (mapv :instrument effective-eligible)
      :excluded-instruments excluded-instruments
      :price-series-by-instrument price-series-by-instrument
-     :return-series-by-instrument (select-keys return-series-by-instrument
-                                               (map :instrument-id effective-eligible))
-     :return-intervals (return-intervals-for-calendar effective-calendar
-                                                       effective-return-calendar)
-     :expected-return-series-by-instrument {}
-     :expected-return-intervals-by-instrument {}
+     :return-series-by-instrument (select-keys return-series-by-instrument (map :instrument-id effective-eligible))
+     :return-intervals (return-intervals-for-calendar effective-calendar effective-return-calendar)
+     :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
+     :cadence-by-instrument (:cadence-by-instrument native-history)
+     :expected-return-series-by-instrument (:expected-return-series-by-instrument native-history)
+     :expected-return-intervals-by-instrument (:expected-return-intervals-by-instrument native-history)
+     :risk-estimation (:risk-estimation native-history)
      :funding-by-instrument funding-by-instrument
      :warnings warnings
      :freshness (freshness effective-calendar as-of-ms stale-after-ms)
-     :alignment-source {:kind (if use-aligned?
-                                :api-v2-aligned-returns
-                                :api-v2-point-returns)
+     :alignment-source {:kind (if use-aligned? :api-v2-aligned-returns :api-v2-point-returns)
                         :status (:status api-v2-history)
                         :dataset-version (:dataset-version api-v2-history)
                         :observations (count effective-calendar)}}))

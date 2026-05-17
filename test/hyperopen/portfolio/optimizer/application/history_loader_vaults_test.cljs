@@ -39,6 +39,57 @@
     (is (= [] (:excluded-instruments aligned)))
     (is (= [] (:warnings aligned)))))
 
+(deftest align-history-inputs-preserves-native-raw-history-for-mixed-frequency-risk-test
+  (let [d0 (fixtures/day-start-ms "2025-05-28")
+        vault-address "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+        vault-instrument-id (str "vault:" vault-address)
+        market-history (mapv (fn [idx]
+                               [(+ d0 (* idx fixtures/day-ms))
+                                (+ 100 idx)])
+                             (range 29))
+        aligned (history-loader/align-history-inputs
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"}
+                             {:instrument-id vault-instrument-id
+                              :market-type :vault
+                              :coin vault-instrument-id
+                              :vault-address vault-address}]
+                  :candle-history-by-coin {"BTC" (fixtures/candle-rows market-history)}
+                  :vault-details-by-address
+                  {vault-address
+                   {:portfolio
+                    {:one-year
+                     (fixtures/summary-from-points
+                      [[d0 100 0]
+                       [(+ d0 (* 14 fixtures/day-ms)) 102 2]
+                       [(+ d0 (* 28 fixtures/day-ms)) 105 5]])}}}
+                  :as-of-ms (+ d0 (* 29 fixtures/day-ms))
+                  :stale-after-ms (* 2 fixtures/day-ms)})]
+    (is (= 3 (count (:calendar aligned))))
+    (is (= 2 (count (:return-calendar aligned))))
+    (is (= 29
+           (count (get-in aligned [:raw-price-series-by-instrument "perp:BTC"]))))
+    (is (= 3
+           (count (get-in aligned [:raw-price-series-by-instrument vault-instrument-id]))))
+    (is (= :dense
+           (get-in aligned [:cadence-by-instrument "perp:BTC" :kind])))
+    (is (= :sparse
+           (get-in aligned [:cadence-by-instrument vault-instrument-id :kind])))
+    (is (= 28
+           (count (get-in aligned [:expected-return-series-by-instrument "perp:BTC"]))))
+    (is (= 2
+           (count (get-in aligned [:expected-return-series-by-instrument vault-instrument-id]))))
+    (is (= 28
+           (count (get-in aligned [:expected-return-intervals-by-instrument "perp:BTC"]))))
+    (is (= 2
+           (count (get-in aligned [:expected-return-intervals-by-instrument vault-instrument-id]))))
+    (is (= {:kind :mixed-frequency
+            :dense-block-calendar :daily
+            :sparse-policy :pairwise-interval-aggregation
+            :sparse-correlation-shrinkage true}
+           (:risk-estimation aligned)))))
+
 (deftest align-history-inputs-aligns-vault-and-market-history-by-utc-day-test
   (let [d0 (fixtures/day-start-ms "2026-04-27")
         d1 (+ d0 fixtures/day-ms)
@@ -294,7 +345,15 @@
              :end-ms m3
              :dt-days 185
              :dt-years (/ 185 365.2425)}]
-           (get-in aligned [:expected-return-intervals-by-instrument hlp-id])))))
+           (get-in aligned [:expected-return-intervals-by-instrument hlp-id])))
+    (is (= [h0 h1 m3]
+           (mapv :time-ms
+                 (get-in aligned [:raw-price-series-by-instrument hlp-id]))))
+    (is (every? true?
+                (map fixtures/near?
+                     [100 110 121]
+                     (mapv :close
+                           (get-in aligned [:raw-price-series-by-instrument hlp-id])))))))
 
 (deftest align-history-inputs-keeps-common-history-warning-when-no-vault-window-overlaps-test
   (let [vault-a "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

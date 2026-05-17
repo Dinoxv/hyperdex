@@ -131,6 +131,10 @@
            (click-actions
             (node-by-role view-node
                           "portfolio-optimizer-risk-model-sample-covariance"))))
+    (is (= [[:actions/set-portfolio-optimizer-risk-model-kind :mixed-frequency]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-risk-model-mixed-frequency"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :gross-max
              [:event.target/value]]]
@@ -157,6 +161,8 @@
                        "Combines market-implied returns with your Black-Litterman views and confidence inputs."]
                       ["portfolio-optimizer-risk-model-diagonal-shrink"
                        "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."]
+                      ["portfolio-optimizer-risk-model-mixed-frequency"
+                       "Keeps dense assets on daily history while aggregating them over sparse asset intervals when needed."]
                       ["portfolio-optimizer-risk-model-sample-covariance"
                        "Uses the raw historical covariance matrix from the selected asset return history."]]]
     (doseq [[role copy] expectations]
