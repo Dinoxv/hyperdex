@@ -26,5 +26,6 @@
   (is (= "N/A" (opt-format/keyword-label nil)))
   (is (= "Maximum Sharpe" (opt-format/display-label :max-sharpe)))
   (is (= "Black-Litterman" (opt-format/display-label :black-litterman)))
+  (is (= "Ledoit-Wolf covariance" (opt-format/display-label :ledoit-wolf-dense)))
   (is (= "custom-kind" (opt-format/display-label :custom-kind)))
   (is (= "N/A" (opt-format/format-time nil))))

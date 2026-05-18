@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.risk
   (:require [hyperopen.portfolio.optimizer.domain.math :as math]
+            [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf :as risk-ledoit-wolf]
             [hyperopen.portfolio.optimizer.domain.risk-mixed-frequency :as mixed-frequency]))
 
 (def default-periods-per-year
@@ -48,6 +49,7 @@
   [kind]
   (case kind
     :ledoit-wolf :diagonal-shrink
+    :ledoit-wolf-dense :ledoit-wolf-dense
     :diagonal-shrink :diagonal-shrink
     :sample-covariance :sample-covariance
     :mixed-frequency :mixed-frequency
@@ -212,14 +214,23 @@
       (let [series (series-by-id history instrument-ids)
             sample (covariance-matrix series periods-per-year*)
             shrinkage (or (:shrinkage risk-model*) default-shrinkage)
+            ledoit-wolf-result (when (= :ledoit-wolf-dense model-kind)
+                                 (risk-ledoit-wolf/estimate
+                                  {:series series
+                                   :periods-per-year periods-per-year*}))
             covariance (case model-kind
                          :diagonal-shrink (diagonal-shrink sample shrinkage)
+                         :ledoit-wolf-dense (:covariance ledoit-wolf-result)
                          :sample-covariance sample
                          sample)]
         (cond-> {:model model-kind
                  :instrument-ids instrument-ids
                  :covariance covariance
                  :warnings warnings*}
+          (= :ledoit-wolf-dense model-kind)
+          (merge (select-keys ledoit-wolf-result
+                              [:shrinkage :sample-count :feature-count]))
+
           (= :diagonal-shrink model-kind)
           (assoc :shrinkage {:kind :diagonal
                              :shrinkage shrinkage}))))))

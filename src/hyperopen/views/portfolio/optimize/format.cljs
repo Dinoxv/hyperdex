@@ -86,6 +86,7 @@
     :ew-mean "EW mean"
     :black-litterman "Black-Litterman"
     :diagonal-shrink "Stabilized covariance"
+    :ledoit-wolf-dense "Ledoit-Wolf covariance"
     :mixed-frequency "Mixed-frequency covariance"
     :sample-covariance "Sample covariance"
     (keyword-label value)))

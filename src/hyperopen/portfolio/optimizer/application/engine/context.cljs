@@ -123,6 +123,7 @@
   [request instrument-ids]
   (constraints/encode-constraints
    {:universe (ordered-universe (:universe request) instrument-ids)
+    :history (:history request)
     :current-weights (into {}
                            (map (fn [instrument-id]
                                   [instrument-id (current-weight request instrument-id)]))

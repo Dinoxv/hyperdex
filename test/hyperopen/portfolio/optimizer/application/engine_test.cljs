@@ -213,6 +213,9 @@
     (is (false? @called?))
     (is (= :black-litterman-view-has-no-matching-instrument
            (:code warning)))
+    (is (= 1 (count (filter #(= :black-litterman-view-has-no-matching-instrument
+                                (:code %))
+                            (:warnings result)))))
     (is (= "sol-view" (:view-id warning)))
     (is (= ["perp:SOL"] (:instrument-ids warning)))))
 

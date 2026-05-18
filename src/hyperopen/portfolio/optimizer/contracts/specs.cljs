@@ -58,7 +58,11 @@
   #{:historical-mean :ew-mean :black-litterman})
 
 (def risk-model-kinds
-  #{:diagonal-shrink :ledoit-wolf :sample-covariance :mixed-frequency})
+  #{:diagonal-shrink
+    :ledoit-wolf
+    :ledoit-wolf-dense
+    :sample-covariance
+    :mixed-frequency})
 
 (def black-litterman-view-kinds
   #{:absolute :relative})

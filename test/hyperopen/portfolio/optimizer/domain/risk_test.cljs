@@ -51,6 +51,17 @@
             (near? (get-in matrix [row col])
                    (get-in matrix [col row])))))
 
+(defn- matrix-near?
+  ([expected actual]
+   (matrix-near? expected actual 0.0000001))
+  ([expected actual tolerance]
+   (every? true?
+           (for [row (range (count expected))
+                 col (range (count (nth expected row)))]
+             (near? (get-in expected [row col])
+                    (get-in actual [row col])
+                    tolerance)))))
+
 (defn- mixed-frequency-history
   []
   (let [btc-closes (assoc (mapv #(+ 107818 (* 95 %)) (range 29))
@@ -113,6 +124,29 @@
             :shrinkage 0.5}
            (:shrinkage result)))))
 
+(deftest ledoit-wolf-dense-uses-scaled-identity-shrinkage-on-dense-rectangular-history-test
+  (let [result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :periods-per-year 1
+                 :history {:return-series-by-instrument {"A" [1 2 3]
+                                                         "B" [2 4 6]}}})
+        expected-covariance [[1 0.8888888888888888]
+                             [0.8888888888888888 2.333333333333333]]
+        shrinkage (:shrinkage result)]
+    (is (= :ledoit-wolf-dense (:model result)))
+    (is (= ["A" "B"] (:instrument-ids result)))
+    (is (matrix-near? expected-covariance
+                      (:covariance result)
+                      0.0000001))
+    (is (= :ledoit-wolf (:kind shrinkage)))
+    (is (= :scaled-identity (:target shrinkage)))
+    (is (near? (/ 1 3)
+               (:shrinkage shrinkage)
+               0.0000001))
+    (is (= 3 (:sample-count result)))
+    (is (= 2 (:feature-count result)))
+    (is (= [] (:warnings result)))))
+
 (deftest covariance-conditioning-reports-eigenvalue-condition-number-test
   (let [summary (risk/covariance-conditioning [[2 1]
                                                [1 2]])]
@@ -164,6 +198,20 @@
     (is (= :sample-covariance (:requested-model result)))
     (is (= {:code :risk-model-overridden-for-mixed-frequency
             :requested-model :sample-covariance
+            :model :mixed-frequency
+            :reason :sparse-history}
+           (some #(when (= :risk-model-overridden-for-mixed-frequency (:code %)) %)
+                 (:warnings result))))))
+
+(deftest ledoit-wolf-dense-request-routes-sparse-history-to-mixed-frequency-test
+  (let [{:keys [history]} (mixed-frequency-history)
+        result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :history history})]
+    (is (= :mixed-frequency (:model result)))
+    (is (= :ledoit-wolf-dense (:requested-model result)))
+    (is (= {:code :risk-model-overridden-for-mixed-frequency
+            :requested-model :ledoit-wolf-dense
             :model :mixed-frequency
             :reason :sparse-history}
            (some #(when (= :risk-model-overridden-for-mixed-frequency (:code %)) %)

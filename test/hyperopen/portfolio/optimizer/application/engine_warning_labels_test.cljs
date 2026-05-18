@@ -13,12 +13,11 @@
         btc-rows (mapv (fn [n close]
                          {:time-ms (day n)
                           :close (str close)})
-                       (range 43)
-                       (map #(+ 100 %) (range 43)))
-        vault-history [[(day 0) 100]
-                       [(day 14) 103]
-                       [(day 28) 106]
-                       [(day 42) 109]]
+                       (range 841)
+                       (map #(+ 100 %) (range 841)))
+        vault-history (mapv (fn [n]
+                              [(day (* 14 n)) (+ 100 n)])
+                            (range 61))
         request (fixtures/sample-engine-request
                  {:draft (fixtures/sample-draft
                           {:id "vault-warning-labels"

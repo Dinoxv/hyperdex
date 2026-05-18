@@ -171,6 +171,10 @@
   [labels-by-instrument warnings]
   (mapv (partial user-facing-warning labels-by-instrument) warnings))
 
+(defn- dedupe-warnings
+  [warnings]
+  (vec (distinct (remove nil? warnings))))
+
 (defn- request-instrument-ids
   [request]
   (vec (distinct (concat (keep :instrument-id (:universe request))
@@ -305,12 +309,14 @@
                           :labels-by-instrument labels-by-instrument*})
         warnings* (user-facing-warnings
                    labels-by-instrument*
-                   (vec (concat (:warnings request)
-                                (:warnings risk-result)
-                                (:warnings return-result)
-                                (:warnings default-frontier)
-                                (when cash-warning [cash-warning])
-                                (when sparse-warning [sparse-warning]))))]
+                   (dedupe-warnings
+                    (concat (:warnings request)
+                            (:warnings encoded)
+                            (:warnings risk-result)
+                            (:warnings return-result)
+                            (:warnings default-frontier)
+                            (when cash-warning [cash-warning])
+                            (when sparse-warning [sparse-warning]))))]
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)
@@ -371,9 +377,11 @@
                                                       (request-instrument-ids request)))))
         warnings* (user-facing-warnings
                    labels-by-instrument*
-                   (vec (concat (:warnings request)
-                                (:warnings risk-result)
-                                (:warnings return-result))))]
+                   (dedupe-warnings
+                    (concat (:warnings request)
+                            (:warnings solver-plan)
+                            (:warnings risk-result)
+                            (:warnings return-result))))]
     (assoc solver-plan
            :scenario-id (:scenario-id request)
            :warnings warnings*)))

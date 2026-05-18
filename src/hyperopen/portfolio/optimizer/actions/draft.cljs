@@ -20,6 +20,7 @@
 (def risk-models
   {:diagonal-shrink {:kind :diagonal-shrink}
    :ledoit-wolf {:kind :diagonal-shrink}
+   :ledoit-wolf-dense {:kind :ledoit-wolf-dense}
    :sample-covariance {:kind :sample-covariance}
    :mixed-frequency {:kind :mixed-frequency}})
 
