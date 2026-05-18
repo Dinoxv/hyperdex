@@ -188,8 +188,13 @@
                                      instrument-ids
                                      risk-instrument-ids)
             override-warning (mixed-frequency/override-warning model-kind)
-            {:keys [covariance pair-metadata warnings]}
-            (mixed-frequency/matrix history risk-instrument-ids)
+            {:keys [covariance pair-metadata warnings dense-block]}
+            (mixed-frequency/matrix
+             history
+             risk-instrument-ids
+             {:dense-block-estimator (when (= :ledoit-wolf-dense model-kind)
+                                       :ledoit-wolf-dense)
+              :periods-per-year periods-per-year*})
             shrinkage (or (:shrinkage risk-model*) default-shrinkage)
             {covariance* :covariance psd-warning :warning}
             (repair-psd covariance)
@@ -206,7 +211,21 @@
                  :instrument-ids risk-instrument-ids
                  :covariance covariance**
                  :pair-metadata pair-metadata
-                 :risk-estimation (mixed-frequency/risk-estimation history)
+                 :risk-estimation (cond-> (mixed-frequency/risk-estimation
+                                            history)
+                                    dense-block
+                                    (assoc :dense-block-estimator :ledoit-wolf-dense
+                                           :dense-block-instrument-ids
+                                           (:instrument-ids dense-block)
+                                           :dense-block-shrinkage
+                                           (:shrinkage dense-block)
+                                           :dense-block-sample-count
+                                           (:sample-count dense-block)
+                                           :dense-block-feature-count
+                                           (:feature-count dense-block))
+                                    (and dense-block psd-warning)
+                                    (assoc :dense-block-post-repair-diagonal-loading
+                                           (:diagonal-loading psd-warning)))
                  :warnings warnings**}
           (= :diagonal-shrink model-kind)
           (assoc :shrinkage {:kind :diagonal

@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.domain.risk-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]
             [hyperopen.portfolio.optimizer.domain.risk :as risk]))
 
 (def day-ms
@@ -27,6 +28,15 @@
              :close close})
           (range)
           closes)))
+
+(defn- native-return-series-by-instrument
+  [history instrument-ids]
+  (into {}
+        (map (fn [instrument-id]
+               [instrument-id
+                (history-series/simple-return-series
+                 (get-in history [:raw-price-series-by-instrument instrument-id]))]))
+        instrument-ids))
 
 (defn- annualized-interval-covariance
   [xs ys dt-years]
@@ -216,6 +226,112 @@
             :reason :sparse-history}
            (some #(when (= :risk-model-overridden-for-mixed-frequency (:code %)) %)
                  (:warnings result))))))
+
+(deftest mixed-frequency-ledoit-wolf-request-uses-ledoit-wolf-dense-block-test
+  (let [{:keys [history vault-id]} (mixed-frequency-history)
+        dense-instrument-ids ["perp:BTC" "perp:ETH" "perp:HYPE"]
+        result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :periods-per-year 365
+                 :history history})
+        native-dense-returns (native-return-series-by-instrument
+                              history
+                              dense-instrument-ids)
+        dense-only (risk/estimate-risk-model
+                    {:risk-model {:kind :ledoit-wolf-dense}
+                     :periods-per-year 365
+                     :history {:return-series-by-instrument
+                               native-dense-returns}})
+        ids (:instrument-ids result)
+        dense-ids (:instrument-ids dense-only)
+        mixed-index (zipmap ids (range))
+        dense-index (zipmap dense-ids (range))
+        pair-meta (get-in result [:pair-metadata "perp:BTC|perp:ETH"])
+        btc-hlp-meta (get-in result [:pair-metadata (str "perp:BTC|" vault-id)])
+        psd-loading (or (:diagonal-loading
+                         (some #(when (= :psd-repair-applied (:code %)) %)
+                               (:warnings result)))
+                        0)
+        sparse-retention (/ 2 (+ 2 30))]
+    (is (= :mixed-frequency (:model result)))
+    (is (= :ledoit-wolf-dense (:requested-model result)))
+    (doseq [left-id dense-ids
+            right-id dense-ids]
+      (let [dense-covariance (get-in dense-only
+                                     [:covariance (dense-index left-id) (dense-index right-id)])
+            mixed-covariance (get-in result
+                                     [:covariance (mixed-index left-id) (mixed-index right-id)])
+            expected (if (= left-id right-id)
+                       (+ dense-covariance psd-loading)
+                       dense-covariance)]
+        (is (near? expected mixed-covariance 0.0000001))))
+    (is (= :ledoit-wolf-dense (:estimator pair-meta)))
+    (is (true? (:dense-block? pair-meta)))
+    (is (= :scaled-identity (:target pair-meta)))
+    (is (number? (:shrinkage pair-meta)))
+    (is (= :sparse-interval (:calendar-kind btc-hlp-meta)))
+    (is (= sparse-retention
+           (:correlation-retention btc-hlp-meta)))
+    (is (= :ledoit-wolf-dense
+           (get-in result [:risk-estimation :dense-block-estimator])))
+    (is (= 28
+           (get-in result [:risk-estimation :dense-block-sample-count])))
+    (when (pos? psd-loading)
+      (is (= psd-loading
+             (get-in result
+                     [:risk-estimation
+                      :dense-block-post-repair-diagonal-loading]))))
+    (is (= dense-ids
+           (get-in result [:risk-estimation :dense-block-instrument-ids])))))
+
+(deftest mixed-frequency-ledoit-wolf-ignores-sparse-collapsed-aligned-dense-returns-test
+  (let [{:keys [history]} (mixed-frequency-history)
+        history* (update history :return-series-by-instrument dissoc "perp:HYPE")
+        result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :history history*})
+        pair-meta (get-in result [:pair-metadata "perp:BTC|perp:ETH"])]
+    (is (= :mixed-frequency (:model result)))
+    (is (= :ledoit-wolf-dense (:estimator pair-meta)))
+    (is (= 28
+           (get-in result [:risk-estimation :dense-block-sample-count])))
+    (is (nil? (some #(when (= :dense-block-ledoit-wolf-unavailable (:code %)) %)
+                    (:warnings result))))))
+
+(deftest mixed-frequency-ledoit-wolf-falls-back-when-native-dense-block-has-too-few-returns-test
+  (let [{:keys [history]} (mixed-frequency-history)
+        history* (update-in history
+                            [:raw-price-series-by-instrument "perp:HYPE"]
+                            #(subvec (vec %) 0 2))
+        result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :history history*})
+        pair-meta (get-in result [:pair-metadata "perp:BTC|perp:ETH"])
+        warning (some #(when (= :dense-block-ledoit-wolf-unavailable (:code %)) %)
+                      (:warnings result))]
+    (is (= :mixed-frequency (:model result)))
+    (is (= :pairwise-mixed-frequency (:estimator pair-meta)))
+    (is (= :insufficient-dense-return-observations (:reason warning)))
+    (is (= 1 (:observations warning)))
+    (is (= 2 (:required warning)))))
+
+(deftest mixed-frequency-ledoit-wolf-falls-back-when-native-dense-returns-are-non-rectangular-test
+  (let [{:keys [history]} (mixed-frequency-history)
+        result (risk/estimate-risk-model
+                {:risk-model {:kind :ledoit-wolf-dense}
+                 :history (assoc-in history
+                                    [:raw-price-series-by-instrument
+                                     "perp:HYPE"
+                                     1
+                                     :close]
+                                    0)})
+        pair-meta (get-in result [:pair-metadata "perp:BTC|perp:ETH"])
+        warning (some #(when (= :dense-block-ledoit-wolf-unavailable (:code %)) %)
+                      (:warnings result))]
+    (is (= :mixed-frequency (:model result)))
+    (is (= :pairwise-mixed-frequency (:estimator pair-meta)))
+    (is (= :non-rectangular-dense-return-series (:reason warning)))
+    (is (= ["perp:BTC" "perp:ETH" "perp:HYPE"] (:instrument-ids warning)))))
 
 (deftest mixed-frequency-risk-aggregates-dense-assets-over-sparse-intervals-test
   (let [{:keys [history vault-id]} (mixed-frequency-history)
