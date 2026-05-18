@@ -278,6 +278,20 @@
                       :missing)]))
           requested-ids)))
 
+(defn current-portfolio-history-load-needed?
+  [readiness]
+  (let [request (:request readiness)
+        current-ids (instrument-ids (:current-portfolio-universe request))
+        selected-ids (instrument-ids (:requested-universe request))
+        current-history-ids (instrument-ids
+                             (get-in request
+                                     [:current-portfolio-history
+                                      :eligible-instruments]))]
+    (and (:runnable? readiness)
+         (seq current-ids)
+         (not (set/subset? current-ids selected-ids))
+         (not (set/subset? current-ids current-history-ids)))))
+
 (defn readiness-error-message
   [readiness]
   (let [details (seq (distinct (keep :message (:blocking-warnings readiness))))

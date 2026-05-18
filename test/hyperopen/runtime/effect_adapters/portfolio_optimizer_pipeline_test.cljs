@@ -273,6 +273,90 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest run-portfolio-optimizer-pipeline-loads-missing-current-history-before-run-test
+  (async done
+    (let [calls (atom [])
+          btc-instrument {:instrument-id "perp:BTC"
+                          :market-type :perp
+                          :coin "BTC"}
+          eth-instrument {:instrument-id "perp:ETH"
+                          :market-type :perp
+                          :coin "ETH"}
+          store (atom {:portfolio {:optimizer
+                                    {:draft {:id "draft-current-outside"
+                                             :universe [btc-instrument
+                                                        eth-instrument]
+                                             :objective {:kind :minimum-variance}
+                                             :return-model {:kind :historical-mean}
+                                             :risk-model {:kind :diagonal-shrink}
+                                             :constraints {:long-only? true
+                                                           :max-asset-weight 1.0}}
+                                     :history-data {:candle-history-by-coin
+                                                    {"BTC" [{:time 1000 :close "100"}
+                                                            {:time 2000 :close "110"}]
+                                                     "ETH" [{:time 1000 :close "200"}
+                                                            {:time 2000 :close "220"}]}
+                                                    :funding-history-by-coin {}
+                                                    :loaded-at-ms 2100}
+                                     :runtime {:as-of-ms 3000
+                                               :stale-after-ms 60000}}}
+                       :asset-selector {:market-by-key
+                                        {"perp:HYPE" {:instrument-id "perp:HYPE"
+                                                      :market-type :perp
+                                                      :coin "HYPE"}}}
+                       :webdata2 {:clearinghouseState
+                                  {:marginSummary {:accountValue "1000"}
+                                   :assetPositions [{:position {:coin "HYPE"
+                                                                :szi "1"
+                                                                :positionValue "250"}}]}}})
+          selected-bundle {:candle-history-by-coin
+                           {"BTC" [{:time 1000 :close "100"}
+                                   {:time 2000 :close "110"}]
+                            "ETH" [{:time 1000 :close "200"}
+                                   {:time 2000 :close "220"}]}
+                           :funding-history-by-coin {}
+                           :warnings []}
+          current-bundle {:candle-history-by-coin
+                          {"HYPE" [{:time 1000 :close "10"}
+                                   {:time 2000 :close "12"}]}
+                          :funding-history-by-coin {}
+                          :warnings []}
+          env {:now-ms (constantly 1000)
+               :next-run-id (constantly "pipeline-run-current-outside")
+               :load-history! (fn [store* opts]
+                                ((:on-progress opts) {:completed 2
+                                                      :total 2
+                                                      :percent 100})
+                                (swap! calls conj [:history])
+                                (swap! store*
+                                       assoc-in
+                                       [:portfolio :optimizer :history-data]
+                                       (assoc selected-bundle
+                                              :current-portfolio-history-data
+                                              current-bundle
+                                              :loaded-at-ms 1000))
+                                (swap! store*
+                                       assoc-in
+                                       [:portfolio :optimizer :history-load-state]
+                                       {:status :succeeded
+                                        :warnings []})
+                                (js/Promise.resolve selected-bundle))
+               :request-run! (fn [payload]
+                               (swap! calls conj [:run (:request payload)])
+                               (:run-id payload))}]
+      (-> (pipeline/run-portfolio-optimizer-pipeline-effect env nil store)
+          (.then (fn [run-id]
+                   (let [request (second (second @calls))]
+                     (is (= "pipeline-run-current-outside" run-id))
+                     (is (= [:history :run] (mapv first @calls)))
+                     (is (= ["perp:HYPE"]
+                            (mapv :instrument-id
+                                  (get-in request
+                                          [:current-portfolio-history
+                                           :eligible-instruments])))))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest run-portfolio-optimizer-pipeline-fails-without-universe-test
   (async done
     (let [store (atom {:portfolio {:optimizer {:draft {:id "draft-empty"

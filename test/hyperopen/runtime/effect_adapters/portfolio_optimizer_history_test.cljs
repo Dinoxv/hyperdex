@@ -104,6 +104,67 @@
                (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest load-portfolio-optimizer-history-effect-stores-current-portfolio-history-separately-test
+  (async done
+    (let [calls (atom [])
+          selected-bundle {:api-v2-history
+                           {:status :ok
+                            :series-by-instrument
+                            {"perp:BTC" {:instrument-id "hl:perp:BTC"}}}
+                           :warnings []}
+          current-bundle {:api-v2-history
+                          {:status :ok
+                           :series-by-instrument
+                           {"perp:HYPE" {:instrument-id "hl:perp:HYPE"}}}
+                          :warnings []}
+          store (atom {:portfolio {:optimizer
+                                    {:draft {:universe [{:instrument-id "perp:BTC"
+                                                         :market-type :perp
+                                                         :coin "BTC"}]}
+                                     :runtime {:as-of-ms 3000}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*request-history-bundle!*
+                    (fn [_deps request]
+                      (swap! calls conj request)
+                      (js/Promise.resolve
+                       (if (= ["perp:HYPE"]
+                              (mapv :instrument-id (:universe request)))
+                         current-bundle
+                         selected-bundle)))
+                    portfolio-optimizer-adapters/*now-ms* (fn [] 12345)]
+        (-> (portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect
+             nil
+             store
+             {:current-portfolio-universe [{:instrument-id "perp:HYPE"
+                                            :market-type :perp
+                                            :coin "HYPE"}]})
+            (.then
+             (fn [result]
+               (is (= selected-bundle
+                      (dissoc result :current-portfolio-history-data)))
+               (is (= current-bundle
+                      (:current-portfolio-history-data result)))
+               (is (= [["perp:BTC"] ["perp:HYPE"]]
+                      (mapv (fn [request]
+                              (mapv :instrument-id (:universe request)))
+                            @calls)))
+               (is (= #{"perp:BTC"}
+                      (set (keys (get-in @store
+                                         [:portfolio
+                                          :optimizer
+                                          :history-data
+                                          :api-v2-history
+                                          :series-by-instrument])))))
+               (is (= #{"perp:HYPE"}
+                      (set (keys (get-in @store
+                                         [:portfolio
+                                          :optimizer
+                                          :history-data
+                                          :current-portfolio-history-data
+                                          :api-v2-history
+                                          :series-by-instrument])))))
+               (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (defn- discovery-response
   [payload]
   #js {:ok true

@@ -43,6 +43,20 @@
     :periods-per-year (:periods-per-year request)
     :history (:history request)}))
 
+(defn- current-portfolio-return-model
+  [request]
+  (let [return-model (:return-model request)]
+    (if (= :black-litterman (:kind return-model))
+      {:kind :historical-mean}
+      return-model)))
+
+(defn- current-portfolio-return-estimate
+  [request]
+  (returns/estimate-expected-returns
+   {:return-model (current-portfolio-return-model request)
+    :periods-per-year (:periods-per-year request)
+    :history (:current-portfolio-history request)}))
+
 (defn expected-return-vector
   [return-result instrument-ids]
   (mapv #(or (get-in return-result [:expected-returns-by-instrument %]) 0)
@@ -122,6 +136,23 @@
    :warnings (:warnings return-result)
    :problems []})
 
+(defn- current-portfolio-analysis
+  [request]
+  (when-let [history (:current-portfolio-history request)]
+    (let [risk-result (risk/estimate-risk-model
+                       {:risk-model (:risk-model request)
+                        :periods-per-year (:periods-per-year request)
+                        :history history})
+          instrument-ids (:instrument-ids risk-result)
+          return-result (current-portfolio-return-estimate request)
+          expected-returns (expected-return-vector return-result instrument-ids)
+          weights (current-weights request instrument-ids)]
+      {:risk-result risk-result
+       :return-result return-result
+       :expected-returns expected-returns
+       :instrument-ids instrument-ids
+       :weights weights})))
+
 (defn report-progress!
   [on-progress payload]
   (when (fn? on-progress)
@@ -151,13 +182,15 @@
              :percent 100
              :detail (or (some-> (:model return-result) name)
                          "estimated")})
-         expected-returns (expected-return-vector return-result instrument-ids)]
+         expected-returns (expected-return-vector return-result instrument-ids)
+         current-portfolio-analysis* (current-portfolio-analysis request)]
      (if (= :invalid (:status return-result))
        {:risk-result risk-result
         :return-result return-result
         :expected-returns expected-returns
         :encoded nil
         :current-weights (current-weights request instrument-ids)
+        :current-portfolio-analysis current-portfolio-analysis*
         :solver-plan (invalid-return-model-plan return-result)
         :display-frontier-plans {}
         :display-frontier-aliases {}}
@@ -182,6 +215,7 @@
           :expected-returns expected-returns
           :encoded encoded
           :current-weights current-weights*
+          :current-portfolio-analysis current-portfolio-analysis*
           :solver-plan solver-plan
           :display-frontier-plans plans
           :display-frontier-aliases aliases})))))

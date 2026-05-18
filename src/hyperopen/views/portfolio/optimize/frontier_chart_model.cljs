@@ -116,11 +116,28 @@
                                    :unconstrained)])
       (:frontier result)))
 
+(defn current-allocation?
+  [result]
+  (let [weights (filter opt-format/finite-number?
+                        (or (:current-portfolio-weights result)
+                            (:current-weights result)))]
+    (pos? (reduce + 0 (map js/Math.abs weights)))))
+
+(defn current-point
+  [result]
+  (when (and (opt-format/finite-number? (:current-volatility result))
+             (opt-format/finite-number? (:current-expected-return result))
+             (current-allocation? result))
+    {:expected-return (:current-expected-return result)
+     :volatility (:current-volatility result)
+     :sharpe (get-in result [:current-performance :in-sample-sharpe])}))
+
 (defn chart-model
   [draft result overlay-mode constrain-frontier?]
   (let [overlay-mode* (overlay-model/normalize-mode overlay-mode)
         overlay-points (overlay-model/visible-points result overlay-mode*)
         domain-overlay-points (overlay-model/all-points result)
+        current-point* (current-point result)
         {:keys [subtitle
                 x-axis-prefix
                 y-axis-prefix
@@ -132,6 +149,9 @@
                     vec)
         x-domain (domain (concat (numeric-values points :volatility)
                                  (numeric-values domain-overlay-points :volatility)
+                                 (numeric-values (when current-point*
+                                                   [current-point*])
+                                                 :volatility)
                                  (when (opt-format/finite-number? (:volatility result))
                                    [(:volatility result)]))
                          0
@@ -139,6 +159,9 @@
                          {:floor-zero? true})
         y-domain (domain (concat (numeric-values points :expected-return)
                                  (numeric-values domain-overlay-points :expected-return)
+                                 (numeric-values (when current-point*
+                                                   [current-point*])
+                                                 :expected-return)
                                  (when (opt-format/finite-number? (:expected-return result))
                                    [(:expected-return result)]))
                          0
@@ -155,6 +178,7 @@
      :y-axis-prefix y-axis-prefix
      :reading-text reading-text
      :points points
+     :current-point current-point*
      :x-domain x-domain*
      :y-domain y-domain*
      :x-ticks x-ticks

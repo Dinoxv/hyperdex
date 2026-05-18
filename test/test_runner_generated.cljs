@@ -192,6 +192,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
@@ -460,6 +461,7 @@
             [hyperopen.views.portfolio.optimize.format-test]
             [hyperopen.views.portfolio.optimize.frontier-callout-test]
             [hyperopen.views.portfolio.optimize.frontier-chart-contract-test]
+            [hyperopen.views.portfolio.optimize.frontier-chart-model-test]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
             [hyperopen.views.portfolio.optimize.index-view-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
@@ -842,6 +844,7 @@
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
              'hyperopen.portfolio.optimizer.application.execution-test
@@ -1110,6 +1113,7 @@
              'hyperopen.views.portfolio.optimize.format-test
              'hyperopen.views.portfolio.optimize.frontier-callout-test
              'hyperopen.views.portfolio.optimize.frontier-chart-contract-test
+             'hyperopen.views.portfolio.optimize.frontier-chart-model-test
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
              'hyperopen.views.portfolio.optimize.index-view-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test

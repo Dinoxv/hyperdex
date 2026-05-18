@@ -4,6 +4,7 @@
             [hyperopen.views.portfolio.optimize.frontier-chart-axes :as chart-axes]
             [hyperopen.views.portfolio.optimize.frontier-chart-model :as model]
             [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]
+            [hyperopen.views.portfolio.optimize.frontier-current :as frontier-current]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers :as frontier-overlays]
             [hyperopen.views.portfolio.optimize.frontier-target :as frontier-target]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
@@ -73,12 +74,19 @@
    "[data-role=\"portfolio-optimizer-frontier-target-marker\"]"
    "[data-role=\"portfolio-optimizer-frontier-callout-target\"]"))
 
+(defn- current-callout-visibility-rule
+  []
+  (callout-visibility-rule
+   "[data-role=\"portfolio-optimizer-frontier-current-marker\"]"
+   "[data-role=\"portfolio-optimizer-frontier-callout-current\"]"))
+
 (defn- frontier-callout-style
-  [points overlay-mode overlay-points]
-  (when (or (seq points) (seq overlay-points))
+  [points overlay-mode overlay-points current-point]
+  (when (or (seq points) (seq overlay-points) current-point)
     [:style {:type "text/css"}
      (str/join "\n" (concat
-                     [(target-callout-visibility-rule)]
+                     [(target-callout-visibility-rule)
+                      (current-callout-visibility-rule)]
                      (map-indexed (fn [idx _]
                                     (frontier-callout-visibility-rule idx))
                                   points)
@@ -146,13 +154,13 @@
       :allocations allocations})))
 
 (defn chart-svg
-  [draft result {:keys [points overlay-mode overlay-points x-domain y-domain
+  [draft result {:keys [points overlay-mode overlay-points current-point x-domain y-domain
                         x-ticks y-ticks positions x-axis-prefix y-axis-prefix]}]
   [:svg {:viewBox (str "0 0 " model/chart-width " " model/chart-height)
          :class ["h-[23.75rem]" "w-full" "overflow-visible" "text-trading-text"]
          :data-role "portfolio-optimizer-frontier-svg"
          :aria-label "Efficient frontier chart. X axis is annualized volatility. Y axis is annualized expected return."}
-   (frontier-callout-style points overlay-mode overlay-points)
+   (frontier-callout-style points overlay-mode overlay-points current-point)
    (frontier-target/gradient-defs)
    [:g {:data-role "portfolio-optimizer-frontier-grid"}
     (map-indexed (fn [idx value]
@@ -218,6 +226,14 @@
    (map-indexed (fn [idx point]
                   (frontier-point draft idx point x-domain y-domain))
                 points)
+   (when current-point
+     (frontier-current/marker
+      {:bounds model/chart-bounds
+       :point-position model/point-position
+       :x-domain x-domain
+       :y-domain y-domain
+       :result result
+       :render-callout? false}))
    (frontier-target/marker
     {:bounds model/chart-bounds
      :point-position model/point-position
@@ -251,6 +267,13 @@
       :x-domain x-domain
       :y-domain y-domain
       :result result})
+    (when current-point
+      (frontier-current/callout
+       {:bounds model/chart-bounds
+        :point-position model/point-position
+        :x-domain x-domain
+        :y-domain y-domain
+        :result result}))
     (map #(frontier-overlays/callout
            {:bounds model/chart-bounds
             :overlay-mode overlay-mode

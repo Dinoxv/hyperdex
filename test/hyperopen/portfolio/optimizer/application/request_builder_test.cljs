@@ -285,6 +285,40 @@
     (is (= :taker (:fee-mode assumptions)))
     (is (not (contains? assumptions :slippage-fallback-bps)))))
 
+(deftest build-engine-request-does-not-use-selected-cache-for-outside-current-history-test
+  (let [request (request-builder/build-engine-request
+                 {:draft {:id "draft-outside-current-cache"
+                          :universe [{:instrument-id "perp:BTC"
+                                      :market-type :perp
+                                      :coin "BTC"}
+                                     {:instrument-id "perp:ETH"
+                                      :market-type :perp
+                                      :coin "ETH"}]
+                          :objective {:kind :minimum-variance}
+                          :return-model {:kind :historical-mean}
+                          :risk-model {:kind :diagonal-shrink}
+                          :constraints {:long-only? true}}
+                  :current-portfolio {:capital {:nav-usdc 10000}
+                                      :by-instrument {"perp:HYPE"
+                                                      {:instrument-id "perp:HYPE"
+                                                       :market-type :perp
+                                                       :coin "HYPE"
+                                                       :weight 0.25}}}
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" [{:time 1000 :close "100"}
+                                         {:time 2000 :close "110"}]
+                                  "ETH" [{:time 1000 :close "200"}
+                                         {:time 2000 :close "220"}]
+                                  "HYPE" [{:time 1000 :close "10"}
+                                          {:time 2000 :close "12"}]}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms 2500})]
+    (is (= ["perp:HYPE"]
+           (mapv :instrument-id (:current-portfolio-universe request))))
+    (is (nil? (:current-portfolio-history request))
+        "Outside-universe current history must come from the separate current bundle, not stale selected-cache data.")))
+
 (defn- black-litterman-request
   [views]
   (request-builder/build-engine-request

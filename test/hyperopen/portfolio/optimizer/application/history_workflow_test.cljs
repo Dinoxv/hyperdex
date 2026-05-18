@@ -12,6 +12,11 @@
    :market-type :perp
    :coin "ETH"})
 
+(def hype-instrument
+  {:instrument-id "perp:HYPE"
+   :market-type :perp
+   :coin "HYPE"})
+
 (def queued-status
   {:status :queued
    :started-at-ms nil
@@ -90,6 +95,40 @@
            (:optimizer-history/instrument-id request-instrument)))
     (is (= :hl-perp
            (:optimizer-history/instrument-kind request-instrument)))))
+
+(deftest begin-history-load-carries-current-portfolio-universe-separately-test
+  (let [state (-> (prefetch-state)
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:marginSummary {:accountValue "1000"}
+                             :assetPositions [{:position {:coin "HYPE"
+                                                          :szi "1"
+                                                          :positionValue "250"}}]})
+                  (assoc-in [:asset-selector :market-by-key]
+                            {"perp:HYPE" {:key "perp:HYPE"
+                                          :market-type :perp
+                                          :coin "HYPE"
+                                          :symbol "HYPE"}})
+                  (assoc-in [:portfolio :optimizer :history-discovery]
+                            {:status :partial
+                             :backend-id-by-local-id {"perp:HYPE" "hl:perp:HYPE"}
+                             :instruments-by-backend-id
+                             {"hl:perp:HYPE" {:instrument-id "hl:perp:HYPE"
+                                             :display-symbol "HYPE"
+                                             :instrument-kind :hl-perp
+                                             :history {:status :available
+                                                       :quality-status :passed}}}}))
+        result (workflow/begin-history-load
+                {:state state
+                 :opts {}
+                 :now-ms 1000})
+        request (get-in result [:commands 0 :request])]
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (:universe request))))
+    (is (= ["perp:HYPE"]
+           (mapv :instrument-id (:current-portfolio-universe request))))
+    (is (= ["hl:perp:HYPE"]
+           (mapv :optimizer-history/instrument-id
+                 (:current-portfolio-universe request))))))
 
 (deftest complete-selection-prefetch-failure-continues-with-next-queued-instrument-test
   (let [started (workflow/begin-selection-prefetch

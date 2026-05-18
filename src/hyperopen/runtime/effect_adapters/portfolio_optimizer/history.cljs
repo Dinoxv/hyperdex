@@ -6,7 +6,7 @@
   [{:keys [request-candle-snapshot!]} coin opts]
   (request-candle-snapshot! coin opts))
 
-(defn- request-history-bundle!
+(defn- request-history-bundle-raw!
   [env on-progress request]
   ((:request-history-bundle! env)
    {:request-candle-snapshot! (partial request-candle-snapshot! env)
@@ -17,6 +17,45 @@
     :request-id (:request-id env)
     :on-progress on-progress}
    request))
+
+(defn- instrument-id-set
+  [universe]
+  (set (keep :instrument-id universe)))
+
+(defn- current-history-needed?
+  [selected-universe current-universe]
+  (let [selected-ids (instrument-id-set selected-universe)
+        current-ids (instrument-id-set current-universe)]
+    (and (seq current-ids)
+         (not= selected-ids current-ids))))
+
+(defn- current-history-error-bundle
+  [err]
+  {:warnings [{:code :current-portfolio-history-unavailable
+               :message "Current portfolio history could not be loaded."
+               :error-message (workflow/error-message err)}]})
+
+(defn- request-history-bundle!
+  [env on-progress request]
+  (let [current-universe (vec (:current-portfolio-universe request))
+        selected-request (dissoc request :current-portfolio-universe)
+        selected-universe (:universe selected-request)
+        fetch-current? (current-history-needed? selected-universe current-universe)]
+    (-> (request-history-bundle-raw! env on-progress selected-request)
+        (.then (fn [selected-bundle]
+                 (if fetch-current?
+                   (-> (request-history-bundle-raw!
+                        env
+                        on-progress
+                        (assoc selected-request :universe current-universe))
+                       (.catch (fn [err]
+                                 (js/Promise.resolve
+                                  (current-history-error-bundle err))))
+                       (.then (fn [current-bundle]
+                                (assoc selected-bundle
+                                       :current-portfolio-history-data
+                                       current-bundle))))
+                   selected-bundle))))))
 
 (defn- now-for-request
   [env state opts]

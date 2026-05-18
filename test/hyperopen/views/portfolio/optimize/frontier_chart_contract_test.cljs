@@ -34,6 +34,8 @@
                                      "portfolio-optimizer-frontier-current-marker")
         target-callout (node-by-role view-node
                                      "portfolio-optimizer-frontier-callout-target")
+        current-callout (node-by-role view-node
+                                      "portfolio-optimizer-frontier-callout-current")
         target-core (node-by-role view-node
                                   "portfolio-optimizer-frontier-target-core")
         target-halo (node-by-role view-node
@@ -161,7 +163,8 @@
     (is (some? target-label))
     (is (some? target-leader-line))
     (is (= "3 3" (node-attr target-leader-line :stroke-dasharray)))
-    (is (nil? current-marker))
+    (is (some? current-marker))
+    (is (= 0 (node-attr current-marker :tabIndex)))
     (is (some? target-callout))
     (is (= "var(--optimizer-border-strong)"
            (node-attr (first (collect-nodes target-callout
@@ -216,8 +219,7 @@
              "35.0%"
              "-2.0%"}
            (set (collect-strings target-callout))))
-    (is (not (contains? strings "Current Portfolio")))
-    (is (not (contains? strings "Where you are now")))
+    (is (contains? strings "Current"))
     (is (= #{"FRONTIER POINT 2"
              "PORTFOLIO"
              "μ · return"
@@ -231,6 +233,23 @@
              "0.43"
              "50.0%"}
            (set (collect-strings frontier-callout))))
+    (is (= #{"CURRENT"
+             "PORTFOLIO"
+             "μ · return"
+             "σ · vol"
+             "Sharpe"
+             "Gross Exposure"
+             "Net Exposure"
+             "IMPLIED ALLOCATION"
+             "BTC"
+             "PURR"
+             "12.00%"
+             "24.00%"
+             "0.5"
+             "30.00%"
+             "20.0%"
+             "10.0%"}
+           (set (collect-strings current-callout))))
     (is (= #{"BTC"
              "Expected Return"
              "Volatility"
@@ -302,3 +321,33 @@
     (is (contains? strings "partially-blocked"))
     (is (contains? strings "spot-submit-unsupported"))
     (is (contains? strings "perp:BTC"))))
+
+(deftest results-panel-renders-current-marker-for-current-portfolio-outside-selected-universe-test
+  (let [outside-result (-> solved-result
+                           (assoc :current-weights [0 0]
+                                  :current-weights-by-instrument {"perp:BTC" 0
+                                                                  "spot:PURR" 0}
+                                  :current-portfolio-instrument-ids ["perp:HYPE"]
+                                  :current-portfolio-weights [0.991]
+                                  :current-portfolio-weights-by-instrument {"perp:HYPE" 0.991}
+                                  :current-expected-return 0.5686
+                                  :current-volatility 0.5505
+                                  :current-performance {:in-sample-sharpe 1.033})
+                           (assoc-in [:labels-by-instrument "perp:HYPE"] "HYPE"))
+        view-node (results-panel/results-panel
+                   {:result outside-result
+                    :computed-at-ms 2600}
+                   {:objective {:kind :target-volatility}}
+                   {:frontier-overlay-mode :standalone})
+        current-marker (node-by-role view-node
+                                     "portfolio-optimizer-frontier-current-marker")
+        current-callout (node-by-role view-node
+                                      "portfolio-optimizer-frontier-callout-current")
+        current-callout-strings (set (collect-strings current-callout))]
+    (is (some? current-marker))
+    (is (= 0 (node-attr current-marker :tabIndex)))
+    (is (contains? current-callout-strings "CURRENT"))
+    (is (contains? current-callout-strings "HYPE"))
+    (is (contains? current-callout-strings "99.1%"))
+    (is (not (contains? current-callout-strings "BTC")))
+    (is (not (contains? current-callout-strings "PURR")))))

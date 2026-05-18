@@ -84,10 +84,6 @@
                                                "Select a universe before running."))
        :commands []}
 
-      (:runnable? initial-readiness)
-      {:state (worker-run-state state* run-id)
-       :commands [(request-worker-run-command run-id (:request initial-readiness))]}
-
       (selection-prefetch-loading? state)
       {:state state*
        :commands [(cond-> {:command/type :optimizer.workflow/wait-for-history-idle
@@ -97,6 +93,15 @@
                     (some? history-idle-timeout-ms)
                     (assoc :timeout-ms history-idle-timeout-ms))]}
 
+      (setup-readiness/current-portfolio-history-load-needed? initial-readiness)
+      {:state state*
+       :commands [{:command/type :optimizer.workflow/load-history
+                   :run-id run-id}]}
+
+      (:runnable? initial-readiness)
+      {:state (worker-run-state state* run-id)
+       :commands [(request-worker-run-command run-id (:request initial-readiness))]}
+
       :else
       {:state state*
        :commands [{:command/type :optimizer.workflow/load-history
@@ -104,10 +109,19 @@
 
 (defn after-history-idle
   [{:keys [state run-id]}]
-  (let [{:keys [request runnable?]} (setup-readiness/build-readiness state)]
-    (if runnable?
+  (let [{:keys [request runnable?] :as readiness}
+        (setup-readiness/build-readiness state)]
+    (cond
+      (setup-readiness/current-portfolio-history-load-needed? readiness)
+      {:state state
+       :commands [{:command/type :optimizer.workflow/load-history
+                   :run-id run-id}]}
+
+      runnable?
       {:state (worker-run-state state run-id)
        :commands [(request-worker-run-command run-id request)]}
+
+      :else
       {:state state
        :commands [{:command/type :optimizer.workflow/load-history
                    :run-id run-id}]})))

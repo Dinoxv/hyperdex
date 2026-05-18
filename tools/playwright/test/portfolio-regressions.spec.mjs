@@ -404,6 +404,39 @@ async function seedOptimizerAssetSelectorMarkets(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedOptimizerCurrentResultPoint(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const store = globalThis.hyperopen.system.store;
+    const state = c.deref(store);
+    const resultPath = path("portfolio", "optimizer", "last-successful-run", "result");
+    const result = c.get_in(state, resultPath);
+    const labels = c.assoc(
+      c.get(result, kw("labels-by-instrument")) || c.PersistentArrayMap.EMPTY,
+      "perp:HYPE",
+      "HYPE"
+    );
+    const withCurrentPoint = c.assoc(
+      result,
+      kw("current-weights"), vector([0, 0, 0, 0]),
+      kw("current-portfolio-instrument-ids"), vector(["perp:HYPE"]),
+      kw("current-portfolio-weights"), vector([0.3]),
+      kw("current-portfolio-weights-by-instrument"), map(["perp:HYPE", 0.3]),
+      kw("labels-by-instrument"), labels,
+      kw("current-expected-return"), 0.02,
+      kw("current-volatility"), 0.3,
+      kw("current-performance"), map([kw("in-sample-sharpe"), 0.067])
+    );
+    c.reset_BANG_(store, c.assoc_in(state, resultPath, withCurrentPoint));
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function stubOptimizerVaultMetadata(page, vaultSummaries = null) {
   const summaries = vaultSummaries ?? [OPTIMIZER_DEFAULT_VAULT_SUMMARY];
 
@@ -1748,8 +1781,9 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     .toContainText("Allocation");
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))
     .toContainText("Efficient Frontier");
+  await seedOptimizerCurrentResultPoint(page);
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-current-marker']"))
-    .toHaveCount(0);
+    .toBeVisible();
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-legend']"))
     .toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-x-axis-label']"))
@@ -1875,6 +1909,21 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   await expect(targetCallout).toContainText("Sharpe");
   await expect(targetCallout).toContainText("IMPLIED ALLOCATION");
   await expect(targetCallout).not.toContainText("Gross Exposure");
+
+  const currentMarker = page.locator("[data-role='portfolio-optimizer-frontier-current-marker-hitbox']");
+  const currentCallout = page.locator("[data-role='portfolio-optimizer-frontier-callout-current']");
+  await expect(currentMarker).toBeVisible();
+  await currentMarker.hover();
+  await expect(currentCallout).toHaveCSS("opacity", "1");
+  await expect(currentCallout).toContainText("CURRENT");
+  await expect(currentCallout).toContainText("PORTFOLIO");
+  await expect(currentCallout).toContainText("μ · return");
+  await expect(currentCallout).toContainText("σ · vol");
+  await expect(currentCallout).toContainText("Gross Exposure");
+  await expect(currentCallout).toContainText("Net Exposure");
+  await expect(currentCallout).toContainText("IMPLIED ALLOCATION");
+  await expect(currentCallout).toContainText("HYPE");
+  await expect(currentCallout).toContainText("30.0%");
 
   const standaloneMarkerGroup = page.locator("[data-role='portfolio-optimizer-frontier-overlay-standalone-perp:BTC']");
   const standaloneMarkerSymbol = page.locator("[data-role='portfolio-optimizer-frontier-overlay-symbol-standalone-perp:BTC']");

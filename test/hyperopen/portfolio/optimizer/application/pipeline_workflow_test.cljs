@@ -8,6 +8,16 @@
    :market-type :perp
    :coin "BTC"})
 
+(def eth-instrument
+  {:instrument-id "perp:ETH"
+   :market-type :perp
+   :coin "ETH"})
+
+(def hype-instrument
+  {:instrument-id "perp:HYPE"
+   :market-type :perp
+   :coin "HYPE"})
+
 (defn- runnable-state
   []
   {:portfolio {:optimizer
@@ -30,6 +40,37 @@
    :webdata2 {:clearinghouseState
               {:marginSummary {:accountValue "1000"}
                :assetPositions []}}})
+
+(defn- selected-ready-current-outside-state
+  []
+  (-> (runnable-state)
+      (assoc-in [:portfolio :optimizer :draft :universe]
+                [btc-instrument eth-instrument])
+      (assoc-in [:portfolio :optimizer :history-data :candle-history-by-coin]
+                {"BTC" [{:time 1000 :close "100"}
+                        {:time 2000 :close "110"}]
+                 "ETH" [{:time 1000 :close "200"}
+                        {:time 2000 :close "220"}]})
+      (assoc-in [:portfolio :optimizer :history-data :funding-history-by-coin]
+                {})
+      (assoc-in [:webdata2 :clearinghouseState]
+                {:marginSummary {:accountValue "1000"}
+                 :assetPositions [{:position {:coin "HYPE"
+                                              :szi "1"
+                                              :positionValue "250"}}]})
+      (assoc-in [:asset-selector :market-by-key]
+                {"perp:HYPE" hype-instrument})))
+
+(deftest begin-run-loads-current-history-before-ready-selected-worker-run-test
+  (let [result (workflow/begin-run
+                {:state (selected-ready-current-outside-state)
+                 :run-id "pipeline-run-current-history"
+                 :started-at-ms 1000})]
+    (is (= [{:command/type :optimizer.workflow/load-history
+             :run-id "pipeline-run-current-history"}]
+           (:commands result)))
+    (is (= :running
+           (get-in result [:state :portfolio :optimizer :optimization-progress :status])))))
 
 (deftest begin-run-plans-history-idle-wait-while-selection-prefetch-active-test
   (let [state (-> (runnable-state)

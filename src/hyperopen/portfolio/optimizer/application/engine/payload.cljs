@@ -174,7 +174,9 @@
 (defn- request-instrument-ids
   [request]
   (vec (distinct (concat (keep :instrument-id (:universe request))
-                         (keep :instrument-id (:requested-universe request))))))
+                         (keep :instrument-id (:requested-universe request))
+                         (keep :instrument-id
+                               (:current-portfolio-universe request))))))
 
 (defn- sharpe-summary
   [expected-return volatility]
@@ -195,6 +197,28 @@
      :latest-common-ms (:latest-common-ms freshness)
      :age-ms (:age-ms freshness)
      :stale? (:stale? freshness)}))
+
+(defn- portfolio-allocation?
+  [weights]
+  (let [weights* (filter finite-number? weights)]
+    (pos? (reduce + 0 (map js/Math.abs weights*)))))
+
+(defn- current-portfolio-metrics
+  [analysis]
+  (when (and analysis
+             (portfolio-allocation? (:weights analysis)))
+    (let [weights (:weights analysis)
+          expected-returns (:expected-returns analysis)
+          covariance (get-in analysis [:risk-result :covariance])
+          expected-return (math/portfolio-return weights expected-returns)
+          volatility (sqrt (math/portfolio-variance weights covariance))]
+      (when (and (finite-number? expected-return)
+                 (finite-number? volatility))
+        {:instrument-ids (:instrument-ids analysis)
+         :weights weights
+         :expected-return expected-return
+         :volatility volatility
+         :performance (sharpe-summary expected-return volatility)}))))
 
 (defn- rebalance-preview
   [request instrument-ids current-weights target-weights]
@@ -227,7 +251,8 @@
    selection
    display-frontiers
    encoded
-   current-weights*]
+   current-weights*
+   current-portfolio-analysis]
   (let [instrument-ids (:instrument-ids risk-result)
         default-frontier (or (:unconstrained display-frontiers)
                              (:constrained display-frontiers)
@@ -251,9 +276,21 @@
                        :expected-returns expected-returns})
         cash-warning (min-variance-cash-warning request encoded diagnostics*)
         sparse-warning (sparse-history-objective-warning request risk-result)
-        current-expected-return (math/portfolio-return current-weights* expected-returns)
-        current-volatility (sqrt (math/portfolio-variance current-weights*
-                                                          (:covariance risk-result)))
+        selected-current-metrics (current-portfolio-metrics
+                                  {:instrument-ids instrument-ids
+                                   :weights current-weights*
+                                   :expected-returns expected-returns
+                                   :risk-result risk-result})
+        current-portfolio-metrics* (or (current-portfolio-metrics
+                                        current-portfolio-analysis)
+                                       selected-current-metrics)
+        current-portfolio-instrument-ids (or (:instrument-ids
+                                              current-portfolio-metrics*)
+                                             instrument-ids)
+        current-portfolio-weights (or (:weights current-portfolio-metrics*)
+                                      current-weights*)
+        current-expected-return (:expected-return current-portfolio-metrics*)
+        current-volatility (:volatility current-portfolio-metrics*)
         expected-return (math/portfolio-return target-weights expected-returns)
         volatility (sqrt (math/portfolio-variance target-weights (:covariance risk-result)))
         labels-by-instrument* (labels-by-instrument
@@ -280,14 +317,20 @@
      :instrument-ids instrument-ids
      :target-weights target-weights
      :current-weights current-weights*
+     :current-portfolio-instrument-ids current-portfolio-instrument-ids
+     :current-portfolio-weights current-portfolio-weights
      :labels-by-instrument labels-by-instrument*
      :target-weights-by-instrument (zipmap instrument-ids target-weights)
      :current-weights-by-instrument (zipmap instrument-ids current-weights*)
+     :current-portfolio-weights-by-instrument (zipmap current-portfolio-instrument-ids
+                                                       current-portfolio-weights)
      :expected-returns-by-instrument (zipmap instrument-ids expected-returns)
      :dropped-weights dropped
      :current-expected-return current-expected-return
      :current-volatility current-volatility
-     :current-performance (sharpe-summary current-expected-return current-volatility)
+     :current-performance (or (:performance current-portfolio-metrics*)
+                              (sharpe-summary current-expected-return
+                                              current-volatility))
      :expected-return expected-return
      :volatility volatility
      :performance (sharpe-summary expected-return volatility)
@@ -342,6 +385,7 @@
            expected-returns
            encoded
            current-weights
+           current-portfolio-analysis
            solver-plan
            display-frontier-plans
            display-frontier-aliases]}
@@ -371,5 +415,6 @@
                         selection
                         display-frontiers
                         encoded
-                        current-weights))
+                        current-weights
+                        current-portfolio-analysis))
       selection)))

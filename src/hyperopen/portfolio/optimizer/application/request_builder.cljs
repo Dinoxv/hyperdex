@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.request-builder
-  (:require [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+  (:require [clojure.set :as set]
+            [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data :as prior-data]))
@@ -82,6 +83,80 @@
       (assoc :fallback-slippage-bps fallback-slippage-bps))))
 
 (def ^:private finite-number? coercion/finite-number?)
+
+(defn- non-zero-current-row?
+  [row]
+  (let [weight (:weight row)]
+    (and (finite-number? weight)
+         (not (zero? weight)))))
+
+(defn- current-row-instrument
+  [row]
+  (select-keys row
+               [:instrument-id
+                :market-type
+                :instrument-type
+                :coin
+                :dex
+                :symbol
+                :base
+                :quote
+                :name
+                :vault-address
+                :hip3?
+                :optimizer-history/instrument-id
+                :optimizer-history/display-symbol
+                :optimizer-history/instrument-kind
+                :optimizer-history/history-status
+                :optimizer-history/quality-status
+                :optimizer-history/proxy]))
+
+(defn- universe-by-id
+  [universe]
+  (into {}
+        (map (fn [instrument]
+               [(:instrument-id instrument) instrument]))
+        universe))
+
+(defn- instrument-id-set
+  [universe]
+  (set (keep :instrument-id universe)))
+
+(defn- current-portfolio-rows
+  [current-portfolio]
+  (let [exposures (seq (:exposures current-portfolio))]
+    (if exposures
+      exposures
+      (vals (or (:by-instrument current-portfolio) {})))))
+
+(defn- current-portfolio-universe
+  [current-portfolio requested-universe]
+  (let [requested-by-id (universe-by-id requested-universe)]
+    (vec (vals (reduce (fn [acc row]
+                         (let [instrument-id (:instrument-id row)]
+                           (if (and instrument-id
+                                    (non-zero-current-row? row))
+                             (assoc acc
+                                    instrument-id
+                                    (merge (get requested-by-id instrument-id)
+                                           (current-row-instrument row)))
+                             acc)))
+                       {}
+                       (current-portfolio-rows current-portfolio))))))
+
+(defn- current-history-source
+  [history-data current-universe requested-universe]
+  (let [current-ids (instrument-id-set current-universe)
+        selected-ids (instrument-id-set requested-universe)]
+    (cond
+      (empty? current-ids)
+      nil
+
+      (set/subset? current-ids selected-ids)
+      history-data
+
+      :else
+      (:current-portfolio-history-data history-data))))
 
 (defn- confidence-variance
   [confidence]
@@ -250,6 +325,22 @@
       :market-cap-by-coin market-cap-by-coin
       :current-portfolio current-portfolio})))
 
+(defn- align-history
+  [{:keys [universe
+           history-data
+           as-of-ms
+           stale-after-ms
+           funding-periods-per-year]}]
+  (history-loader/align-history-inputs
+   {:universe universe
+    :api-v2-history (:api-v2-history history-data)
+    :candle-history-by-coin (:candle-history-by-coin history-data)
+    :funding-history-by-coin (:funding-history-by-coin history-data)
+    :vault-details-by-address (:vault-details-by-address history-data)
+    :as-of-ms as-of-ms
+    :stale-after-ms stale-after-ms
+    :funding-periods-per-year funding-periods-per-year}))
+
 (defn build-engine-request
   [{:keys [draft
            current-portfolio
@@ -265,16 +356,26 @@
         risk-model (or (:risk-model draft*) default-risk-model)
         objective (or (:objective draft*) default-objective)
         constraints (normalize-constraints (:constraints draft*))
-        history (history-loader/align-history-inputs
+        history (align-history
                  {:universe requested-universe
-                  :api-v2-history (:api-v2-history history-data)
-                  :candle-history-by-coin (:candle-history-by-coin history-data)
-                  :funding-history-by-coin (:funding-history-by-coin history-data)
-                  :vault-details-by-address (:vault-details-by-address history-data)
+                  :history-data history-data
                   :as-of-ms as-of-ms
                   :stale-after-ms stale-after-ms
                   :funding-periods-per-year funding-periods-per-year})
         eligible-universe (:eligible-instruments history)
+        current-universe (current-portfolio-universe current-portfolio
+                                                     requested-universe)
+        current-history-data (current-history-source history-data
+                                                     current-universe
+                                                     requested-universe)
+        current-history (when (and (seq current-universe)
+                                   current-history-data)
+                          (align-history
+                           {:universe current-universe
+                            :history-data current-history-data
+                            :as-of-ms as-of-ms
+                            :stale-after-ms stale-after-ms
+                            :funding-periods-per-year funding-periods-per-year}))
         universe-filtered-return-model (filter-black-litterman-views-for-universe
                                         return-model
                                         eligible-universe)
@@ -290,7 +391,9 @@
     (cond-> {:scenario-id (:id draft*)
              :universe eligible-universe
              :requested-universe requested-universe
+             :current-portfolio-universe current-universe
              :current-portfolio current-portfolio
+             :current-portfolio-history current-history
              :return-model return-model
              :risk-model risk-model
              :objective objective

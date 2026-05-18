@@ -1,6 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.history-workflow
-  (:require [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
+  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def default-funding-window-ms
@@ -10,6 +12,7 @@
   [request]
   (select-keys request
                [:universe
+                :current-portfolio-universe
                 :interval
                 :bars
                 :priority
@@ -28,6 +31,54 @@
     (mapv #(history-api-v2/with-discovery-metadata % discovery)
           (or universe []))))
 
+(defn- finite-number?
+  [value]
+  (coercion/finite-number? value))
+
+(defn- non-zero-current-exposure?
+  [exposure]
+  (let [weight (:weight exposure)]
+    (and (finite-number? weight)
+         (not (zero? weight)))))
+
+(defn- current-exposure-instrument
+  [exposure]
+  (select-keys exposure
+               [:instrument-id
+                :market-type
+                :instrument-type
+                :coin
+                :dex
+                :symbol
+                :base
+                :quote
+                :name
+                :vault-address
+                :hip3?
+                :optimizer-history/instrument-id
+                :optimizer-history/display-symbol
+                :optimizer-history/instrument-kind
+                :optimizer-history/history-status
+                :optimizer-history/quality-status
+                :optimizer-history/proxy]))
+
+(defn- distinct-instruments
+  [instruments]
+  (vec (vals (reduce (fn [acc instrument]
+                       (if-let [instrument-id (:instrument-id instrument)]
+                         (assoc acc instrument-id instrument)
+                         acc))
+                     {}
+                     instruments))))
+
+(defn- current-portfolio-universe
+  [state]
+  (->> (:exposures (current-portfolio/current-portfolio-snapshot state))
+       (filter non-zero-current-exposure?)
+       (map current-exposure-instrument)
+       distinct-instruments
+       (enrich-universe-from-discovery state)))
+
 (defn history-request
   [state opts]
   (let [opts* (or opts {})
@@ -35,6 +86,7 @@
         now-ms (or (:now-ms opts*)
                    (:as-of-ms runtime))
         request (merge {:universe (get-in state contracts/draft-universe-path)
+                        :current-portfolio-universe (current-portfolio-universe state)
                         :interval :1d
                         :bars 365
                         :priority :high
@@ -45,7 +97,13 @@
                                      :funding-periods-per-year
                                      :funding-window-ms])
                        (dissoc opts* :now-ms))]
-    (update request :universe #(enrich-universe-from-discovery state %))))
+    (let [request* (-> request
+                       (update :universe #(enrich-universe-from-discovery state %))
+                       (update :current-portfolio-universe
+                               #(enrich-universe-from-discovery state %)))]
+      (cond-> request*
+        (empty? (:current-portfolio-universe request*))
+        (dissoc :current-portfolio-universe)))))
 
 (defn begin-history-load-state
   [signature started-at-ms]
@@ -189,6 +247,7 @@
             request (history-request state
                                      (assoc (request-opts opts)
                                             :universe prefetch-universe
+                                            :current-portfolio-universe []
                                             :now-ms now-ms))
             signature (request-signature request)
             started-at-ms* (or started-at-ms now-ms)

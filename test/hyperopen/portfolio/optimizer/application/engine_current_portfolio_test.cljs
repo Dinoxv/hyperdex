@@ -1,0 +1,66 @@
+(ns hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.application.engine :as engine]
+            [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
+            [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
+
+(deftest run-optimization-locates-current-portfolio-outside-selected-universe-test
+  (let [day-ms 86400000
+        selected-history {"BTC" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "101"}
+                                 {:time-ms (* 2 day-ms) :close "102"}]
+                          "ETH" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "99"}
+                                 {:time-ms (* 2 day-ms) :close "100"}]}
+        hype-history [{:time-ms 0 :close "100"}
+                      {:time-ms day-ms :close "110"}
+                      {:time-ms (* 2 day-ms) :close "105"}
+                      {:time-ms (* 3 day-ms) :close "120"}]
+        request (request-builder/build-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "outside-current"
+                           :universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"}
+                                      {:instrument-id "perp:ETH"
+                                       :market-type :perp
+                                       :coin "ETH"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :objective {:kind :minimum-variance}
+                           :constraints {:long-only? true
+                                         :max-asset-weight 1}})
+                  :current-portfolio {:capital {:nav-usdc 10000}
+                                      :exposures [{:instrument-id "perp:HYPE"
+                                                   :market-type :perp
+                                                   :coin "HYPE"
+                                                   :weight 0.25
+                                                   :signed-notional-usdc 2500
+                                                   :abs-notional-usdc 2500}]
+                                      :by-instrument {"perp:HYPE" {:instrument-id "perp:HYPE"
+                                                                  :market-type :perp
+                                                                  :coin "HYPE"
+                                                                  :weight 0.25}}}
+                  :history-data {:candle-history-by-coin selected-history
+                                 :funding-history-by-coin {}
+                                 :current-portfolio-history-data
+                                 {:candle-history-by-coin {"HYPE" hype-history}
+                                  :funding-history-by-coin {}}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 4 day-ms)})
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]})})]
+    (is (= ["perp:BTC" "perp:ETH"] (:instrument-ids result)))
+    (is (= {"perp:BTC" 0
+            "perp:ETH" 0}
+           (:current-weights-by-instrument result))
+        "Selected-universe current weights should stay aligned to optimizer assets.")
+    (is (= {"perp:HYPE" 0.25}
+           (:current-portfolio-weights-by-instrument result))
+        "The current marker should keep outside-universe current holdings.")
+    (is (pos? (:current-volatility result)))
+    (is (not (zero? (:current-expected-return result))))))

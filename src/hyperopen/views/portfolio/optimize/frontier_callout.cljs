@@ -37,10 +37,15 @@
        :net (reduce + weights*)})))
 
 (defn exposure-summary
-  [{:keys [diagnostics target-weights current-weights]} kind]
+  [{:keys [diagnostics
+           target-weights
+           current-weights
+           current-portfolio-weights]} kind]
   (let [weights-exposure (case kind
                            :target (exposure-from-weights target-weights)
-                           :current (exposure-from-weights current-weights)
+                           :current (exposure-from-weights
+                                     (or current-portfolio-weights
+                                         current-weights))
                            nil)]
     (case kind
       :target
