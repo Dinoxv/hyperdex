@@ -32,6 +32,16 @@
                                     "portfolio-optimizer-frontier-target-marker")
         current-marker (node-by-role view-node
                                      "portfolio-optimizer-frontier-current-marker")
+        current-halo (node-by-role view-node
+                                   "portfolio-optimizer-frontier-current-halo")
+        current-ring (node-by-role view-node
+                                   "portfolio-optimizer-frontier-current-ring")
+        current-core (node-by-role view-node
+                                   "portfolio-optimizer-frontier-current-core")
+        current-label (node-by-role view-node
+                                    "portfolio-optimizer-frontier-current-label")
+        current-leader-line (node-by-role view-node
+                                          "portfolio-optimizer-frontier-current-leader-line")
         target-callout (node-by-role view-node
                                      "portfolio-optimizer-frontier-callout-target")
         current-callout (node-by-role view-node
@@ -165,6 +175,21 @@
     (is (= "3 3" (node-attr target-leader-line :stroke-dasharray)))
     (is (some? current-marker))
     (is (= 0 (node-attr current-marker :tabIndex)))
+    (is (= "#2f9bff" (get-in current-marker [1 :style :color])))
+    (is (= "rgba(47, 155, 255, 0.22)" (node-attr current-halo :fill)))
+    (is (= "rgba(117, 211, 255, 0.92)" (node-attr current-ring :stroke)))
+    (is (= "#2f9bff" (node-attr current-core :fill)))
+    (is (= "rgba(47, 155, 255, 0.50)" (node-attr current-leader-line :stroke)))
+    (is (empty? (filter #{"#35d7c7"
+                          "rgba(53, 215, 199, 0.18)"
+                          "rgba(143, 252, 241, 0.88)"}
+                        [(get-in current-marker [1 :style :color])
+                         (node-attr current-halo :fill)
+                         (node-attr current-ring :stroke)
+                         (node-attr current-core :fill)
+                         (node-attr current-leader-line :stroke)
+                         (node-attr (first (collect-nodes current-label #(= :rect (first %))))
+                                    :stroke)])))
     (is (some? target-callout))
     (is (= "var(--optimizer-border-strong)"
            (node-attr (first (collect-nodes target-callout

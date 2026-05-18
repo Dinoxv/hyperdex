@@ -1,9 +1,9 @@
 (ns hyperopen.views.portfolio.optimize.frontier-current
   (:require [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]))
 
-(def current-color "#35d7c7")
-(def current-fill "rgba(53, 215, 199, 0.18)")
-(def current-stroke "rgba(143, 252, 241, 0.88)")
+(def current-color "#2f9bff")
+(def current-fill "rgba(47, 155, 255, 0.22)")
+(def current-stroke "rgba(117, 211, 255, 0.92)")
 
 (defn- current-model
   [{:keys [point-position x-domain y-domain result]}]
@@ -60,7 +60,7 @@
              :y1 (+ y 6)
              :x2 label-x
              :y2 (+ label-y 10)
-             :stroke "rgba(53, 215, 199, 0.42)"
+             :stroke "rgba(47, 155, 255, 0.50)"
              :strokeWidth 1
              :stroke-dasharray "2 3"
              :data-role "portfolio-optimizer-frontier-current-leader-line"}]
@@ -90,11 +90,11 @@
               :width 56
               :height 22
               :rx 3
-              :fill "rgba(7, 18, 21, 0.94)"
-              :stroke "rgba(143, 252, 241, 0.34)"}]
+              :fill "rgba(7, 30, 56, 0.94)"
+              :stroke "rgba(117, 211, 255, 0.54)"}]
       [:text {:x 28
               :y 11
-              :fill "#d9fffb"
+              :fill "#e3f5ff"
               :fontSize 11
               :fontWeight 650
               :text-anchor "middle"
