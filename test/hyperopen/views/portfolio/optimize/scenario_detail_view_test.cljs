@@ -291,6 +291,39 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
     (is (= false (get-in save-button [1 :disabled])))))
 
+(deftest portfolio-optimizer-scenario-detail-retains-recommendation-while-recomputing-test
+  (let [scenario-id "scn_recompute"
+        base-state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state base-state)
+        state (-> base-state
+                  (assoc-in [:portfolio :optimizer :last-successful-run] solved-run)
+                  (assoc-in [:portfolio :optimizer :draft :universe]
+                            [{:instrument-id "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"}
+                             {:instrument-id "perp:ETH"
+                              :market-type :perp
+                              :coin "ETH"}])
+                  (assoc-in [:portfolio :optimizer :draft :metadata :dirty?] true)
+                  (assoc-in [:portfolio :optimizer :optimization-progress]
+                            {:status :running
+                             :run-id "run-recompute"
+                             :started-at-ms 2600
+                             :overall-percent 35
+                             :steps [{:id :fetch-returns
+                                      :label "Fetch returns"
+                                      :status :running
+                                      :percent 35}]}))
+        view-node (portfolio-view/portfolio-view state)
+        strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-recompute-banner")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-progress-panel")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")))
+    (is (contains? strings "Recomputing recommendation"))
+    (is (contains? strings "Keeping the previous allocation visible until the new run finishes."))))
+
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_inputs"}

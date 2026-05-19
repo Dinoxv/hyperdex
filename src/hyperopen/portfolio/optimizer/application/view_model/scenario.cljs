@@ -80,7 +80,12 @@
         selected-tab (active-tab state)
         readiness (setup-readiness/build-readiness state*)
         current-result?* (workspace/current-result? state* readiness)
-        stale? (workspace/scenario-stale? state* readiness)]
+        stale? (workspace/scenario-stale? state* readiness)
+        optimization-progress (get-in state* contracts/optimization-progress-path)
+        progress-running? (= :running (:status optimization-progress))
+        run-state (get-in state* contracts/run-state-path)
+        running? (or (= :running (:status run-state))
+                     progress-running?)]
     {:state state*
      :route route
      :scenario-id scenario-id
@@ -94,7 +99,10 @@
      :result (workspace/result state*)
      :last-successful-run (get-in state* contracts/last-successful-run-path)
      :active-scenario (get-in state* contracts/active-scenario-path)
-     :run-state (get-in state* contracts/run-state-path)
+     :run-state run-state
+     :optimization-progress optimization-progress
+     :progress-running? progress-running?
+     :running? running?
      :scenario-save-state (get-in state* contracts/scenario-save-state-path)
      :frontier-overlay-mode (get-in state* contracts/ui-frontier-overlay-mode-path)
      :constrain-frontier? (get-in state* contracts/ui-constrain-frontier-path)}))

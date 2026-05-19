@@ -4,6 +4,7 @@
             [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.inputs-tab :as inputs-tab-view]
+            [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]))
@@ -34,11 +35,13 @@
            scenario-name
            active-scenario
            run-state
+           running?
            scenario-save-state
            current-result?]}]
   (let [status (:status active-scenario)
         read-only? (true? (:read-only? active-scenario))
-        running? (= :running (:status run-state))
+        running? (or running?
+                     (= :running (:status run-state)))
         save-state (:status scenario-save-state)
         saving? (= :saving save-state)
         save-disabled? (or saving?
@@ -344,34 +347,55 @@
   [model]
   (= :solved (:status (:result model))))
 
+(defn- recompute-banner
+  [optimization-progress]
+  [:section {:class ["border-y"
+                     "border-primary/40"
+                     "bg-primary/10"
+                     "px-4"
+                     "py-3"
+                     "text-sm"
+                     "text-primary"]
+             :data-role "portfolio-optimizer-recompute-banner"}
+   [:p {:class ["font-semibold"]} "Recomputing recommendation"]
+   [:p {:class ["mt-1" "text-trading-muted"]}
+    "Keeping the previous allocation visible until the new run finishes."]
+   (optimization-progress-panel/progress-panel optimization-progress)])
+
 (defn- recommendation-tab
   [{:keys [last-successful-run
            draft
            stale?
            current-result?
+           running?
+           optimization-progress
            frontier-overlay-mode
            state
            constrain-frontier?] :as model}]
-  [:section {:class ["space-y-0"]
-             :data-role "portfolio-optimizer-recommendation-tab"}
+  (into
+   [:section {:class ["space-y-0"]
+              :data-role "portfolio-optimizer-recommendation-tab"}]
    (cond
-     (and (solved-result? model) current-result?)
-     (results-panel/results-panel
-      last-successful-run
-      draft
-      {:state state
-       :stale? stale?
-       :frontier-overlay-mode frontier-overlay-mode
-       :constrain-frontier? constrain-frontier?
-       :include-rebalance? false})
+     (and (solved-result? model)
+          (or current-result? running?))
+     (cond-> []
+       running? (conj (recompute-banner optimization-progress))
+       true (conj (results-panel/results-panel
+                   last-successful-run
+                   draft
+                   {:state state
+                    :stale? (and stale? (not running?))
+                    :frontier-overlay-mode frontier-overlay-mode
+                    :constrain-frontier? constrain-frontier?
+                    :include-rebalance? false})))
 
      (solved-result? model)
-     (stale-recommendation-blocked)
+     [(stale-recommendation-blocked)]
 
      :else
-     (empty-tab "portfolio-optimizer-recommendation-empty"
-                "Recommendation"
-                "Run or load this scenario to review target allocation, frontier, diagnostics, and rebalance context."))])
+     [(empty-tab "portfolio-optimizer-recommendation-empty"
+                 "Recommendation"
+                 "Run or load this scenario to review target allocation, frontier, diagnostics, and rebalance context.")])))
 
 (defn- rebalance-tab
   [{:keys [last-successful-run] :as model}]
@@ -407,7 +431,8 @@
                 state
                 selected-tab
                 result
-                stale?] :as model} (optimizer-view-model/scenario-detail-model state route)]
+                stale?
+                running?] :as model} (optimizer-view-model/scenario-detail-model state route)]
     [:section {:class ["portfolio-optimizer" "optimizer-scenario-surface"
                        "space-y-0" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-scenario-detail-surface"
@@ -416,7 +441,7 @@
      (provenance-strip model)
      (scenario-tabs scenario-id selected-tab)
      (kpi-strip result)
-     (stale-banner stale?)
+     (stale-banner (and stale? (not running?)))
      (if loading?
        (scenario-loading-state scenario-id)
        (tab-body model))

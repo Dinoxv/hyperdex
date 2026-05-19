@@ -217,6 +217,16 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   await ethRow.click();
 
   await expect(popover).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+    .toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))
+    .toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-stale-banner']"))
+    .toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-recompute-banner']"))
+    .toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-progress-panel']"))
+    .toBeVisible();
   await expect.poll(async () => {
     const universe = await readOptimizerState(page, ["portfolio", "optimizer", "draft", "universe"]);
     return universe
