@@ -187,14 +187,29 @@
           :actions/set-portfolio-optimizer-universe-search-query
           ["eth"]
           {:phase :test})))
+  (is (= [true]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-draft-add-asset-open
+          [true]
+          {:phase :test})))
   (is (= ["ArrowDown" ["perp:BTC" "spot:HYPE/USDC"]]
          (contracts/assert-action-args!
           :actions/handle-portfolio-optimizer-universe-search-keydown
           ["ArrowDown" ["perp:BTC" "spot:HYPE/USDC"]]
           {:phase :test})))
+  (is (= ["Enter" ["perp:BTC" "spot:HYPE/USDC"]]
+         (contracts/assert-action-args!
+          :actions/handle-portfolio-optimizer-draft-add-asset-keydown
+          ["Enter" ["perp:BTC" "spot:HYPE/USDC"]]
+          {:phase :test})))
   (is (= ["perp:ETH"]
          (contracts/assert-action-args!
           :actions/add-portfolio-optimizer-universe-instrument
+          ["perp:ETH"]
+          {:phase :test})))
+  (is (= ["perp:ETH"]
+         (contracts/assert-action-args!
+          :actions/add-portfolio-optimizer-universe-instrument-and-run
           ["perp:ETH"]
           {:phase :test})))
   (is (= ["perp:ETH"]

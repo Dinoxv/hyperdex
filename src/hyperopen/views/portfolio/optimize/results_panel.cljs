@@ -11,7 +11,7 @@
    (results-panel last-successful-run nil))
   ([last-successful-run draft]
    (results-panel last-successful-run draft nil))
-  ([last-successful-run draft {:keys [stale? include-rebalance? frontier-overlay-mode
+  ([last-successful-run draft {:keys [state stale? include-rebalance? frontier-overlay-mode
                                       constrain-frontier?]
                                :or {include-rebalance? true
                                     frontier-overlay-mode :standalone}}]
@@ -24,7 +24,9 @@
                :data-role "portfolio-optimizer-results-grid"}
          [:div {:class ["optimizer-results-left-panel" "min-h-0" "space-y-0"]
                 :data-role "portfolio-optimizer-results-left-panel"}
-          (target-exposure-table/target-exposure-table result)]
+          (target-exposure-table/target-exposure-table result
+                                                        {:state state
+                                                         :draft draft})]
          [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"]
                 :data-role "portfolio-optimizer-results-center-panel"}
           (frontier-chart/frontier-chart

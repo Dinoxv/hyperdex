@@ -44,6 +44,95 @@
     (is (contains? strings "low-invested-exposure"))
     (is (contains? strings "partially-blocked"))))
 
+(deftest results-panel-allocation-add-asset-selector-renders-closed-and-open-states-test
+  (let [draft {:universe [{:instrument-id "perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"}
+                          {:instrument-id "spot:PURR"
+                           :market-type :spot
+                           :coin "PURR"
+                           :symbol "PURR/USDC"
+                           :base "PURR"
+                           :quote "USDC"}]
+               :objective {:kind :minimum-variance}}
+        base-state {:portfolio {:optimizer {:draft draft}}
+                    :asset-selector
+                    {:markets [{:key "perp:BTC"
+                                :market-type :perp
+                                :coin "BTC"
+                                :symbol "BTC-USDC"}
+                               {:key "perp:ETH"
+                                :market-type :perp
+                                :coin "ETH"
+                                :symbol "ETH-USDC"
+                                :base "ETH"
+                                :quote "USDC"
+                                :volume24h 84000000}
+                               {:key "perp:TIA"
+                                :market-type :perp
+                                :coin "TIA"
+                                :symbol "TIA-USDC"
+                                :base "TIA"
+                                :quote "USDC"
+                                :volume24h 12000000}]}}
+        closed-view (results-panel/results-panel
+                     {:result solved-result
+                      :computed-at-ms 2600}
+                     draft
+                     {:state base-state
+                      :frontier-overlay-mode :standalone})
+        open-state (assoc-in base-state
+                             [:portfolio-ui :optimizer :draft-add-asset-open?]
+                             true)
+        open-view (results-panel/results-panel
+                   {:result solved-result
+                    :computed-at-ms 2600}
+                   draft
+                   {:state open-state
+                    :frontier-overlay-mode :standalone})
+        add-button (node-by-role closed-view "portfolio-optimizer-draft-add-asset")
+        popover (node-by-role open-view "portfolio-optimizer-draft-add-asset-popover")
+        search-input (node-by-role open-view
+                                   "portfolio-optimizer-draft-add-asset-search-input")
+        search-clear (node-by-role open-view
+                                   "portfolio-optimizer-draft-add-asset-search-clear")
+        search-hint (node-by-role open-view
+                                  "portfolio-optimizer-draft-add-asset-search-add-hint")
+        eth-row (node-by-role open-view
+                              "portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH")
+        eth-add (node-by-role open-view
+                              "portfolio-optimizer-draft-add-asset-add-perp:ETH")
+        strings (set (collect-strings open-view))]
+    (is (some? add-button))
+    (is (= [[:actions/set-portfolio-optimizer-draft-add-asset-open true]]
+           (click-actions add-button)))
+    (is (nil? (node-by-role closed-view
+                            "portfolio-optimizer-draft-add-asset-popover")))
+    (is (some? popover))
+    (is (contains? (set (node-attr popover :class)) "fixed"))
+    (is (contains? (set (node-attr popover :class)) "md:absolute"))
+    (is (some? search-input))
+    (is (= "text" (node-attr search-input :type)))
+    (is (fn? (node-attr search-input :replicant/on-render)))
+    (is (= [[:actions/set-portfolio-optimizer-universe-search-query
+             [:event.target/value]]]
+           (get-in search-input [1 :on :input])))
+    (is (= [[:actions/handle-portfolio-optimizer-draft-add-asset-keydown
+             [:event/key]
+             ["perp:ETH" "perp:TIA"]]]
+           (get-in search-input [1 :on :keydown])))
+    (is (nil? search-clear))
+    (is (some? search-hint))
+    (is (some? eth-row))
+    (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
+           (click-actions eth-row)))
+    (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
+           (click-actions eth-add)))
+    (is (contains? strings "Search a tradable asset"))
+    (is (contains? strings "ETH-USDC"))
+    (is (not (some? (node-by-role open-view
+                                  "portfolio-optimizer-draft-add-asset-candidate-row-perp:BTC"))))))
+
 (deftest results-panel-renders-constrain-frontier-checkbox-above-chart-test
   (let [draft {:objective {:kind :minimum-variance}}
         result (assoc solved-result

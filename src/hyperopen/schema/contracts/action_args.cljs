@@ -232,12 +232,17 @@
    :actions/set-portfolio-optimizer-instrument-filter ::portfolio-optimizer-instrument-key-value-args
    :actions/set-portfolio-optimizer-asset-override ::portfolio-optimizer-instrument-key-value-args
    :actions/set-portfolio-optimizer-universe-search-query ::common/single-input-args
+   :actions/set-portfolio-optimizer-draft-add-asset-open ::common/boolean-args
    :actions/handle-portfolio-optimizer-universe-search-keydown
+   ::portfolio-optimizer-universe-search-keydown-args
+   :actions/handle-portfolio-optimizer-draft-add-asset-keydown
    ::portfolio-optimizer-universe-search-keydown-args
    :actions/set-portfolio-optimizer-frontier-overlay-mode ::common/keyword-or-string-args
    :actions/set-portfolio-optimizer-constrain-frontier ::common/boolean-args
    :actions/set-portfolio-optimizer-results-tab ::common/tab-args
    :actions/add-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
+   :actions/add-portfolio-optimizer-universe-instrument-and-run
+   ::portfolio-optimizer-instrument-id-args
    :actions/remove-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
    :actions/set-portfolio-optimizer-universe-from-current ::common/no-args
    :actions/load-portfolio-optimizer-history-from-draft ::common/no-args

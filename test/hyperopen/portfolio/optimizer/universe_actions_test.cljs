@@ -23,6 +23,23 @@
                   :warnings []}]))
          instruments)})
 
+(defn- effect-values-by-path
+  [effects]
+  (reduce (fn [acc effect]
+            (case (first effect)
+              :effects/save
+              (assoc acc (second effect) (nth effect 2))
+
+              :effects/save-many
+              (reduce (fn [acc [path value]]
+                        (assoc acc path value))
+                      acc
+                      (second effect))
+
+              acc))
+          {}
+          (or effects [])))
+
 (deftest set-draft-universe-from-current-holdings-test
   (let [btc-instrument {:instrument-id "perp:BTC"
                         :market-type :perp
@@ -133,6 +150,111 @@
            (actions/add-portfolio-optimizer-universe-instrument
             state
             "spot:PURR/USDC")))))
+
+(deftest set-draft-add-asset-open-updates-results-selector-ui-state-test
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :optimizer :draft-add-asset-open?] true]
+            [[:portfolio-ui :optimizer :universe-search-query] ""]
+            [[:portfolio-ui :optimizer :universe-search-active-index] 0]]]]
+         (actions/set-portfolio-optimizer-draft-add-asset-open
+          {:portfolio-ui {:optimizer {:universe-search-query "eth"
+                                      :universe-search-active-index 2}}}
+          true)))
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :optimizer :draft-add-asset-open?] false]
+            [[:portfolio-ui :optimizer :universe-search-query] ""]
+            [[:portfolio-ui :optimizer :universe-search-active-index] 0]]]]
+         (actions/set-portfolio-optimizer-draft-add-asset-open
+          {:portfolio-ui {:optimizer {:universe-search-query "eth"
+                                      :universe-search-active-index 2}}}
+          false))))
+
+(deftest add-draft-universe-instrument-and-run-closes-selector-before-recompute-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true}
+        eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true
+                        :symbol "ETH-USDC"
+                        :base "ETH"
+                        :quote "USDC"}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument]}}}
+               :portfolio-ui {:optimizer {:draft-add-asset-open? true
+                                          :universe-search-query "eth"
+                                          :universe-search-active-index 0}}
+               :asset-selector {:market-by-key
+                                {"perp:ETH" {:key "perp:ETH"
+                                             :market-type :perp
+                                             :coin "ETH"
+                                             :symbol "ETH-USDC"
+                                             :base "ETH"
+                                             :quote "USDC"}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :universe]
+               [btc-instrument eth-instrument]]
+              [[:portfolio-ui :optimizer :universe-search-query]
+               ""]
+              [[:portfolio-ui :optimizer :universe-search-active-index]
+               0]
+              [[:portfolio :optimizer :history-prefetch]
+               (queued-prefetch-state [eth-instrument])]
+              [[:portfolio-ui :optimizer :draft-add-asset-open?]
+               false]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]
+            selection-prefetch-effect
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/add-portfolio-optimizer-universe-instrument-and-run
+            state
+            "perp:ETH")))))
+
+(deftest add-draft-universe-instrument-and-run-preserves-black-litterman-run-gate-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true}
+        eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument]
+                                               :return-model {:kind :black-litterman
+                                                              :views []}
+                                               :risk-model {:kind :sample-covariance}
+                                               :constraints {:long-only? true}}}}
+               :portfolio-ui {:optimizer {:draft-add-asset-open? true
+                                          :black-litterman-editor
+                                          {:selected-kind :absolute
+                                           :drafts {:absolute {:instrument-id "perp:BTC"
+                                                               :return-text ""
+                                                               :return-text-touched? false
+                                                               :confidence :medium
+                                                               :horizon :3m
+                                                               :notes ""}}
+                                           :errors {}}}}
+               :asset-selector {:market-by-key
+                                {"perp:ETH" {:key "perp:ETH"
+                                             :market-type :perp
+                                             :coin "ETH"}}}}
+        effects (actions/add-portfolio-optimizer-universe-instrument-and-run
+                 state
+                 "perp:ETH")
+        values (effect-values-by-path effects)]
+    (is (= [:effects/save-many
+            :effects/load-portfolio-optimizer-history
+            :effects/save-many]
+           (mapv first effects)))
+    (is (= [btc-instrument eth-instrument]
+           (get values [:portfolio :optimizer :draft :universe])))
+    (is (= false
+           (get values [:portfolio-ui :optimizer :draft-add-asset-open?])))
+    (is (= "Add a view before running Use my views."
+           (get values [:portfolio-ui :optimizer :black-litterman-editor :errors :return-text])))
+    (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
+                   effects)))))
 
 (deftest add-draft-universe-instrument-preserves-history-discovery-backend-id-test
   (let [eth-instrument {:instrument-id "perp:ETH"

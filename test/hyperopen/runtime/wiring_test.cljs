@@ -104,9 +104,15 @@
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-asset-override])))
     (is (identical? (:set-portfolio-optimizer-universe-search-query optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :set-portfolio-optimizer-universe-search-query])))
+    (is (identical? (:set-portfolio-optimizer-draft-add-asset-open optimizer-action-deps)
+                    (get-in deps [:portfolio-optimizer
+                                  :set-portfolio-optimizer-draft-add-asset-open])))
     (is (identical? (:handle-portfolio-optimizer-universe-search-keydown optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :handle-portfolio-optimizer-universe-search-keydown])))
+    (is (identical? (:handle-portfolio-optimizer-draft-add-asset-keydown optimizer-action-deps)
+                    (get-in deps [:portfolio-optimizer
+                                  :handle-portfolio-optimizer-draft-add-asset-keydown])))
     (is (identical? (:set-portfolio-optimizer-frontier-overlay-mode optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :set-portfolio-optimizer-frontier-overlay-mode])))
@@ -115,6 +121,9 @@
                                   :set-portfolio-optimizer-constrain-frontier])))
     (is (identical? (:add-portfolio-optimizer-universe-instrument optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :add-portfolio-optimizer-universe-instrument])))
+    (is (identical? (:add-portfolio-optimizer-universe-instrument-and-run optimizer-action-deps)
+                    (get-in deps [:portfolio-optimizer
+                                  :add-portfolio-optimizer-universe-instrument-and-run])))
     (is (identical? (:remove-portfolio-optimizer-universe-instrument optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :remove-portfolio-optimizer-universe-instrument])))
     (is (identical? (:set-portfolio-optimizer-universe-from-current optimizer-action-deps)

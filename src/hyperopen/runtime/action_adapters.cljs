@@ -208,8 +208,14 @@
 (def set-portfolio-optimizer-universe-search-query-action
   portfolio-optimizer-actions/set-portfolio-optimizer-universe-search-query)
 
+(def set-portfolio-optimizer-draft-add-asset-open-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-draft-add-asset-open)
+
 (def handle-portfolio-optimizer-universe-search-keydown-action
   portfolio-optimizer-actions/handle-portfolio-optimizer-universe-search-keydown)
+
+(def handle-portfolio-optimizer-draft-add-asset-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-draft-add-asset-keydown)
 
 (def set-portfolio-optimizer-results-tab-action
   portfolio-optimizer-actions/set-portfolio-optimizer-results-tab)
@@ -222,6 +228,9 @@
 
 (def add-portfolio-optimizer-universe-instrument-action
   portfolio-optimizer-actions/add-portfolio-optimizer-universe-instrument)
+
+(def add-portfolio-optimizer-universe-instrument-and-run-action
+  portfolio-optimizer-actions/add-portfolio-optimizer-universe-instrument-and-run)
 
 (def remove-portfolio-optimizer-universe-instrument-action
   portfolio-optimizer-actions/remove-portfolio-optimizer-universe-instrument)

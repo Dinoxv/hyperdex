@@ -84,6 +84,7 @@
 (def ui-diagnostics-tab-path paths/ui-diagnostics-tab-path)
 (def ui-universe-search-query-path paths/ui-universe-search-query-path)
 (def ui-universe-search-active-index-path paths/ui-universe-search-active-index-path)
+(def ui-draft-add-asset-open-path paths/ui-draft-add-asset-open-path)
 (def ui-black-litterman-editor-path paths/ui-black-litterman-editor-path)
 (def ui-frontier-overlay-mode-path paths/ui-frontier-overlay-mode-path)
 (def ui-constrain-frontier-path paths/ui-constrain-frontier-path)

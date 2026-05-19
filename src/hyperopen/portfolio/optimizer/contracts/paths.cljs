@@ -65,6 +65,8 @@
 (def ui-universe-search-query-path (conj optimizer-ui-path :universe-search-query))
 (def ui-universe-search-active-index-path
   (conj optimizer-ui-path :universe-search-active-index))
+(def ui-draft-add-asset-open-path
+  (conj optimizer-ui-path :draft-add-asset-open?))
 (def ui-black-litterman-editor-path
   (conj optimizer-ui-path :black-litterman-editor))
 (def ui-frontier-overlay-mode-path
@@ -134,6 +136,7 @@
    :optimizer-ui/diagnostics-tab ui-diagnostics-tab-path
    :optimizer-ui/universe-search-query ui-universe-search-query-path
    :optimizer-ui/universe-search-active-index ui-universe-search-active-index-path
+   :optimizer-ui/draft-add-asset-open ui-draft-add-asset-open-path
    :optimizer-ui/black-litterman-editor ui-black-litterman-editor-path
    :optimizer-ui/frontier-overlay-mode ui-frontier-overlay-mode-path
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path})

@@ -81,8 +81,12 @@
    [:actions/set-portfolio-optimizer-asset-override :set-portfolio-optimizer-asset-override]
    [:actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-universe-search-query]
+   [:actions/set-portfolio-optimizer-draft-add-asset-open
+    :set-portfolio-optimizer-draft-add-asset-open]
    [:actions/handle-portfolio-optimizer-universe-search-keydown
     :handle-portfolio-optimizer-universe-search-keydown]
+   [:actions/handle-portfolio-optimizer-draft-add-asset-keydown
+    :handle-portfolio-optimizer-draft-add-asset-keydown]
    [:actions/set-portfolio-optimizer-frontier-overlay-mode
     :set-portfolio-optimizer-frontier-overlay-mode]
    [:actions/set-portfolio-optimizer-constrain-frontier
@@ -91,6 +95,8 @@
     :set-portfolio-optimizer-results-tab]
    [:actions/add-portfolio-optimizer-universe-instrument
     :add-portfolio-optimizer-universe-instrument]
+   [:actions/add-portfolio-optimizer-universe-instrument-and-run
+    :add-portfolio-optimizer-universe-instrument-and-run]
    [:actions/remove-portfolio-optimizer-universe-instrument
     :remove-portfolio-optimizer-universe-instrument]
    [:actions/set-portfolio-optimizer-universe-from-current :set-portfolio-optimizer-universe-from-current]

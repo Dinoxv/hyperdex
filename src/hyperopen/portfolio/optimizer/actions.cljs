@@ -35,14 +35,23 @@
 (def set-portfolio-optimizer-universe-search-query
   universe/set-portfolio-optimizer-universe-search-query)
 
+(def set-portfolio-optimizer-draft-add-asset-open
+  universe/set-portfolio-optimizer-draft-add-asset-open)
+
 (def handle-portfolio-optimizer-universe-search-keydown
   universe/handle-portfolio-optimizer-universe-search-keydown)
+
+(def handle-portfolio-optimizer-draft-add-asset-keydown
+  universe/handle-portfolio-optimizer-draft-add-asset-keydown)
 
 (def set-portfolio-optimizer-results-tab
   run/set-portfolio-optimizer-results-tab)
 
 (def add-portfolio-optimizer-universe-instrument
   universe/add-portfolio-optimizer-universe-instrument)
+
+(def add-portfolio-optimizer-universe-instrument-and-run
+  universe/add-portfolio-optimizer-universe-instrument-and-run)
 
 (def remove-portfolio-optimizer-universe-instrument
   universe/remove-portfolio-optimizer-universe-instrument)

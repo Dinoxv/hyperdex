@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.universe
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
@@ -17,11 +18,36 @@
      [contracts/ui-universe-search-active-index-path
       0]]]])
 
+(defn- draft-add-asset-closed-path-value
+  []
+  [contracts/ui-draft-add-asset-open-path false])
+
+(defn- reset-search-path-values
+  []
+  [[contracts/ui-universe-search-query-path ""]
+   [contracts/ui-universe-search-active-index-path 0]])
+
+(defn set-portfolio-optimizer-draft-add-asset-open
+  [_state open?]
+  [[:effects/save-many
+    (into [[contracts/ui-draft-add-asset-open-path (boolean open?)]]
+          (reset-search-path-values))]])
+
 (declare add-portfolio-optimizer-universe-instrument)
 
 (defn handle-portfolio-optimizer-universe-search-keydown
   [state key market-keys]
   (universe-keyboard/handle-keydown add-portfolio-optimizer-universe-instrument state key market-keys))
+
+(declare add-portfolio-optimizer-universe-instrument-and-run)
+
+(defn handle-portfolio-optimizer-draft-add-asset-keydown
+  [state key market-keys]
+  (universe-keyboard/handle-keydown
+   add-portfolio-optimizer-universe-instrument-and-run
+   state
+   key
+   market-keys))
 
 (defn- with-prefetch-effect
   [effects prefetch-plan]
@@ -73,6 +99,51 @@
         (with-prefetch-effect
           (common/save-draft-path-values path-values)
           prefetch-plan))
+      [])))
+
+(defn- close-draft-add-asset-in-save-many
+  [effect]
+  (if (= :effects/save-many (first effect))
+    (update effect 1
+            (fn [path-values]
+              (let [path-values* (vec (remove #(= contracts/ui-draft-add-asset-open-path
+                                                   (first %))
+                                               path-values))
+                    dirty-path-value (peek path-values*)]
+                (if (= contracts/draft-dirty-path (first dirty-path-value))
+                  (conj (pop path-values*)
+                        (draft-add-asset-closed-path-value)
+                        dirty-path-value)
+                  (conj path-values*
+                        (draft-add-asset-closed-path-value))))))
+    effect))
+
+(defn- state-after-save-effect
+  [state effect]
+  (case (first effect)
+    :effects/save
+    (assoc-in state (second effect) (nth effect 2))
+
+    :effects/save-many
+    (reduce (fn [state* [path value]]
+              (assoc-in state* path value))
+            state
+            (second effect))
+
+    state))
+
+(defn- projected-state-after-save-effects
+  [state effects]
+  (reduce state-after-save-effect state effects))
+
+(defn add-portfolio-optimizer-universe-instrument-and-run
+  [state market-key]
+  (let [effects (add-portfolio-optimizer-universe-instrument state market-key)]
+    (if (seq effects)
+      (let [effects* (update effects 0 close-draft-add-asset-in-save-many)]
+        (into effects*
+              (run-actions/run-portfolio-optimizer-from-draft
+               (projected-state-after-save-effects state effects*))))
       [])))
 
 (defn- black-litterman-universe-path-values

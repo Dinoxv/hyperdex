@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { dispatch, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
+import {
+  keyword as optimizerKeyword,
+  readOptimizerState,
+  seedOptimizerMarkets
+} from "../support/optimizer_state.mjs";
 
 async function seedRetainedDraftScenario(page) {
   await page.evaluate(() => {
@@ -80,8 +85,9 @@ async function seedRetainedDraftScenario(page) {
         kw("rows"), vector([])
       ])
     ]);
+    const requestSignature = map([kw("seed"), "retained-draft-smoke"]);
     const lastSuccessfulRun = map([
-      kw("request-signature"), map([kw("seed"), "retained-draft-smoke"]),
+      kw("request-signature"), requestSignature,
       kw("computed-at-ms"), 1777046100000,
       kw("result"), result
     ]);
@@ -98,6 +104,11 @@ async function seedRetainedDraftScenario(page) {
       state,
       path("portfolio", "optimizer", "last-successful-run"),
       lastSuccessfulRun
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "run-state"),
+      map([kw("status"), kw("succeeded"), kw("request-signature"), requestSignature])
     );
     state = c.assoc_in(
       state,
@@ -150,4 +161,138 @@ test("portfolio optimizer setup and retained draft detail routes render through 
     .toBeVisible();
   await expect(page.locator("[data-role='portfolio-optimizer-scenario-kpi-strip']"))
     .toContainText("Expected Return");
+});
+
+test("portfolio optimizer draft allocation add asset selector updates draft and starts recompute @smoke @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  await seedRetainedDraftScenario(page);
+  await seedOptimizerMarkets(page, [
+    {
+      key: "perp:BTC",
+      "market-type": optimizerKeyword("perp"),
+      coin: "BTC",
+      symbol: "BTC-USDC",
+      base: "BTC",
+      quote: "USDC",
+      volume24h: 96000000
+    },
+    {
+      key: "perp:ETH",
+      "market-type": optimizerKeyword("perp"),
+      coin: "ETH",
+      symbol: "ETH-USDC",
+      base: "ETH",
+      quote: "USDC",
+      volume24h: 84000000
+    }
+  ]);
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize/draft",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+    .toBeVisible();
+
+  const addAsset = page.locator("[data-role='portfolio-optimizer-draft-add-asset']");
+  const popover = page.locator("[data-role='portfolio-optimizer-draft-add-asset-popover']");
+  const searchInput = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-input']");
+  const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
+
+  await addAsset.click();
+  await expect(popover).toBeVisible();
+  await expect(searchInput).toBeVisible();
+  await searchInput.fill("eth");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(ethRow).toBeVisible();
+  await ethRow.click();
+
+  await expect(popover).toHaveCount(0);
+  await expect.poll(async () => {
+    const universe = await readOptimizerState(page, ["portfolio", "optimizer", "draft", "universe"]);
+    return universe
+      .map((row) => row["instrument-id"])
+      .some((instrumentId) => instrumentId === "perp:ETH" || instrumentId === "hl:perp:ETH");
+  }).toBe(true);
+  await expect.poll(async () => {
+    const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);
+    return progress?.status;
+  }).not.toBe("idle");
+});
+
+test("portfolio optimizer draft add asset selector stays contained and focused across viewports @smoke @regression", async ({ page }) => {
+  test.setTimeout(180_000);
+
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 900 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 }
+  ]) {
+    await test.step(`viewport ${viewport.width}`, async () => {
+      await page.setViewportSize(viewport);
+      await visitRoute(page, "/portfolio/optimize/new", {
+        routeModuleTimeoutMs: 30_000,
+        idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+      });
+
+      await seedRetainedDraftScenario(page);
+      await seedOptimizerMarkets(page, [
+        {
+          key: "perp:BTC",
+          "market-type": optimizerKeyword("perp"),
+          coin: "BTC",
+          symbol: "BTC-USDC",
+          base: "BTC",
+          quote: "USDC",
+          volume24h: 96000000
+        },
+        {
+          key: "perp:ETH",
+          "market-type": optimizerKeyword("perp"),
+          coin: "ETH",
+          symbol: "ETH-USDC",
+          base: "ETH",
+          quote: "USDC",
+          volume24h: 84000000
+        }
+      ]);
+      await dispatch(page, [
+        ":actions/navigate",
+        "/portfolio/optimize/draft",
+        { "replace?": true }
+      ]);
+      await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+      const addAsset = page.locator("[data-role='portfolio-optimizer-draft-add-asset']");
+      const popover = page.locator("[data-role='portfolio-optimizer-draft-add-asset-popover']");
+      const searchInput = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-input']");
+      const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
+
+      await addAsset.scrollIntoViewIfNeeded();
+      await addAsset.click();
+      await expect(popover).toBeVisible();
+      await expect(searchInput).toHaveAttribute("type", "text");
+      await expect(searchInput).toBeFocused();
+      await page.keyboard.type("eth");
+      await expect(searchInput).toHaveValue("eth");
+      await expect(ethRow).toBeVisible();
+
+      const box = await popover.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    });
+  }
 });

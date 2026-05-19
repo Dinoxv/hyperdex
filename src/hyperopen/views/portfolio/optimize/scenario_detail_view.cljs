@@ -350,6 +350,7 @@
            stale?
            current-result?
            frontier-overlay-mode
+           state
            constrain-frontier?] :as model}]
   [:section {:class ["space-y-0"]
              :data-role "portfolio-optimizer-recommendation-tab"}
@@ -358,7 +359,8 @@
      (results-panel/results-panel
       last-successful-run
       draft
-      {:stale? stale?
+      {:state state
+       :stale? stale?
        :frontier-overlay-mode frontier-overlay-mode
        :constrain-frontier? constrain-frontier?
        :include-rebalance? false})

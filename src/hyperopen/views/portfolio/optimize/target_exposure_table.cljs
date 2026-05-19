@@ -1,8 +1,29 @@
 (ns hyperopen.views.portfolio.optimize.target-exposure-table
   (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.rebalance :as rebalance-view-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
+
+(def ^:private add-asset-input-class
+  ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
+   "font-mono" "text-[0.6875rem]" "font-medium" "outline-none"
+   "transition-shadow" "focus:border-warning/70"
+   "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
+
+(defn- search-input-mount-focus!
+  [{:keys [:replicant/life-cycle :replicant/node]}]
+  (when (= :replicant.life-cycle/mount life-cycle)
+    (platform/queue-microtask!
+     (fn []
+       (when (and node
+                  (.-isConnected node)
+                  (fn? (.-focus node)))
+         (.focus node)
+         (when (fn? (.-select node))
+           (.select node)))))))
 
 (defn- format-delta-pct
   [value]
@@ -119,25 +140,168 @@
                  "font-mono" "text-right" "font-semibold" "tabular-nums"]}
     (format-compact-usdc delta-notional)]])
 
+(defn- candidate-row
+  [{:keys [market-key label name adv-label]} idx active-index]
+  [:div {:class ["optimizer-draft-add-asset-candidate-row"
+                 "grid" "grid-cols-[58px_minmax(0,1fr)_48px_44px]"
+                 "items-center" "gap-2" "border-b" "border-base-300" "px-2"
+                 "py-1.5" "last:border-b-0" "hover:bg-base-200/40"]
+         :data-role (str "portfolio-optimizer-draft-add-asset-candidate-row-"
+                         market-key)
+         :id (str "portfolio-optimizer-draft-add-asset-candidate-" idx)
+         :role "option"
+         :aria-selected (if (= idx active-index) "true" "false")
+         :data-active (when (= idx active-index) "true")
+         :on {:click [[:actions/add-portfolio-optimizer-universe-instrument-and-run
+                       market-key]]}}
+   [:span {:class ["truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
+    label]
+   [:span {:class ["truncate" "text-[0.6875rem]" "text-trading-muted"]}
+    name]
+   [:span {:class ["font-mono" "text-[0.6rem]" "text-trading-muted" "text-right"]}
+    adv-label]
+   [:button {:type "button"
+             :class ["text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
+                     "text-warning" "hover:text-warning"]
+             :data-role (str "portfolio-optimizer-draft-add-asset-add-"
+                             market-key)
+             :on {:click [[:actions/add-portfolio-optimizer-universe-instrument-and-run
+                           market-key]]}}
+    "+ add"]])
+
+(defn- add-asset-popover
+  [state draft]
+  (let [{:keys [search-query markets candidate-rows active-index market-keys]}
+        (optimizer-view-model/universe-panel-model state draft)
+        searching? (seq search-query)]
+    [:div {:class ["optimizer-draft-add-asset-popover"
+                   "fixed" "inset-x-2" "top-16" "z-30" "max-h-[calc(100vh-5rem)]"
+                   "overflow-auto" "border" "border-base-300" "bg-base-100" "p-3"
+                   "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+                   "md:absolute" "md:inset-auto" "md:right-0" "md:top-[calc(100%+4px)]"
+                   "md:w-[360px]" "md:max-h-[360px]"]
+           :data-role "portfolio-optimizer-draft-add-asset-popover"}
+     [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+      [:div
+       [:p {:class ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]"
+                    "text-trading-muted/70"]}
+        "Add to universe"]
+       [:p {:class ["mt-1" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]"
+                    "text-trading-text"]}
+        "Search a tradable asset"]
+       [:p {:class ["mt-1" "text-[0.6875rem]" "leading-4" "text-trading-muted"]}
+        "Adds to the scenario's universe and re-solves. Targets and frontier will refresh."]]
+      [:button {:type "button"
+                :class ["font-mono" "text-xs" "text-trading-muted" "hover:text-warning"]
+                :aria-label "Close add asset"
+                :data-role "portfolio-optimizer-draft-add-asset-close"
+                :on {:click [[:actions/set-portfolio-optimizer-draft-add-asset-open false]]}}
+       "x"]]
+     [:div {:class ["optimizer-universe-search-shell"
+                    "mt-3" "flex" "items-center" "gap-1.5" "border" "px-2"
+                    "portfolio-optimizer-universe-search-shell"
+                    (if searching?
+                      "border-warning/70"
+                      "border-base-300")
+                    "bg-transparent"]
+            :data-role "portfolio-optimizer-draft-add-asset-search-shell"
+            :data-searching (when searching? "true")}
+      [:span {:class ["optimizer-universe-search-affordance"
+                      "portfolio-optimizer-universe-search-affordance"
+                      "font-mono" "text-[0.65rem]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-draft-add-asset-search-icon"}
+       "⌕"]
+      [:input {:type "text"
+               :class (into add-asset-input-class ["optimizer-universe-search-field"
+                                                   "portfolio-optimizer-universe-search-field"
+                                                   "border-0" "bg-transparent" "px-0"
+                                                   "focus:border-0"])
+               :placeholder "Ticker or name (e.g. TIA, Injective)..."
+               :data-role "portfolio-optimizer-draft-add-asset-search-input"
+               :aria-controls "portfolio-optimizer-draft-add-asset-search-results"
+               :aria-activedescendant (when (seq markets)
+                                        (str "portfolio-optimizer-draft-add-asset-candidate-"
+                                             active-index))
+               :value search-query
+               :replicant/on-render search-input-mount-focus!
+               :on {:input [[:actions/set-portfolio-optimizer-universe-search-query
+                             [:event.target/value]]]
+                    :keydown [[:actions/handle-portfolio-optimizer-draft-add-asset-keydown
+                               [:event/key]
+                               market-keys]]}}]
+      (when searching?
+        [:button {:type "button"
+                  :class ["optimizer-universe-search-affordance"
+                          "optimizer-universe-search-clear"
+                          "portfolio-optimizer-universe-search-affordance"
+                          "font-mono" "text-xs" "text-trading-muted" "hover:text-warning"]
+                  :aria-label "Clear add asset search"
+                  :data-role "portfolio-optimizer-draft-add-asset-search-clear"
+                  :on {:click [[:actions/set-portfolio-optimizer-universe-search-query ""]]}}
+         "x"])
+      [:span {:class ["optimizer-universe-search-add-hint"
+                      "portfolio-optimizer-universe-search-add-hint"
+                      "border" "border-base-300"
+                      "font-mono" "text-[0.55rem]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-draft-add-asset-search-add-hint"}
+       "↵ add"]]
+     (if (seq candidate-rows)
+       (into [:div {:class ["mt-2" "max-h-[260px]" "overflow-auto" "border"
+                            "border-base-300" "bg-base-200/80"]
+                    :id "portfolio-optimizer-draft-add-asset-search-results"
+                    :role "listbox"
+                    :data-role "portfolio-optimizer-draft-add-asset-search-results"}]
+             (map-indexed (fn [idx row]
+                            (candidate-row row idx active-index))
+                          candidate-rows))
+       [:p {:class ["mt-2" "border" "border-base-300" "bg-base-200/70" "p-2"
+                    "text-xs" "text-trading-muted"]
+            :data-role "portfolio-optimizer-draft-add-asset-search-results-empty"}
+        "No matching unused instruments found."])]))
+
+(defn- add-asset-controls
+  [state draft]
+  (when (and state draft)
+    (let [open? (true? (get-in state contracts/ui-draft-add-asset-open-path))]
+      [:div {:class ["relative" "flex" "items-center" "gap-2"]}
+       [:button {:type "button"
+                 :class ["border" "border-base-300" "bg-base-200/40" "px-2.5" "py-1"
+                         "font-mono" "text-[0.65625rem]" "font-semibold"
+                         "text-trading-text" "hover:border-warning/60"
+                         "hover:text-warning"]
+                 :data-role "portfolio-optimizer-draft-add-asset"
+                 :aria-expanded (if open? "true" "false")
+                 :on {:click [[:actions/set-portfolio-optimizer-draft-add-asset-open
+                               true]]}}
+        "+ Add asset"]
+       (when open?
+         (add-asset-popover state draft))])))
+
 (defn target-exposure-table
-  [result]
+  ([result]
+   (target-exposure-table result nil))
+  ([result {:keys [state draft]}]
   (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result)]
     [:section {:class ["optimizer-target-exposure-table"
                        "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
                :data-role "portfolio-optimizer-target-exposure-table"}
-     [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
+     [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
+                    "border-base-300" "px-4" "py-3"]}
       [:div
        [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "Allocation"]
        [:p {:class ["mt-1" "text-xs" "text-trading-text"]}
         "By asset · click to expand legs"]]
-      [:div {:class ["flex" "border" "border-base-300" "text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]"]}
-       [:button {:type "button"
-                 :class ["border-r" "border-base-300" "bg-base-200/60" "px-3" "py-1" "text-trading-text"]}
-        "By Asset"]
-       [:button {:type "button"
-                 :class ["px-3" "py-1" "text-trading-muted"]}
-        "By Leg"]]]
+      [:div {:class ["flex" "items-center" "gap-2"]}
+       [:div {:class ["flex" "border" "border-base-300" "text-[0.62rem]" "font-semibold"
+                      "uppercase" "tracking-[0.06em]"]}
+        [:button {:type "button"
+                  :class ["border-r" "border-base-300" "bg-base-200/60" "px-3" "py-1" "text-trading-text"]}
+         "By Asset"]
+        [:button {:type "button"
+                  :class ["px-3" "py-1" "text-trading-muted"]}
+         "By Leg"]]
+       (add-asset-controls state draft)]]
      [:div {:class ["overflow-auto"]}
       [:table {:class ["w-full" "border-collapse" "text-[0.6875rem]"]}
        [:thead
@@ -152,7 +316,7 @@
 	        [:tbody]
 	        (mapcat
 	         (fn [{:keys [rows] :as group}]
-	           (concat
-	            [(exposure-group-row group)]
-	            (map exposure-row rows)))
-	         groups))]]]))
+	            (concat
+	             [(exposure-group-row group)]
+	             (map exposure-row rows)))
+	          groups))]]])))
