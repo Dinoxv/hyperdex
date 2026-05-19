@@ -199,13 +199,10 @@
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
                0]
-              [[:portfolio :optimizer :history-prefetch]
-               (queued-prefetch-state [eth-instrument])]
               [[:portfolio-ui :optimizer :draft-add-asset-open?]
                false]
               [[:portfolio :optimizer :draft :metadata :dirty?]
                true]]]
-            selection-prefetch-effect
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/add-portfolio-optimizer-universe-instrument-and-run
             state
@@ -244,7 +241,6 @@
                  "perp:ETH")
         values (effect-values-by-path effects)]
     (is (= [:effects/save-many
-            :effects/load-portfolio-optimizer-history
             :effects/save-many]
            (mapv first effects)))
     (is (= [btc-instrument eth-instrument]

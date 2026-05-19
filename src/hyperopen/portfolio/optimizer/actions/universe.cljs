@@ -101,14 +101,16 @@
           prefetch-plan))
       [])))
 
-(defn- close-draft-add-asset-in-save-many
+(defn- draft-add-run-save-effect
   [effect]
   (if (= :effects/save-many (first effect))
     (update effect 1
             (fn [path-values]
-              (let [path-values* (vec (remove #(= contracts/ui-draft-add-asset-open-path
-                                                   (first %))
-                                               path-values))
+              (let [path-values* (vec (remove #(or (= contracts/ui-draft-add-asset-open-path
+                                                     (first %))
+                                                  (= contracts/history-prefetch-path
+                                                     (first %)))
+                                             path-values))
                     dirty-path-value (peek path-values*)]
                 (if (= contracts/draft-dirty-path (first dirty-path-value))
                   (conj (pop path-values*)
@@ -117,6 +119,11 @@
                   (conj path-values*
                         (draft-add-asset-closed-path-value))))))
     effect))
+
+(defn- selection-prefetch-effect?
+  [effect]
+  (and (= :effects/load-portfolio-optimizer-history (first effect))
+       (= :selection-prefetch (:source (second effect)))))
 
 (defn- state-after-save-effect
   [state effect]
@@ -140,7 +147,8 @@
   [state market-key]
   (let [effects (add-portfolio-optimizer-universe-instrument state market-key)]
     (if (seq effects)
-      (let [effects* (update effects 0 close-draft-add-asset-in-save-many)]
+      (let [effects* (vec (remove selection-prefetch-effect?
+                                  (update effects 0 draft-add-run-save-effect)))]
         (into effects*
               (run-actions/run-portfolio-optimizer-from-draft
                (projected-state-after-save-effects state effects*))))

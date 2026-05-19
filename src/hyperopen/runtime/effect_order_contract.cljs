@@ -55,8 +55,7 @@
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
-    :heavy-effect-ids #{:effects/load-portfolio-optimizer-history
-                        :effects/run-portfolio-optimizer-pipeline}}
+    :heavy-effect-ids #{:effects/run-portfolio-optimizer-pipeline}}
 
    :actions/set-portfolio-optimizer-universe-from-current
    {:required-phase-order [:projection :persistence :heavy-io]
