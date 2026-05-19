@@ -70,6 +70,57 @@
                                  :summary {:ready-count 1 :blocked-count 0}
                                  :rows []}}}))
 
+(defn- scenario-kpi-delta-classes
+  [current-return target-return current-vol target-vol]
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/scn_tone"}
+                    :portfolio {:optimizer
+                                {:active-scenario {:loaded-id "scn_tone"
+                                                   :name "Tone Check"
+                                                   :status :computed}
+                                 :draft {:id "scn_tone"
+                                         :name "Tone Check"
+                                         :universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}]
+                                         :objective {:kind :max-sharpe}
+                                         :return-model {:kind :historical-mean}
+                                         :risk-model {:kind :sample-covariance}
+                                         :constraints {:max-asset-weight 1.0
+                                                       :gross-max 1.0}
+                                         :metadata {:dirty? false}}
+                                 :last-successful-run
+                                 (fixtures/sample-last-successful-run
+                                  {:computed-at-ms 1714137600000
+                                   :request-signature {:seed 1}
+                                   :result {:as-of-ms 1714137600000
+                                            :instrument-ids ["perp:BTC"]
+                                            :current-weights [1.0]
+                                            :target-weights [1.0]
+                                            :target-weights-by-instrument {"perp:BTC" 1.0}
+                                            :current-weights-by-instrument {"perp:BTC" 1.0}
+                                            :current-expected-return current-return
+                                            :expected-return target-return
+                                            :current-volatility current-vol
+                                            :volatility target-vol
+                                            :performance {:shrunk-sharpe 0.44}
+                                            :history-summary {:return-observations 12 :stale? false}
+                                            :return-model :historical-mean
+                                            :risk-model :sample-covariance
+                                            :diagnostics {:turnover 0.0
+                                                          :gross-exposure 1.0
+                                                          :net-exposure 1.0}
+                                            :rebalance-preview {:status :ready
+                                                                :capital-usd 100000
+                                                                :summary {:ready-count 1 :blocked-count 0}
+                                                                :rows []}}})}}})]
+    {:volatility (set (get-in (node-by-role view-node
+                                             "portfolio-optimizer-scenario-kpi-volatility")
+                              [4 1 :class]))
+     :expected-return (set (get-in (node-by-role view-node
+                                                 "portfolio-optimizer-scenario-kpi-expected-return")
+                                  [4 1 :class]))}))
+
 (deftest portfolio-view-delegates-optimizer-scenario-route-to-detail-surface-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_01"}})
@@ -173,6 +224,15 @@
     (is (contains? strings "data as of "))
     (is (contains? strings "gross ≤ 1.5 · cap 40.00%"))
     (is (contains? strings "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."))))
+
+(deftest portfolio-optimizer-scenario-kpi-delta-classes-reflect-metric-semantics-test
+  (let [improved-risk (scenario-kpi-delta-classes 0.1 0.14 0.32 0.24)
+        worse-risk (scenario-kpi-delta-classes 0.1 0.14 0.24 0.32)
+        lower-return (scenario-kpi-delta-classes 0.14 0.1 0.32 0.24)]
+    (is (contains? (:volatility improved-risk) "text-trading-green"))
+    (is (contains? (:volatility worse-risk) "text-trading-red"))
+    (is (contains? (:expected-return improved-risk) "text-trading-green"))
+    (is (contains? (:expected-return lower-return) "text-warning"))))
 
 (deftest portfolio-optimizer-scenario-detail-marks-clean-mismatched-result-stale-test
   (let [scenario-id "scn_bl"

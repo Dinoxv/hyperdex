@@ -128,20 +128,30 @@
                  :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
         (if running? "Running" "Rerun")]]]]))
 
+(defn- kpi-delta-class
+  [delta {:keys [positive negative]}]
+  (cond
+    (not (opt-format/finite-number? delta)) "text-trading-muted"
+    (pos? delta) positive
+    (neg? delta) negative
+    :else "text-trading-muted"))
+
 (defn- kpi-card
-  [data-role label value delta]
-  [:div {:class ["optimizer-kpi-card" "border-r" "border-base-300" "px-3" "py-2.5" "last:border-r-0"]
-         :data-role data-role}
-   [:p {:class ["font-mono"
-                "text-[0.6rem]"
-                "uppercase"
-                "tracking-[0.08em]"
-                "text-trading-muted/70"]}
-    label]
-   [:p {:class ["mt-1" "font-mono" "text-sm" "font-semibold" "tabular-nums" "text-trading-text"]}
-    value]
-   [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "tabular-nums" "text-trading-green"]}
-    delta]])
+  ([data-role label value delta]
+   (kpi-card data-role label value delta "text-trading-green"))
+  ([data-role label value delta delta-class]
+   [:div {:class ["optimizer-kpi-card" "border-r" "border-base-300" "px-3" "py-2.5" "last:border-r-0"]
+          :data-role data-role}
+    [:p {:class ["font-mono"
+                 "text-[0.6rem]"
+                 "uppercase"
+                 "tracking-[0.08em]"
+                 "text-trading-muted/70"]}
+     label]
+    [:p {:class ["mt-1" "font-mono" "text-sm" "font-semibold" "tabular-nums" "text-trading-text"]}
+     value]
+    [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "tabular-nums" delta-class]}
+     delta]]))
 
 (defn- kpi-strip
   [result*]
@@ -152,6 +162,10 @@
         current-vol (:current-volatility result*)
         target-return (:expected-return result*)
         target-vol (:volatility result*)
+        return-delta (when (opt-format/finite-number? current-return)
+                       (- (or target-return 0) current-return))
+        vol-delta (when (opt-format/finite-number? current-vol)
+                    (- (or target-vol 0) current-vol))
         gross (:gross-exposure diagnostics)
         net (:net-exposure diagnostics)]
     [:section {:class ["optimizer-scenario-kpi-strip"
@@ -165,8 +179,11 @@
                   (opt-format/format-pct target-vol)]
                  (opt-format/format-pct target-vol))
                (if (opt-format/finite-number? current-vol)
-                 (str (opt-format/format-pct-delta (- (or target-vol 0) current-vol)) " · annualized")
-                 "annualized"))
+                 (str (opt-format/format-pct-delta vol-delta) " · annualized")
+                 "annualized")
+               (kpi-delta-class vol-delta
+                                {:positive "text-trading-red"
+                                 :negative "text-trading-green"}))
      (kpi-card "portfolio-optimizer-scenario-kpi-expected-return"
                "Expected Return · current → target"
                (if (opt-format/finite-number? current-return)
@@ -175,8 +192,11 @@
                   (opt-format/format-pct target-return)]
                  (opt-format/format-pct target-return))
                (if (opt-format/finite-number? current-return)
-                 (str (opt-format/format-pct-delta (- (or target-return 0) current-return)) " · annualized")
-                 "annualized"))
+                 (str (opt-format/format-pct-delta return-delta) " · annualized")
+                 "annualized")
+               (kpi-delta-class return-delta
+                                {:positive "text-trading-green"
+                                 :negative "text-warning"}))
      (kpi-card "portfolio-optimizer-scenario-kpi-sharpe"
                "Sharpe"
                (opt-format/format-decimal (or (:shrunk-sharpe performance)
