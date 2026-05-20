@@ -102,6 +102,14 @@
     border-color: var(--optimizer-accent-border);
   }
 
+  .portfolio-optimizer .optimizer-draft-add-asset-results {
+    scrollbar-width: none;
+  }
+
+  .portfolio-optimizer .optimizer-draft-add-asset-results::-webkit-scrollbar {
+    display: none;
+  }
+
   .portfolio-optimizer .optimizer-target-exposure-table table th {
     background-color: var(--optimizer-surface);
     color: var(--optimizer-text-3);

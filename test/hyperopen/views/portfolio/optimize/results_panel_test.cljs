@@ -100,6 +100,8 @@
                                    "portfolio-optimizer-draft-add-asset-search-clear")
         search-hint (node-by-role open-view
                                   "portfolio-optimizer-draft-add-asset-search-add-hint")
+        search-results (node-by-role open-view
+                                     "portfolio-optimizer-draft-add-asset-search-results")
         eth-row (node-by-role open-view
                               "portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH")
         eth-add (node-by-role open-view
@@ -113,6 +115,8 @@
     (is (some? popover))
     (is (contains? (set (node-attr popover :class)) "fixed"))
     (is (contains? (set (node-attr popover :class)) "md:absolute"))
+    (is (contains? (set (node-attr popover :class)) "overflow-hidden"))
+    (is (not (contains? (set (node-attr popover :class)) "overflow-auto")))
     (is (contains? (set (node-attr popover :class)) "optimizer-draft-add-asset-popover--dark"))
     (is (some? search-input))
     (is (= "text" (node-attr search-input :type)))
@@ -128,6 +132,8 @@
            (get-in search-input [1 :on :keydown])))
     (is (nil? search-clear))
     (is (nil? search-hint))
+    (is (contains? (set (node-attr search-results :class))
+                   "optimizer-draft-add-asset-results"))
     (is (some? eth-row))
     (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
            (click-actions eth-row)))

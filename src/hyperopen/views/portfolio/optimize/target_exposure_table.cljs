@@ -223,7 +223,7 @@
     [:div {:class ["optimizer-draft-add-asset-popover"
                    "optimizer-draft-add-asset-popover--dark"
                    "fixed" "inset-x-2" "top-16" "z-30" "max-h-[calc(100vh-5rem)]"
-                   "overflow-auto" "border" "border-base-300" "p-3"
+                   "overflow-hidden" "border" "border-base-300" "p-3"
                    "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
                    "md:absolute" "md:inset-auto" "md:right-0" "md:top-[calc(100%+4px)]"
                    "md:w-[380px]" "md:max-h-[360px]"]
@@ -277,7 +277,8 @@
                                [:event/key]
                                market-keys]]}}]]
      (if (seq candidate-rows)
-       (into [:div {:class ["mt-2" "max-h-[260px]" "overflow-auto" "border"
+       (into [:div {:class ["optimizer-draft-add-asset-results"
+                            "mt-2" "max-h-[260px]" "overflow-auto" "border"
                             "border-base-300" "bg-base-200/80"]
                     :id "portfolio-optimizer-draft-add-asset-search-results"
                     :role "listbox"

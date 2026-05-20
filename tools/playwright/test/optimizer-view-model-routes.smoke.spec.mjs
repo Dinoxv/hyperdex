@@ -353,6 +353,7 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   const searchInput = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-input']");
   const searchHint = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-add-hint']");
   const searchClear = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-clear']");
+  const searchResults = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-results']");
   const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
 
   await addAsset.click();
@@ -360,11 +361,13 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   await expect(searchInput).toBeVisible();
   await expect(searchHint).toHaveCount(0);
   await expect(popover).toHaveCSS("background-color", "rgb(14, 16, 19)");
+  await expect(popover).toHaveCSS("overflow-y", "hidden");
   await expect(searchInput).toHaveCSS("box-shadow", "none");
   await searchInput.fill("eth");
   await expect(searchClear).toHaveCount(0);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(ethRow).toBeVisible();
+  await expect(searchResults).toHaveCSS("scrollbar-width", "none");
   await ethRow.click();
 
   await expect(popover).toHaveCount(0);
