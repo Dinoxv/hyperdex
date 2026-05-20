@@ -4,7 +4,8 @@
             [hyperopen.portfolio.optimizer.domain.constraints :as constraints]
             [hyperopen.portfolio.optimizer.domain.objectives :as objectives]
             [hyperopen.portfolio.optimizer.domain.returns :as returns]
-            [hyperopen.portfolio.optimizer.domain.risk :as risk]))
+            [hyperopen.portfolio.optimizer.domain.risk :as risk]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (defn- return-model-kind
   [request]
@@ -13,14 +14,77 @@
 (defn- universe-by-id
   [universe]
   (into {}
-        (map (fn [instrument]
-               [(:instrument-id instrument) instrument]))
+        (mapcat (fn [instrument]
+                  (map (fn [instrument-id]
+                         [instrument-id instrument])
+                       (ids/instrument-id-candidates instrument))))
         universe))
 
 (defn- ordered-universe
   [universe instrument-ids]
   (let [by-id (universe-by-id universe)]
-    (mapv by-id instrument-ids)))
+    (mapv (fn [instrument-id]
+            (assoc (or (get by-id instrument-id) {})
+                   :instrument-id instrument-id))
+          instrument-ids)))
+
+(defn- id-set
+  [values]
+  (cond
+    (nil? values) nil
+    (set? values) values
+    (sequential? values) (set values)
+    :else #{values}))
+
+(defn- instrument-allowed?
+  [allowlist instrument]
+  (or (nil? allowlist)
+      (some allowlist (ids/instrument-id-candidates instrument))))
+
+(defn- instrument-blocked?
+  [blocklist instrument]
+  (boolean (some blocklist (ids/instrument-id-candidates instrument))))
+
+(defn- active-universe
+  [request]
+  (let [allowlist (id-set (get-in request [:constraints :allowlist]))
+        blocklist (or (id-set (get-in request [:constraints :blocklist])) #{})]
+    (filterv (fn [instrument]
+               (and (instrument-allowed? allowlist instrument)
+                    (not (instrument-blocked? blocklist instrument))))
+             (:universe request))))
+
+(defn- first-available-id
+  [available instrument]
+  (first (filter available (ids/instrument-id-candidates instrument))))
+
+(defn- active-instrument-ids
+  [request available-instrument-ids]
+  (let [available (set available-instrument-ids)
+        selected (if (seq (:universe request))
+                   (keep (partial first-available-id available)
+                         (active-universe request))
+                   available-instrument-ids)]
+    (vec (distinct selected))))
+
+(defn- covariance-submatrix
+  [covariance indexes]
+  (mapv (fn [row-idx]
+          (let [row (nth covariance row-idx)]
+            (mapv #(nth row %) indexes)))
+        indexes))
+
+(defn- filter-risk-result
+  [risk-result active-ids]
+  (let [instrument-ids (:instrument-ids risk-result)]
+    (if (= instrument-ids active-ids)
+      risk-result
+      (let [index-by-id (zipmap instrument-ids (range))
+            indexes (mapv index-by-id active-ids)]
+        (assoc risk-result
+               :instrument-ids active-ids
+               :covariance (covariance-submatrix (:covariance risk-result)
+                                                 indexes))))))
 
 (defn- current-weight
   [request instrument-id]
@@ -163,10 +227,12 @@
   ([request]
    (optimization-context request nil))
   ([request on-progress]
-   (let [risk-result (risk/estimate-risk-model
-                      {:risk-model (:risk-model request)
-                       :periods-per-year (:periods-per-year request)
-                       :history (:history request)})
+   (let [raw-risk-result (risk/estimate-risk-model
+                          {:risk-model (:risk-model request)
+                           :periods-per-year (:periods-per-year request)
+                           :history (:history request)})
+         instrument-ids (active-instrument-ids request (:instrument-ids raw-risk-result))
+         risk-result (filter-risk-result raw-risk-result instrument-ids)
          _ (report-progress!
             on-progress
             {:step :risk-model
@@ -174,7 +240,6 @@
              :percent 100
              :detail (or (some-> (:model risk-result) name)
                          "estimated")})
-         instrument-ids (:instrument-ids risk-result)
          return-result (expected-return-result request risk-result)
          _ (report-progress!
             on-progress

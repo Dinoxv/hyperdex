@@ -106,17 +106,28 @@
   (vec (or (get-in state contracts/draft-universe-path)
            [])))
 
+(defn instrument-matches-id?
+  [instrument instrument-id]
+  (let [instrument-id* (non-blank-text instrument-id)]
+    (boolean
+     (and instrument-id*
+          (some #(= instrument-id* %)
+                (ids/instrument-id-candidates instrument))))))
+
+(defn find-instrument
+  [universe instrument-id]
+  (some #(when (instrument-matches-id? % instrument-id) %)
+        universe))
+
 (defn instrument-present?
   [universe instrument-id]
-  (boolean
-   (some #(= instrument-id (:instrument-id %)) universe)))
+  (boolean (find-instrument universe instrument-id)))
 
 (defn instrument-market-type
   [state instrument-id]
-  (some (fn [instrument]
-          (when (= instrument-id (:instrument-id instrument))
-            (:market-type instrument)))
-        (get-in state contracts/draft-universe-path)))
+  (some-> (find-instrument (get-in state contracts/draft-universe-path)
+                           instrument-id)
+          :market-type))
 
 (defn set-membership
   [items item enabled?]

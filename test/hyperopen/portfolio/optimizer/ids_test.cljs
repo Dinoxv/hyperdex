@@ -37,3 +37,16 @@
                                        :coin "BTC"})))
   (is (= "BTC"
          (ids/normalize-instrument-id {:coin " BTC "}))))
+
+(deftest instrument-id-candidates-include-backend-and-history-local-ids-test
+  (is (= ["hl:perp:ETH" "perp:ETH"]
+         (ids/instrument-id-candidates
+          {:instrument-id "hl:perp:ETH"
+           :market-type :perp
+           :coin "ETH"})))
+  (is (= ["perp:ETH" "hl:perp:ETH"]
+         (ids/instrument-id-candidates
+          {:instrument-id "perp:ETH"
+           :market-type :perp
+           :coin "ETH"
+           :optimizer-history/instrument-id "hl:perp:ETH"}))))

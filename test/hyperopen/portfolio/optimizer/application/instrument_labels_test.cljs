@@ -17,3 +17,12 @@
     (is (= {"spot:@107" "HYPE"
             "perp:HYPE" "HYPE"}
            labels))))
+
+(deftest labels-by-instrument-matches-backend-perp-to-local-history-id-test
+  (let [labels (instrument-labels/labels-by-instrument
+                [{:instrument-id "hl:perp:ETH"
+                  :market-type :perp
+                  :coin "ETH"}]
+                ["perp:ETH"])]
+    (is (= {"perp:ETH" "ETH"}
+           labels))))

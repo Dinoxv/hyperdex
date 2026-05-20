@@ -8,8 +8,10 @@
 (defn- universe-by-id
   [universe]
   (into {}
-        (map (fn [instrument]
-               [(:instrument-id instrument) instrument]))
+        (mapcat (fn [instrument]
+                  (map (fn [instrument-id]
+                         [instrument-id instrument])
+                       (ids/instrument-id-candidates instrument))))
         universe))
 
 (def ^:private vault-instrument-id? ids/vault-instrument-id?)

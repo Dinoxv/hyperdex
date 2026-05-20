@@ -58,3 +58,37 @@
            (:market perp-row)))
     (is (= :vault (:icon-kind vault-group)))
     (is (= true (:hidden? (first (:rows vault-group)))))))
+
+(deftest target-exposure-table-model-matches-excluded-backend-id-to-local-row-test
+  (let [draft {:universe [{:instrument-id "hl:perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"}
+                          {:instrument-id "hl:perp:ETH"
+                           :market-type :perp
+                           :coin "ETH"}]
+               :constraints {:blocklist ["hl:perp:ETH"]}}
+        result {:instrument-ids ["perp:BTC"]
+                :current-weights [0]
+                :target-weights [1]
+                :labels-by-instrument {"perp:BTC" "BTC"}
+                :rebalance-preview {:capital-usd 10000}}
+        model (rebalance/target-exposure-table-model result {:draft draft})
+        eth-group (some #(when (= "ETH" (:asset %)) %) (:groups model))
+        eth-row (first (:rows eth-group))]
+    (is (some? eth-group))
+    (is (= {:asset "ETH"
+            :instrument-id "perp:ETH"
+            :target-weight 0
+            :delta 0
+            :delta-notional 0
+            :excluded? true
+            :status-label "sell to 0"}
+           (select-keys eth-group
+                        [:asset :instrument-id :target-weight :delta
+                         :delta-notional :excluded? :status-label])))
+    (is (= {:instrument-id "perp:ETH"
+            :target-weight 0
+            :excluded? true
+            :status-label "sell to 0"}
+           (select-keys eth-row
+                        [:instrument-id :target-weight :excluded? :status-label])))))

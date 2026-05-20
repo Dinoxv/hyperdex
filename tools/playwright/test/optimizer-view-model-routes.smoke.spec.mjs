@@ -136,14 +136,14 @@ async function seedTwoAssetDraftScenario(page) {
       c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
 
     const btcInstrument = map([
-      kw("instrument-id"), "perp:BTC",
+      kw("instrument-id"), "hl:perp:BTC",
       kw("market-type"), kw("perp"),
       kw("coin"), "BTC",
       kw("symbol"), "BTC-USDC",
       kw("name"), "Bitcoin"
     ]);
     const ethInstrument = map([
-      kw("instrument-id"), "perp:ETH",
+      kw("instrument-id"), "hl:perp:ETH",
       kw("market-type"), kw("perp"),
       kw("coin"), "ETH",
       kw("symbol"), "ETH-USDC",
@@ -161,6 +161,12 @@ async function seedTwoAssetDraftScenario(page) {
         kw("max-asset-weight"), 1,
         kw("gross-max"), 1,
         kw("blocklist"), vector([])
+      ]),
+      kw("execution-assumptions"), map([
+        kw("manual-capital-usdc"), 10000,
+        kw("fallback-slippage-bps"), 20,
+        kw("prices-by-id"), map(["perp:BTC", 100000, "perp:ETH", 5000]),
+        kw("fee-bps-by-id"), map(["perp:BTC", 4, "perp:ETH", 4])
       ]),
       kw("metadata"), map([kw("dirty?"), false])
     ]);
@@ -219,6 +225,35 @@ async function seedTwoAssetDraftScenario(page) {
     const store = globalThis.hyperopen.system.store;
     let state = c.deref(store);
     state = c.assoc_in(state, path("portfolio", "optimizer", "draft"), draft);
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "history-data"),
+      map([
+        kw("candle-history-by-coin"), map([
+          "BTC", vector([
+            map([kw("time-ms"), 1000, kw("close"), "100"]),
+            map([kw("time-ms"), 2000, kw("close"), "102"]),
+            map([kw("time-ms"), 3000, kw("close"), "105"]),
+            map([kw("time-ms"), 4000, kw("close"), "109"])
+          ]),
+          "ETH", vector([
+            map([kw("time-ms"), 1000, kw("close"), "100"]),
+            map([kw("time-ms"), 2000, kw("close"), "101"]),
+            map([kw("time-ms"), 3000, kw("close"), "100"]),
+            map([kw("time-ms"), 4000, kw("close"), "102"])
+          ])
+        ]),
+        kw("funding-history-by-coin"), map([
+          "BTC", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])]),
+          "ETH", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])])
+        ])
+      ])
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "runtime"),
+      map([kw("as-of-ms"), 5000, kw("stale-after-ms"), 60000])
+    );
     state = c.assoc_in(state, path("portfolio", "optimizer", "last-successful-run"), lastSuccessfulRun);
     state = c.assoc_in(
       state,
@@ -384,7 +419,17 @@ test("portfolio optimizer draft allocation row can be excluded and rerun @smoke 
   await expect.poll(async () => {
     const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);
     return progress?.status;
-  }).not.toBe("idle");
+  }).toBe("succeeded");
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, ["portfolio", "optimizer", "last-successful-run", "result"]);
+    return result?.["instrument-ids"]?.map((instrumentId) =>
+      String(instrumentId).replace(/^hl:/, "")
+    );
+  }).toEqual(["perp:BTC"]);
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, ["portfolio", "optimizer", "last-successful-run", "result"]);
+    return result?.frontier?.every((point) => point.weights?.length === 1);
+  }).toBe(true);
 });
 
 test("portfolio optimizer draft add asset selector stays contained and focused across viewports @smoke @regression", async ({ page }) => {

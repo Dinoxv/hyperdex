@@ -65,3 +65,46 @@
          (vault-address-from-value (:coin value))
          (normalize-vault-address (:vault-address value)))
      (vault-address-from-value value))))
+
+(defn- base-symbol-from-value
+  [value]
+  (let [text (id-text value)
+        scoped (when text
+                 (last (str/split text #":")))
+        base (cond
+               (and scoped (str/includes? scoped "/"))
+               (first (str/split scoped #"/" 2))
+
+               (and scoped (str/includes? scoped "-"))
+               (first (str/split scoped #"-" 2))
+
+               :else scoped)]
+    (coercion/non-blank-text base)))
+
+(defn- market-prefixed-instrument-id
+  [instrument]
+  (let [market-type (normalize-market-type (or (:market-type instrument)
+                                               (:instrument-type instrument)))
+        base (or (base-symbol-from-value (:coin instrument))
+                 (base-symbol-from-value (:base instrument))
+                 (base-symbol-from-value (:display-symbol instrument))
+                 (base-symbol-from-value (:symbol instrument))
+                 (base-symbol-from-value (:instrument-id instrument)))]
+    (when base
+      (case market-type
+        :perp (str "perp:" base)
+        :spot (str "spot:" base)
+        nil))))
+
+(defn instrument-id-candidates
+  [value]
+  (if (map? value)
+    (vec (distinct
+          (keep id-text
+                [(normalize-instrument-id value)
+                 (:key value)
+                 (:local-instrument-id value)
+                 (:optimizer-history/local-instrument-id value)
+                 (:optimizer-history/instrument-id value)
+                 (market-prefixed-instrument-id value)])))
+    (vec (keep id-text [value]))))

@@ -74,11 +74,36 @@
       "vault" (instrument-label labels-by-instrument instrument-id)
       value)))
 
+(defn- universe-by-candidate-id
+  [universe]
+  (into {}
+        (mapcat (fn [instrument]
+                  (map (fn [instrument-id]
+                         [instrument-id instrument])
+                       (ids/instrument-id-candidates instrument))))
+        universe))
+
+(defn- excluded-instrument?
+  [excluded-ids instrument]
+  (boolean
+   (and instrument
+        (some excluded-ids (ids/instrument-id-candidates instrument)))))
+
+(defn- preferred-row-id
+  [result-ids instrument]
+  (let [candidates (ids/instrument-id-candidates instrument)]
+    (or (some result-ids candidates)
+        (some #(when-not (str/starts-with? % "hl:") %)
+              (reverse candidates))
+        (first candidates))))
+
 (defn- row-model
-  [idx labels-by-instrument binding-instrument-ids excluded-ids capital-usd
+  [idx labels-by-instrument binding-instrument-ids excluded-ids draft-by-id capital-usd
    [instrument-id current-weight target-weight]]
   (let [current-weight* (or current-weight 0)
-        excluded? (contains? excluded-ids instrument-id)
+        excluded? (or (contains? excluded-ids instrument-id)
+                      (excluded-instrument? excluded-ids
+                                            (get draft-by-id instrument-id)))
         target-weight* (if excluded?
                          0
                          (or target-weight 0))
@@ -163,9 +188,15 @@
         labels-by-instrument (or (:labels-by-instrument result) {})
         draft-universe (vec (:universe draft))
         excluded-ids (set (or (get-in draft [:constraints :blocklist]) []))
-        draft-ids (set (keep :instrument-id draft-universe))
+        draft-by-id (universe-by-candidate-id draft-universe)
+        result-ids (set instrument-ids)
+        excluded-row-ids (keep (fn [instrument]
+                                 (when (excluded-instrument? excluded-ids
+                                                             instrument)
+                                   (preferred-row-id result-ids instrument)))
+                               draft-universe)
         row-ids (vec (distinct (concat instrument-ids
-                                       (filter draft-ids excluded-ids))))
+                                       excluded-row-ids)))
         binding-instrument-ids (set (keep :instrument-id
                                           (get-in result [:diagnostics :binding-constraints])))
         rows (mapv (fn [idx row]
@@ -173,6 +204,7 @@
                                 labels-by-instrument
                                 binding-instrument-ids
                                 excluded-ids
+                                draft-by-id
                                 capital-usd
                                 row))
                    (range)

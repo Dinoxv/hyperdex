@@ -192,6 +192,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
@@ -258,6 +259,7 @@
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
+            [hyperopen.portfolio.optimizer.universe-exclusion-actions-test]
             [hyperopen.portfolio.optimizer.universe-keyboard-test]
             [hyperopen.portfolio.optimizer.worker-test]
             [hyperopen.portfolio.query-state-test]
@@ -846,6 +848,7 @@
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
@@ -912,6 +915,7 @@
              'hyperopen.portfolio.optimizer.runtime-catalog-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
+             'hyperopen.portfolio.optimizer.universe-exclusion-actions-test
              'hyperopen.portfolio.optimizer.universe-keyboard-test
              'hyperopen.portfolio.optimizer.worker-test
              'hyperopen.portfolio.query-state-test

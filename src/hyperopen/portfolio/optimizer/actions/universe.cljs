@@ -157,16 +157,20 @@
 (defn toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
   [state instrument-id]
   (let [instrument-id* (common/non-blank-text instrument-id)
-        universe (common/draft-universe state)]
-    (if (and instrument-id*
-             (common/instrument-present? universe instrument-id*))
+        universe (common/draft-universe state)
+        instrument (common/find-instrument universe instrument-id*)]
+    (if (and instrument-id* instrument)
       (let [blocklist (common/constraint-list state :blocklist)
-            excluded? (some #(= instrument-id* %) blocklist)
+            instrument-ids (set (ids/instrument-id-candidates instrument))
+            excluded? (boolean (some instrument-ids blocklist))
+            blocklist* (vec (remove instrument-ids blocklist))
             effects (common/save-draft-path-values
                      [[(conj contracts/draft-constraints-path :blocklist)
-                       (common/set-membership blocklist
-                                              instrument-id*
-                                              (not excluded?))]])
+                       (if excluded?
+                         blocklist*
+                         (common/set-membership blocklist*
+                                                instrument-id*
+                                                true))]])
             state* (projected-state-after-save-effects state effects)]
         (into effects
               (run-actions/run-portfolio-optimizer-from-draft state*)))
