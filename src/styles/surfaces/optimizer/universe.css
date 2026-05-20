@@ -37,6 +37,14 @@
     box-shadow: 0 0 0 1px rgba(212, 181, 88, 0.75);
   }
 
+  .portfolio-optimizer
+    .optimizer-draft-add-asset-popover
+    .optimizer-universe-search-shell
+    .optimizer-universe-search-field:focus {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
   .portfolio-optimizer .optimizer-universe-search-add-hint {
     display: inline-flex;
     align-items: center;

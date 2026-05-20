@@ -10,8 +10,7 @@
 (def ^:private add-asset-input-class
   ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
    "font-mono" "text-[0.6875rem]" "font-medium" "outline-none"
-   "transition-shadow" "focus:border-warning/70"
-   "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
+   "transition-shadow" "focus:border-warning/70"])
 
 (defn- search-input-mount-focus!
   [{:keys [:replicant/life-cycle :replicant/node]}]
@@ -222,11 +221,12 @@
         (optimizer-view-model/universe-panel-model state draft)
         searching? (seq search-query)]
     [:div {:class ["optimizer-draft-add-asset-popover"
+                   "optimizer-draft-add-asset-popover--dark"
                    "fixed" "inset-x-2" "top-16" "z-30" "max-h-[calc(100vh-5rem)]"
-                   "overflow-auto" "border" "border-base-300" "bg-base-100" "p-3"
+                   "overflow-auto" "border" "border-base-300" "p-3"
                    "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
                    "md:absolute" "md:inset-auto" "md:right-0" "md:top-[calc(100%+4px)]"
-                   "md:w-[360px]" "md:max-h-[360px]"]
+                   "md:w-[380px]" "md:max-h-[360px]"]
            :data-role "portfolio-optimizer-draft-add-asset-popover"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
       [:div
@@ -275,23 +275,7 @@
                              [:event.target/value]]]
                     :keydown [[:actions/handle-portfolio-optimizer-draft-add-asset-keydown
                                [:event/key]
-                               market-keys]]}}]
-      (when searching?
-        [:button {:type "button"
-                  :class ["optimizer-universe-search-affordance"
-                          "optimizer-universe-search-clear"
-                          "portfolio-optimizer-universe-search-affordance"
-                          "font-mono" "text-xs" "text-trading-muted" "hover:text-warning"]
-                  :aria-label "Clear add asset search"
-                  :data-role "portfolio-optimizer-draft-add-asset-search-clear"
-                  :on {:click [[:actions/set-portfolio-optimizer-universe-search-query ""]]}}
-         "x"])
-      [:span {:class ["optimizer-universe-search-add-hint"
-                      "portfolio-optimizer-universe-search-add-hint"
-                      "border" "border-base-300"
-                      "font-mono" "text-[0.55rem]" "text-trading-muted"]
-              :data-role "portfolio-optimizer-draft-add-asset-search-add-hint"}
-       "↵ add"]]
+                               market-keys]]}}]]
      (if (seq candidate-rows)
        (into [:div {:class ["mt-2" "max-h-[260px]" "overflow-auto" "border"
                             "border-base-300" "bg-base-200/80"]

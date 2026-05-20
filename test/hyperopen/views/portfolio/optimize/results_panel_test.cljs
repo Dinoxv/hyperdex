@@ -81,9 +81,11 @@
                      draft
                      {:state base-state
                       :frontier-overlay-mode :standalone})
-        open-state (assoc-in base-state
-                             [:portfolio-ui :optimizer :draft-add-asset-open?]
-                             true)
+        open-state (-> base-state
+                       (assoc-in [:portfolio-ui :optimizer :draft-add-asset-open?]
+                                 true)
+                       (assoc-in [:portfolio-ui :optimizer :universe-search-query]
+                                 "eth"))
         open-view (results-panel/results-panel
                    {:result solved-result
                     :computed-at-ms 2600}
@@ -111,18 +113,21 @@
     (is (some? popover))
     (is (contains? (set (node-attr popover :class)) "fixed"))
     (is (contains? (set (node-attr popover :class)) "md:absolute"))
+    (is (contains? (set (node-attr popover :class)) "optimizer-draft-add-asset-popover--dark"))
     (is (some? search-input))
     (is (= "text" (node-attr search-input :type)))
+    (is (not (contains? (set (node-attr search-input :class))
+                        "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]")))
     (is (fn? (node-attr search-input :replicant/on-render)))
     (is (= [[:actions/set-portfolio-optimizer-universe-search-query
              [:event.target/value]]]
            (get-in search-input [1 :on :input])))
     (is (= [[:actions/handle-portfolio-optimizer-draft-add-asset-keydown
              [:event/key]
-             ["perp:ETH" "perp:TIA"]]]
+             ["perp:ETH"]]]
            (get-in search-input [1 :on :keydown])))
     (is (nil? search-clear))
-    (is (some? search-hint))
+    (is (nil? search-hint))
     (is (some? eth-row))
     (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
            (click-actions eth-row)))
