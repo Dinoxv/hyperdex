@@ -336,6 +336,15 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
       base: "ETH",
       quote: "USDC",
       volume24h: 84000000
+    },
+    {
+      key: "perp:SOL",
+      "market-type": optimizerKeyword("perp"),
+      coin: "SOL",
+      symbol: "SOL-USDC",
+      base: "SOL",
+      quote: "USDC",
+      volume24h: 62000000
     }
   ]);
   await dispatch(page, [
@@ -355,6 +364,12 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   const searchClear = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-clear']");
   const searchResults = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-results']");
   const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
+  const candidateRows = page.locator(
+    "[data-role^='portfolio-optimizer-draft-add-asset-candidate-row-']"
+  );
+  const activeCandidate = page.locator(
+    "[data-role^='portfolio-optimizer-draft-add-asset-candidate-row-'][data-active='true']"
+  );
 
   await addAsset.click();
   await expect(popover).toBeVisible();
@@ -368,7 +383,34 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(ethRow).toBeVisible();
   await expect(searchResults).toHaveCSS("scrollbar-width", "none");
-  await ethRow.click();
+  await searchInput.fill("");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(candidateRows).toHaveCount(6);
+  await expect(activeCandidate).toHaveCount(1);
+  const firstActiveRole = await activeCandidate.getAttribute("data-role");
+  await searchInput.press("ArrowDown");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(activeCandidate).toHaveCount(1);
+  const secondActiveRole = await activeCandidate.getAttribute("data-role");
+  expect(secondActiveRole).not.toEqual(firstActiveRole);
+  await expect(activeCandidate).toHaveCSS("background-color", "rgba(212, 181, 88, 0.12)");
+  await searchInput.press("ArrowUp");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(activeCandidate).toHaveAttribute(
+    "data-role",
+    firstActiveRole
+  );
+  await searchInput.press("ArrowDown");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(activeCandidate).toHaveAttribute(
+    "data-role",
+    secondActiveRole
+  );
+  const selectedMarketKey = secondActiveRole.replace(
+    "portfolio-optimizer-draft-add-asset-candidate-row-",
+    ""
+  );
+  await searchInput.press("Enter");
 
   await expect(popover).toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
@@ -385,7 +427,9 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
     const universe = await readOptimizerState(page, ["portfolio", "optimizer", "draft", "universe"]);
     return universe
       .map((row) => row["instrument-id"])
-      .some((instrumentId) => instrumentId === "perp:ETH" || instrumentId === "hl:perp:ETH");
+      .some((instrumentId) =>
+        instrumentId === selectedMarketKey || instrumentId === `hl:${selectedMarketKey}`
+      );
   }).toBe(true);
   await expect.poll(async () => {
     const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);

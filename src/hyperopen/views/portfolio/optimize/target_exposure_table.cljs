@@ -258,7 +258,7 @@
                       "font-mono" "text-[0.65rem]" "text-trading-muted"]
               :data-role "portfolio-optimizer-draft-add-asset-search-icon"}
        "⌕"]
-      [:input {:type "text"
+      [:input {:type "search"
                :class (into add-asset-input-class ["optimizer-universe-search-field"
                                                    "portfolio-optimizer-universe-search-field"
                                                    "border-0" "bg-transparent" "px-0"

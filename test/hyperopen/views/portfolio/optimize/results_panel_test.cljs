@@ -119,7 +119,7 @@
     (is (not (contains? (set (node-attr popover :class)) "overflow-auto")))
     (is (contains? (set (node-attr popover :class)) "optimizer-draft-add-asset-popover--dark"))
     (is (some? search-input))
-    (is (= "text" (node-attr search-input :type)))
+    (is (= "search" (node-attr search-input :type)))
     (is (not (contains? (set (node-attr search-input :class))
                         "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]")))
     (is (fn? (node-attr search-input :replicant/on-render)))
