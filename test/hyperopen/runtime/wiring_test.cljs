@@ -124,6 +124,9 @@
     (is (identical? (:add-portfolio-optimizer-universe-instrument-and-run optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer
                                   :add-portfolio-optimizer-universe-instrument-and-run])))
+    (is (identical? (:toggle-portfolio-optimizer-universe-instrument-exclusion-and-run optimizer-action-deps)
+                    (get-in deps [:portfolio-optimizer
+                                  :toggle-portfolio-optimizer-universe-instrument-exclusion-and-run])))
     (is (identical? (:remove-portfolio-optimizer-universe-instrument optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :remove-portfolio-optimizer-universe-instrument])))
     (is (identical? (:set-portfolio-optimizer-universe-from-current optimizer-action-deps)

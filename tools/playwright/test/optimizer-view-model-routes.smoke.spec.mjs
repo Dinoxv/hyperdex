@@ -125,6 +125,116 @@ async function seedRetainedDraftScenario(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedTwoAssetDraftScenario(page) {
+  await seedRetainedDraftScenario(page);
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+
+    const btcInstrument = map([
+      kw("instrument-id"), "perp:BTC",
+      kw("market-type"), kw("perp"),
+      kw("coin"), "BTC",
+      kw("symbol"), "BTC-USDC",
+      kw("name"), "Bitcoin"
+    ]);
+    const ethInstrument = map([
+      kw("instrument-id"), "perp:ETH",
+      kw("market-type"), kw("perp"),
+      kw("coin"), "ETH",
+      kw("symbol"), "ETH-USDC",
+      kw("name"), "Ethereum"
+    ]);
+    const draft = map([
+      kw("id"), "draft-current",
+      kw("name"), "Two Asset Draft Smoke",
+      kw("universe"), vector([btcInstrument, ethInstrument]),
+      kw("objective"), map([kw("kind"), kw("max-sharpe")]),
+      kw("return-model"), map([kw("kind"), kw("historical-mean")]),
+      kw("risk-model"), map([kw("kind"), kw("sample-covariance")]),
+      kw("constraints"), map([
+        kw("long-only?"), true,
+        kw("max-asset-weight"), 1,
+        kw("gross-max"), 1,
+        kw("blocklist"), vector([])
+      ]),
+      kw("metadata"), map([kw("dirty?"), false])
+    ]);
+    const result = map([
+      kw("status"), kw("solved"),
+      kw("scenario-id"), "draft",
+      kw("instrument-ids"), vector(["perp:BTC", "perp:ETH"]),
+      kw("target-weights"), vector([0.5, 0.5]),
+      kw("current-weights"), vector([0.25, 0.15]),
+      kw("target-weights-by-instrument"), map(["perp:BTC", 0.5, "perp:ETH", 0.5]),
+      kw("current-weights-by-instrument"), map(["perp:BTC", 0.25, "perp:ETH", 0.15]),
+      kw("labels-by-instrument"), map(["perp:BTC", "BTC", "perp:ETH", "ETH"]),
+      kw("expected-return"), 0.12,
+      kw("volatility"), 0.2,
+      kw("return-model"), kw("historical-mean"),
+      kw("risk-model"), kw("sample-covariance"),
+      kw("as-of-ms"), 1777046100000,
+      kw("frontier"), vector([
+        map([kw("id"), 0, kw("expected-return"), 0.1, kw("volatility"), 0.18, kw("sharpe"), 0.55]),
+        map([kw("id"), 1, kw("expected-return"), 0.12, kw("volatility"), 0.2, kw("sharpe"), 0.6])
+      ]),
+      kw("frontier-overlays"), map([]),
+      kw("performance"), map([
+        kw("in-sample-sharpe"), 0.58,
+        kw("shrunk-sharpe"), 0.6
+      ]),
+      kw("diagnostics"), map([
+        kw("gross-exposure"), 1,
+        kw("net-exposure"), 1,
+        kw("effective-n"), 2,
+        kw("turnover"), 0.6,
+        kw("binding-constraints"), vector([]),
+        kw("covariance-conditioning"), map([kw("status"), kw("ok")])
+      ]),
+      kw("rebalance-preview"), map([
+        kw("status"), kw("ready"),
+        kw("capital-usd"), 10000,
+        kw("summary"), map([
+          kw("ready-count"), 2,
+          kw("blocked-count"), 0,
+          kw("gross-trade-notional-usd"), 6000,
+          kw("estimated-fees-usd"), 2.5,
+          kw("estimated-slippage-usd"), 8,
+          kw("margin"), map([kw("after-utilization"), 0.2])
+        ]),
+        kw("rows"), vector([])
+      ])
+    ]);
+    const requestSignature = map([kw("seed"), "two-asset-draft-smoke"]);
+    const lastSuccessfulRun = map([
+      kw("request-signature"), requestSignature,
+      kw("computed-at-ms"), 1777046100000,
+      kw("result"), result
+    ]);
+
+    const store = globalThis.hyperopen.system.store;
+    let state = c.deref(store);
+    state = c.assoc_in(state, path("portfolio", "optimizer", "draft"), draft);
+    state = c.assoc_in(state, path("portfolio", "optimizer", "last-successful-run"), lastSuccessfulRun);
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "run-state"),
+      map([kw("status"), kw("succeeded"), kw("request-signature"), requestSignature])
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio-ui", "optimizer", "results-tab"),
+      kw("recommendation")
+    );
+    c.reset_BANG_(store, state);
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 test("portfolio optimizer setup and retained draft detail routes render through view models @smoke @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
@@ -233,6 +343,44 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
       .map((row) => row["instrument-id"])
       .some((instrumentId) => instrumentId === "perp:ETH" || instrumentId === "hl:perp:ETH");
   }).toBe(true);
+  await expect.poll(async () => {
+    const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);
+    return progress?.status;
+  }).not.toBe("idle");
+});
+
+test("portfolio optimizer draft allocation row can be excluded and rerun @smoke @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  await seedTwoAssetDraftScenario(page);
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize/draft",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  const ethRow = page.locator("[data-role='portfolio-optimizer-target-exposure-asset-ETH']");
+  const excludeEth = page.locator("[data-role='portfolio-optimizer-target-exposure-exclude-perp-ETH']");
+
+  await expect(ethRow).toBeVisible();
+  await ethRow.hover();
+  await excludeEth.click();
+
+  await expect(ethRow).toHaveAttribute("data-excluded", "true");
+  await expect(ethRow).toContainText("excluded");
+  await expect(ethRow).toContainText("sell to 0");
+  await expect(ethRow).toContainText("0.00%");
+  await expect.poll(async () => {
+    const blocklist = await readOptimizerState(page, ["portfolio", "optimizer", "draft", "constraints", "blocklist"]);
+    return blocklist;
+  }).toContain("perp:ETH");
   await expect.poll(async () => {
     const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);
     return progress?.status;

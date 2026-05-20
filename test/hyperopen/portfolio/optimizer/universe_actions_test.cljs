@@ -252,6 +252,52 @@
     (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
                    effects)))))
 
+(deftest toggle-draft-universe-instrument-exclusion-and-run-keeps-row-in-universe-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true}
+        eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument
+                                                           eth-instrument]
+                                               :constraints {:blocklist []}}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :constraints :blocklist]
+               ["perp:ETH"]]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+            state
+            "perp:ETH")))
+    (is (= [btc-instrument eth-instrument]
+           (get-in state [:portfolio :optimizer :draft :universe])))))
+
+(deftest toggle-draft-universe-instrument-exclusion-and-run-reincludes-blocklisted-row-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true}
+        eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument
+                                                           eth-instrument]
+                                               :constraints {:blocklist ["perp:ETH"]}}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :constraints :blocklist]
+               []]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+            state
+            "perp:ETH")))))
+
 (deftest add-draft-universe-instrument-preserves-history-discovery-backend-id-test
   (let [eth-instrument {:instrument-id "perp:ETH"
                         :market-type :perp

@@ -133,6 +133,37 @@
     (is (not (some? (node-by-role open-view
                                   "portfolio-optimizer-draft-add-asset-candidate-row-perp:BTC"))))))
 
+(deftest results-panel-allocation-renders-excluded-draft-row-toggle-test
+  (let [draft {:universe [{:instrument-id "perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"}
+                          {:instrument-id "spot:PURR"
+                           :market-type :spot
+                           :coin "PURR"}]
+               :constraints {:blocklist ["spot:PURR"]}
+               :objective {:kind :minimum-variance}}
+        view-node (results-panel/results-panel
+                   {:result solved-result
+                    :computed-at-ms 2600}
+                   draft
+                   {:state {:portfolio {:optimizer {:draft draft}}}
+                    :frontier-overlay-mode :standalone})
+        purr-row (node-by-role view-node
+                               "portfolio-optimizer-target-exposure-asset-PURR")
+        purr-toggle (node-by-role view-node
+                                  "portfolio-optimizer-target-exposure-exclude-spot-PURR")
+        strings (set (collect-strings purr-row))]
+    (is (some? purr-row))
+    (is (= "true" (node-attr purr-row :data-excluded)))
+    (is (contains? strings "excluded"))
+    (is (contains? strings "sell to 0"))
+    (is (contains? strings "0.00%"))
+    (is (some? purr-toggle))
+    (is (= "Include PURR and rerun" (node-attr purr-toggle :aria-label)))
+    (is (= [[:actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+             "spot:PURR"]]
+           (click-actions purr-toggle)))))
+
 (deftest results-panel-renders-constrain-frontier-checkbox-above-chart-test
   (let [draft {:objective {:kind :minimum-variance}}
         result (assoc solved-result

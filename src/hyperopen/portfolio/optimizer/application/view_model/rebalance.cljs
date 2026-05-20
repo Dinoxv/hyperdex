@@ -75,9 +75,13 @@
       value)))
 
 (defn- row-model
-  [idx labels-by-instrument binding-instrument-ids capital-usd [instrument-id current-weight target-weight]]
+  [idx labels-by-instrument binding-instrument-ids excluded-ids capital-usd
+   [instrument-id current-weight target-weight]]
   (let [current-weight* (or current-weight 0)
-        target-weight* (or target-weight 0)
+        excluded? (contains? excluded-ids instrument-id)
+        target-weight* (if excluded?
+                         0
+                         (or target-weight 0))
         current-notional (* (or capital-usd 0) current-weight*)
         target-notional (* (or capital-usd 0) target-weight*)
         delta (- target-weight* current-weight*)
@@ -92,6 +96,8 @@
      :delta delta
      :delta-notional (- target-notional current-notional)
      :binding? binding?
+     :excluded? excluded?
+     :status-label (when excluded? "sell to 0")
      :current-sign (signed-label current-weight*)
      :target-sign (signed-label target-weight*)
      :leg-label (leg-label labels-by-instrument
@@ -124,41 +130,61 @@
         target-weight (reduce + 0 (map :target-weight rows))
         delta (- target-weight current-weight)
         binding? (boolean (some :binding? rows))
+        excluded? (boolean (some :excluded? rows))
         expandable? (> (count rows) 1)
         rows* (mapv #(assoc % :hidden? (not expandable?)) rows)]
     (merge
      {:asset asset
+      :instrument-id (when-not expandable?
+                       (:instrument-id (first rows*)))
       :current-weight current-weight
       :target-weight target-weight
       :delta delta
       :delta-notional (reduce + 0 (map :delta-notional rows))
       :binding? binding?
+      :excluded? excluded?
+      :status-label (when excluded? "sell to 0")
       :expandable? expandable?
       :target-sign (signed-label target-weight)
       :rows rows*}
      (group-icon-model rows*))))
 
 (defn target-exposure-table-model
-  [result]
+  ([result]
+   (target-exposure-table-model result nil))
+  ([result {:keys [draft]}]
   (let [capital-usd (get-in result [:rebalance-preview :capital-usd])
-        instrument-ids (:instrument-ids result)
-        current-weights (:current-weights result)
-        target-weights (:target-weights result)
+        instrument-ids (vec (:instrument-ids result))
+        target-by-id (merge (zipmap instrument-ids (:target-weights result))
+                            (:target-weights-by-instrument result))
+        current-by-id (merge (zipmap instrument-ids (:current-weights result))
+                             (:current-weights-by-instrument result)
+                             (:current-portfolio-weights-by-instrument result))
         labels-by-instrument (or (:labels-by-instrument result) {})
+        draft-universe (vec (:universe draft))
+        excluded-ids (set (or (get-in draft [:constraints :blocklist]) []))
+        draft-ids (set (keep :instrument-id draft-universe))
+        row-ids (vec (distinct (concat instrument-ids
+                                       (filter draft-ids excluded-ids))))
         binding-instrument-ids (set (keep :instrument-id
                                           (get-in result [:diagnostics :binding-constraints])))
         rows (mapv (fn [idx row]
                      (row-model idx
                                 labels-by-instrument
                                 binding-instrument-ids
+                                excluded-ids
                                 capital-usd
                                 row))
                    (range)
-                   (map vector instrument-ids current-weights target-weights))
+                   (map (fn [instrument-id]
+                          [instrument-id
+                           (get current-by-id instrument-id 0)
+                           (get target-by-id instrument-id 0)])
+                        row-ids))
         {:keys [order by-asset]} (grouped-rows rows)
         groups (mapv #(group-model % (get by-asset %)) order)]
     {:capital-usd capital-usd
      :labels-by-instrument labels-by-instrument
      :binding-instrument-ids binding-instrument-ids
      :rows rows
-     :groups groups}))
+     :groups groups})))

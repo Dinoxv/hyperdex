@@ -53,6 +53,9 @@
 (def add-portfolio-optimizer-universe-instrument-and-run
   universe/add-portfolio-optimizer-universe-instrument-and-run)
 
+(def toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+  universe/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run)
+
 (def remove-portfolio-optimizer-universe-instrument
   universe/remove-portfolio-optimizer-universe-instrument)
 

@@ -154,6 +154,24 @@
                (projected-state-after-save-effects state effects*))))
       [])))
 
+(defn toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+  [state instrument-id]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        universe (common/draft-universe state)]
+    (if (and instrument-id*
+             (common/instrument-present? universe instrument-id*))
+      (let [blocklist (common/constraint-list state :blocklist)
+            excluded? (some #(= instrument-id* %) blocklist)
+            effects (common/save-draft-path-values
+                     [[(conj contracts/draft-constraints-path :blocklist)
+                       (common/set-membership blocklist
+                                              instrument-id*
+                                              (not excluded?))]])
+            state* (projected-state-after-save-effects state effects)]
+        (into effects
+              (run-actions/run-portfolio-optimizer-from-draft state*)))
+      [])))
+
 (defn- black-litterman-universe-path-values
   [state universe*]
   (let [ids (set (keep :instrument-id universe*))

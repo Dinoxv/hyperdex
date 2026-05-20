@@ -97,6 +97,8 @@
     :add-portfolio-optimizer-universe-instrument]
    [:actions/add-portfolio-optimizer-universe-instrument-and-run
     :add-portfolio-optimizer-universe-instrument-and-run]
+   [:actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+    :toggle-portfolio-optimizer-universe-instrument-exclusion-and-run]
    [:actions/remove-portfolio-optimizer-universe-instrument
     :remove-portfolio-optimizer-universe-instrument]
    [:actions/set-portfolio-optimizer-universe-from-current :set-portfolio-optimizer-universe-from-current]

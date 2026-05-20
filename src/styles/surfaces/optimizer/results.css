@@ -109,9 +109,65 @@
     background-color: var(--optimizer-surface-2);
   }
 
+  .portfolio-optimizer
+    .optimizer-target-exposure-row--excluded
+    td {
+    color: var(--optimizer-text-3);
+    opacity: 0.62;
+  }
+
   .portfolio-optimizer .optimizer-target-exposure-asset:hover td,
   .portfolio-optimizer .optimizer-target-exposure-row:hover td {
     background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--optimizer-text-3);
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-target-exposure-asset, .optimizer-target-exposure-row):hover
+    .optimizer-target-exposure-exclude-button,
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button:focus-visible,
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button[data-excluded="true"] {
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button:hover {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-excluded-tag,
+  .portfolio-optimizer .optimizer-target-exposure-status {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    padding: 3px 5px;
+    text-transform: uppercase;
   }
 
   .portfolio-optimizer

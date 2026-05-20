@@ -232,6 +232,9 @@
 (def add-portfolio-optimizer-universe-instrument-and-run-action
   portfolio-optimizer-actions/add-portfolio-optimizer-universe-instrument-and-run)
 
+(def toggle-portfolio-optimizer-universe-instrument-exclusion-and-run-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run)
+
 (def remove-portfolio-optimizer-universe-instrument-action
   portfolio-optimizer-actions/remove-portfolio-optimizer-universe-instrument)
 

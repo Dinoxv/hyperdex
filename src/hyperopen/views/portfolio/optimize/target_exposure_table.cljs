@@ -91,19 +91,34 @@
 
 (defn- exposure-row
   [{:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
-           target-weight delta delta-notional]}]
+           target-weight delta delta-notional excluded? status-label instrument-id asset]}]
   [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
                 binding? (conj "bg-warning/10")
+                excluded? (conj "optimizer-target-exposure-row--excluded")
                 hidden? (conj "hidden"))
         :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
         :data-binding (when binding? "true")
+        :data-excluded (when excluded? "true")
         :data-current-sign current-sign
         :data-target-sign target-sign}
    [:td {:class ["text-trading-muted"]} ""]
    [:td {:class ["pl-8" "text-trading-muted"]}
-    leg-label]
-   [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-   [:td {:class ["font-mono" "text-right" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+    [:span {:class (cond-> ["inline-flex" "items-center" "gap-2"]
+                     excluded? (conj "line-through" "decoration-trading-muted/70"))}
+     leg-label]
+    (when excluded?
+      [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
+       status-label])]
+   [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
+                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
+    (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
+                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
+    (opt-format/format-pct target-weight (if excluded?
+                                           {:minimum-fraction-digits 2
+                                            :maximum-fraction-digits 2}
+                                           {:minimum-fraction-digits 1
+                                            :maximum-fraction-digits 1}))]
    [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
                  "font-mono" "text-right" "tabular-nums"]}
     (format-delta-pct delta)]
@@ -113,32 +128,64 @@
 
 (defn- exposure-group-row
   [{:keys [asset current-weight target-weight delta delta-notional binding?
-           expandable? target-sign] :as group}]
-  [:tr {:class ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
+           expandable? target-sign excluded? status-label instrument-id] :as group}]
+  (let [token (data-role-token (or instrument-id asset))]
+    [:tr {:class (cond-> ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
+                  excluded? (conj "optimizer-target-exposure-row--excluded"))
         :data-role (str "portfolio-optimizer-target-exposure-asset-"
                         (data-role-token asset))
+        :data-excluded (when excluded? "true")
         :data-target-sign target-sign}
-   [:td {:class ["w-5" "font-mono" "text-trading-muted/70"]}
-    (when expandable? "▾")]
+   [:td {:class ["w-8" "font-mono" "text-trading-muted/70"]}
+    (if instrument-id
+      [:button {:type "button"
+                :class ["optimizer-target-exposure-exclude-button"]
+                :aria-label (str (if excluded? "Include " "Exclude ")
+                                 asset
+                                 " and rerun")
+                :title (str (if excluded? "Include " "Exclude ") asset)
+                :data-role (str "portfolio-optimizer-target-exposure-exclude-"
+                                token)
+                :data-excluded (when excluded? "true")
+                :on {:click [[:actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+                              instrument-id]]}}
+       "⌀"]
+      (when expandable? "▾"))]
    [:td {:class ["font-mono" "font-semibold" "text-trading-text"]}
     [:span {:class ["inline-flex" "min-w-0" "items-center" "gap-2"]}
      (allocation-asset-icon asset group)
-     [:span {:data-role (str "portfolio-optimizer-target-exposure-group-"
+     [:span {:class (cond-> []
+                      excluded? (conj "line-through" "decoration-trading-muted/70"))
+             :data-role (str "portfolio-optimizer-target-exposure-group-"
                              (data-role-token asset))}
-      asset]]
+      asset]
+     (when excluded?
+       [:span {:class ["optimizer-target-exposure-excluded-tag"]}
+        "excluded"])]
     (when binding?
       [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
                       "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
                       "tracking-[0.08em]" "text-warning"]}
-       "capped"])]
-   [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-   [:td {:class ["font-mono" "text-right" "font-semibold" "tabular-nums"]} (opt-format/format-pct target-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+       "capped"])
+    (when excluded?
+      [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
+       status-label])]
+   [:td {:class (cond-> ["font-mono" "text-right" "font-semibold" "tabular-nums"]
+                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
+    (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+   [:td {:class (cond-> ["font-mono" "text-right" "font-semibold" "tabular-nums"]
+                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
+    (opt-format/format-pct target-weight (if excluded?
+                                           {:minimum-fraction-digits 2
+                                            :maximum-fraction-digits 2}
+                                           {:minimum-fraction-digits 1
+                                            :maximum-fraction-digits 1}))]
    [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
                  "font-mono" "text-right" "font-semibold" "tabular-nums"]}
     (format-delta-pct delta)]
    [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
                  "font-mono" "text-right" "font-semibold" "tabular-nums"]}
-    (format-compact-usdc delta-notional)]])
+    (format-compact-usdc delta-notional)]]))
 
 (defn- candidate-row
   [{:keys [market-key label name adv-label]} idx active-index]
@@ -281,7 +328,8 @@
   ([result]
    (target-exposure-table result nil))
   ([result {:keys [state draft]}]
-  (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result)]
+  (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result
+                                                                          {:draft draft})]
     [:section {:class ["optimizer-target-exposure-table"
                        "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
                :data-role "portfolio-optimizer-target-exposure-table"}

@@ -73,6 +73,7 @@
   (is (fn? action-adapters/set-portfolio-optimizer-constrain-frontier-action))
   (is (fn? action-adapters/add-portfolio-optimizer-universe-instrument-action))
   (is (fn? action-adapters/add-portfolio-optimizer-universe-instrument-and-run-action))
+  (is (fn? action-adapters/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run-action))
   (is (fn? action-adapters/remove-portfolio-optimizer-universe-instrument-action))
   (is (fn? action-adapters/set-portfolio-optimizer-universe-from-current-action))
   (is (fn? action-adapters/load-portfolio-optimizer-history-from-draft-action))
