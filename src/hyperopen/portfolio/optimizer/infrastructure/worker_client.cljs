@@ -26,6 +26,33 @@
                          (handler (normalize-worker-message (.-data event)))))
     true))
 
+(defn- worker-error-payload
+  [kind ^js event]
+  (cond-> {:code kind
+           :message (or (some-> event .-message)
+                        (name kind))}
+    (some-> event .-filename)
+    (assoc :filename (.-filename event))
+    (some-> event .-lineno)
+    (assoc :lineno (.-lineno event))
+    (some-> event .-colno)
+    (assoc :colno (.-colno event))))
+
+(defn add-error-listener!
+  [worker handler]
+  (when worker
+    (.addEventListener worker "error"
+                       (fn [^js event]
+                         (handler (worker-error-payload
+                                   :optimizer-worker-error
+                                   event))))
+    (.addEventListener worker "messageerror"
+                       (fn [^js event]
+                         (handler (worker-error-payload
+                                   :optimizer-worker-message-error
+                                   event))))
+    true))
+
 (defn current-worker
   [worker-ref]
   (cond

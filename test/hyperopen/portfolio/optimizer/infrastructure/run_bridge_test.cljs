@@ -9,6 +9,7 @@
   []
   (let [posted (atom [])
         listeners (atom [])
+        terminated? (atom false)
         worker #js {}]
     (set! (.-postMessage worker)
           (fn [message]
@@ -17,14 +18,27 @@
           (fn [event-name handler]
             (swap! listeners conj {:event-name event-name
                                    :handler handler})))
+    (set! (.-terminate worker)
+          (fn []
+            (reset! terminated? true)))
     {:worker worker
      :posted posted
-     :listeners listeners}))
+     :listeners listeners
+     :terminated? terminated?}))
 
 (defn- emit-worker-message!
   [{:keys [listeners]} message]
   (let [handler (:handler (first @listeners))]
     (handler #js {:data (clj->js message)})))
+
+(defn- emit-worker-error!
+  [{:keys [listeners]} attrs]
+  (let [handler (:handler (first (filter #(= "error" (:event-name %))
+                                         @listeners)))
+        event #js {}]
+    (doseq [[k v] attrs]
+      (aset event (name k) v))
+    (handler event)))
 
 (deftest request-run-posts-worker-message-and-preserves-existing-success-test
   (let [{:keys [worker posted]} (fake-worker)
@@ -56,6 +70,121 @@
       (is (= {:status :solved
               :old? true}
              (get-in @store [:portfolio :optimizer :last-successful-run :result]))))))
+
+(deftest request-run-replaces-owned-worker-between-runs-test
+  (let [worker-a (fake-worker)
+        worker-b (fake-worker)
+        workers (atom [(:worker worker-a) (:worker worker-b)])
+        store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller (run-bridge/make-controller {:store store})
+        run-ids (atom ["run-1" "run-2"])]
+    (with-redefs [worker-client/make-worker! (fn
+                                               ([]
+                                                (worker-client/make-worker!
+                                                 worker-client/default-worker-url))
+                                               ([_url]
+                                               (let [worker (first @workers)]
+                                                 (swap! workers subvec 1)
+                                                 worker)))
+                  run-bridge/next-run-id (fn []
+                                           (let [run-id (first @run-ids)]
+                                             (swap! run-ids subvec 1)
+                                             run-id))]
+      (is (= "run-1"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 1}
+                                       :computed-at-ms 100})))
+      (is (= [{:id "run-1"
+               :type "run-optimizer"
+               :payload {:scenario-id "scenario-1"}}]
+             @(:posted worker-a)))
+      (is (= "run-2"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 2}
+                                       :computed-at-ms 200})))
+      (is (true? @(:terminated? worker-a)))
+      (is (= [{:id "run-2"
+               :type "run-optimizer"
+               :payload {:scenario-id "scenario-1"}}]
+             @(:posted worker-b))))))
+
+(deftest stale-owned-worker-error-does-not-fail-new-run-test
+  (let [worker-a (fake-worker)
+        worker-b (fake-worker)
+        workers (atom [(:worker worker-a) (:worker worker-b)])
+        store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller (run-bridge/make-controller {:store store})
+        run-ids (atom ["run-1" "run-2"])]
+    (with-redefs [worker-client/make-worker! (fn
+                                               ([]
+                                                (worker-client/make-worker!
+                                                 worker-client/default-worker-url))
+                                               ([_url]
+                                                (let [worker (first @workers)]
+                                                  (swap! workers subvec 1)
+                                                  worker)))
+                  run-bridge/next-run-id (fn []
+                                           (let [run-id (first @run-ids)]
+                                             (swap! run-ids subvec 1)
+                                             run-id))]
+      (is (= "run-1"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 1}
+                                       :computed-at-ms 100})))
+      (is (= "run-2"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 2}
+                                       :computed-at-ms 200})))
+      (emit-worker-error! worker-a {:message "Old worker failed."})
+      (is (= :running
+             (get-in @store [:portfolio :optimizer :run-state :status])))
+      (is (= "run-2"
+             (get-in @store [:portfolio :optimizer :run-state :run-id])))
+      (is (nil?
+           (get-in @store [:portfolio :optimizer :run-state :error]))))))
+
+(deftest request-run-fails-current-run-when-worker-unavailable-test
+  (let [store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller (run-bridge/make-controller {:store store})]
+    (with-redefs [worker-client/make-worker! (fn
+                                               ([] nil)
+                                               ([_url] nil))
+                  run-bridge/next-run-id (fn [] "run-missing-worker")]
+      (is (= "run-missing-worker"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 1}
+                                       :computed-at-ms 100})))
+      (is (= :failed
+             (get-in @store [:portfolio :optimizer :run-state :status])))
+      (is (= :optimizer-worker-unavailable
+             (get-in @store [:portfolio :optimizer :run-state :error :code]))))))
+
+(deftest worker-error-event-fails-current-run-test
+  (let [worker (fake-worker)
+        store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller (run-bridge/make-controller {:store store
+                                                :worker-ref (:worker worker)})]
+    (with-redefs [run-bridge/next-run-id (fn [] "run-worker-error")]
+      (is (= "run-worker-error"
+             (run-bridge/request-run! {:controller controller
+                                       :request {:scenario-id "scenario-1"}
+                                       :request-signature {:seed 1}
+                                       :computed-at-ms 100})))
+      (emit-worker-error! worker {:message "Worker script failed."
+                                  :filename "/js/portfolio_optimizer_worker.js"
+                                  :lineno 12})
+      (is (= :failed
+             (get-in @store [:portfolio :optimizer :run-state :status])))
+      (is (= {:code :optimizer-worker-error
+              :message "Worker script failed."
+              :filename "/js/portfolio_optimizer_worker.js"
+              :lineno 12}
+             (get-in @store [:portfolio :optimizer :run-state :error]))))))
 
 (deftest request-run-dedupes-identical-in-flight-signature-test
   (let [{:keys [worker posted]} (fake-worker)
@@ -150,7 +279,8 @@
                                        :request {:scenario-id "scenario-a"}
                                        :request-signature {:seed :a}
                                        :computed-at-ms 100})))
-      (is (= ["message"] (mapv :event-name @(:listeners worker-a))))
+      (is (= ["message" "error" "messageerror"]
+             (mapv :event-name @(:listeners worker-a))))
       (emit-worker-message! worker-a
                             {:id "run-a-1"
                              :type "optimizer-result"

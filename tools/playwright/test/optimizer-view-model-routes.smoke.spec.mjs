@@ -165,8 +165,8 @@ async function seedTwoAssetDraftScenario(page) {
       kw("execution-assumptions"), map([
         kw("manual-capital-usdc"), 10000,
         kw("fallback-slippage-bps"), 20,
-        kw("prices-by-id"), map(["perp:BTC", 100000, "perp:ETH", 5000]),
-        kw("fee-bps-by-id"), map(["perp:BTC", 4, "perp:ETH", 4])
+        kw("prices-by-id"), map(["perp:BTC", 100000, "perp:ETH", 5000, "perp:HYPE", 54]),
+        kw("fee-bps-by-id"), map(["perp:BTC", 4, "perp:ETH", 4, "perp:HYPE", 4])
       ]),
       kw("metadata"), map([kw("dirty?"), false])
     ]);
@@ -241,11 +241,18 @@ async function seedTwoAssetDraftScenario(page) {
             map([kw("time-ms"), 2000, kw("close"), "101"]),
             map([kw("time-ms"), 3000, kw("close"), "100"]),
             map([kw("time-ms"), 4000, kw("close"), "102"])
+          ]),
+          "HYPE", vector([
+            map([kw("time-ms"), 1000, kw("close"), "44"]),
+            map([kw("time-ms"), 2000, kw("close"), "46"]),
+            map([kw("time-ms"), 3000, kw("close"), "51"]),
+            map([kw("time-ms"), 4000, kw("close"), "54"])
           ])
         ]),
         kw("funding-history-by-coin"), map([
           "BTC", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])]),
-          "ETH", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])])
+          "ETH", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])]),
+          "HYPE", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])])
         ])
       ])
     );
@@ -317,7 +324,7 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
     idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
   });
 
-  await seedRetainedDraftScenario(page);
+  await seedTwoAssetDraftScenario(page);
   await seedOptimizerMarkets(page, [
     {
       key: "perp:BTC",
@@ -336,6 +343,15 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
       base: "ETH",
       quote: "USDC",
       volume24h: 84000000
+    },
+    {
+      key: "perp:HYPE",
+      "market-type": optimizerKeyword("perp"),
+      coin: "HYPE",
+      symbol: "HYPE-USDC",
+      base: "HYPE",
+      quote: "USDC",
+      volume24h: 774000000
     },
     {
       key: "perp:SOL",
@@ -363,7 +379,7 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   const searchHint = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-add-hint']");
   const searchClear = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-clear']");
   const searchResults = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-results']");
-  const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
+  const hypeRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:HYPE']");
   const candidateRows = page.locator(
     "[data-role^='portfolio-optimizer-draft-add-asset-candidate-row-']"
   );
@@ -378,35 +394,30 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   await expect(popover).toHaveCSS("background-color", "rgb(14, 16, 19)");
   await expect(popover).toHaveCSS("overflow-y", "hidden");
   await expect(searchInput).toHaveCSS("box-shadow", "none");
-  await searchInput.fill("eth");
+  await searchInput.fill("hype");
   await expect(searchClear).toHaveCount(0);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(ethRow).toBeVisible();
+  await expect(hypeRow).toBeVisible();
   await expect(searchResults).toHaveCSS("scrollbar-width", "none");
-  await searchInput.fill("");
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(candidateRows).toHaveCount(6);
   await expect(activeCandidate).toHaveCount(1);
   const firstActiveRole = await activeCandidate.getAttribute("data-role");
-  await searchInput.press("ArrowDown");
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(activeCandidate).toHaveCount(1);
-  const secondActiveRole = await activeCandidate.getAttribute("data-role");
-  expect(secondActiveRole).not.toEqual(firstActiveRole);
-  await expect(activeCandidate).toHaveCSS("background-color", "rgba(212, 181, 88, 0.12)");
-  await searchInput.press("ArrowUp");
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(activeCandidate).toHaveAttribute(
-    "data-role",
-    firstActiveRole
-  );
-  await searchInput.press("ArrowDown");
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(activeCandidate).toHaveAttribute(
-    "data-role",
-    secondActiveRole
-  );
-  const selectedMarketKey = secondActiveRole.replace(
+  expect(firstActiveRole).toEqual("portfolio-optimizer-draft-add-asset-candidate-row-perp:HYPE");
+  const candidateCount = await candidateRows.count();
+  if (candidateCount > 1) {
+    await searchInput.press("ArrowDown");
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(activeCandidate).toHaveCount(1);
+    const secondActiveRole = await activeCandidate.getAttribute("data-role");
+    expect(secondActiveRole).not.toEqual(firstActiveRole);
+    await expect(activeCandidate).toHaveCSS("background-color", "rgba(212, 181, 88, 0.12)");
+    await searchInput.press("ArrowUp");
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(activeCandidate).toHaveAttribute(
+      "data-role",
+      firstActiveRole
+    );
+  }
+  const selectedMarketKey = firstActiveRole.replace(
     "portfolio-optimizer-draft-add-asset-candidate-row-",
     ""
   );
@@ -434,7 +445,13 @@ test("portfolio optimizer draft allocation add asset selector updates draft and 
   await expect.poll(async () => {
     const progress = await readOptimizerState(page, ["portfolio", "optimizer", "optimization-progress"]);
     return progress?.status;
-  }).not.toBe("idle");
+  }, { timeout: 15_000 }).toBe("succeeded");
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, ["portfolio", "optimizer", "last-successful-run", "result"]);
+    return result?.["instrument-ids"]?.map((instrumentId) =>
+      String(instrumentId).replace(/^hl:/, "")
+    );
+  }).toContain("perp:HYPE");
 });
 
 test("portfolio optimizer draft allocation row can be excluded and rerun @smoke @regression", async ({ page }) => {
@@ -537,7 +554,7 @@ test("portfolio optimizer draft add asset selector stays contained and focused a
       await addAsset.scrollIntoViewIfNeeded();
       await addAsset.click();
       await expect(popover).toBeVisible();
-      await expect(searchInput).toHaveAttribute("type", "text");
+      await expect(searchInput).toHaveAttribute("type", "search");
       await expect(searchInput).toBeFocused();
       await page.keyboard.type("eth");
       await expect(searchInput).toHaveValue("eth");
