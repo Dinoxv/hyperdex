@@ -637,6 +637,8 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   await btcReturn.focus();
   await page.keyboard.press("ArrowUp");
   await expect(btcReturn).toHaveValue("20");
+  await expect(btcReturn).toBeFocused();
+  await expect(menu).toHaveCSS("outline-style", "none");
   await btcStepDown.click();
   await expect(btcReturn).toHaveValue("19.5");
 

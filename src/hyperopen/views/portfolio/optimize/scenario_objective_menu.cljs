@@ -4,8 +4,10 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
+            [hyperopen.system :as app-system]
             [hyperopen.views.asset-icon :as asset-icon]
-            [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
+            [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]
+            [nexus.registry :as nxr]))
 
 (def ^:private objective-menu-options
   [{:key :minimum-volatility
@@ -255,6 +257,24 @@
                             confidence]]}}
      short-label]))
 
+(def ^:private return-step-keys #{"ArrowUp" "ArrowDown"})
+
+(defn- return-step-keydown-handler
+  [instrument-id]
+  (fn [event]
+    (let [key (some-> event .-key)]
+      (when (contains? return-step-keys key)
+        (when (fn? (.-preventDefault event))
+          (.preventDefault event))
+        (when (fn? (.-stopPropagation event))
+          (.stopPropagation event))
+        (when app-system/store
+          (nxr/dispatch app-system/store
+                        nil
+                        [[:actions/step-portfolio-optimizer-objective-menu-view-return
+                          instrument-id
+                          key]]))))))
+
 (defn- inline-view-row
   [universe instrument-id view-draft]
   (let [asset-label (instrument-label universe instrument-id)
@@ -310,9 +330,7 @@
                 :on {:input [[:actions/set-portfolio-optimizer-objective-menu-view-return
                               instrument-id
                               [:event.target/value]]]
-                     :keydown [[:actions/step-portfolio-optimizer-objective-menu-view-return
-                                instrument-id
-                                [:event/key]]]}}]
+                     :keydown (return-step-keydown-handler instrument-id)}}]
        [:span {:class ["optimizer-objective-view-return-suffix"
                        "pointer-events-none"
                        "absolute"
@@ -446,7 +464,9 @@
      (fn []
        (when (and node
                   (.-isConnected node)
-                  (fn? (.-focus node)))
+                  (fn? (.-focus node))
+                  (not (and (fn? (.-contains node))
+                            (.contains node (.-activeElement js/document)))))
          (.focus node))))))
 
 (defn objective-menu
@@ -468,7 +488,10 @@
                          "z-50"
                          "mt-2"
                          "border"
-                         "shadow-2xl"]
+                         "shadow-2xl"
+                         "focus:outline-none"
+                         "focus:ring-0"
+                         "focus:ring-offset-0"]
                  :data-role "portfolio-optimizer-objective-menu"
                  :role "region"
                  :tab-index -1

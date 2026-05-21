@@ -447,10 +447,9 @@
              "perp:BTC"
              [:event.target/value]]]
            (get-in btc-return [1 :on :input])))
-    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
-             "perp:BTC"
-             [:event/key]]]
-           (get-in btc-return [1 :on :keydown])))
+    (is (fn? (get-in btc-return [1 :on :keydown])))
+    (is (contains? (set (get-in menu [1 :class])) "focus:outline-none"))
+    (is (contains? (set (get-in menu [1 :class])) "focus:ring-0"))
     (is (= "Increase BTC return" (get-in btc-step-up [1 :aria-label])))
     (is (= "Decrease BTC return" (get-in btc-step-down [1 :aria-label])))
     (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
