@@ -7,6 +7,7 @@
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
+            [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]))
 
 (def ^:private tabs
@@ -243,18 +244,26 @@
       "Rerun"]]))
 
 (defn- provenance-strip
-  [{:keys [draft result scenario-id]}]
+  [{:keys [state draft result scenario-id]}]
   (let [result* result
-        constraints (:constraints draft)]
+        constraints (:constraints draft)
+        objective-key (objective-menu/current-objective-menu-key draft result*)
+        objective-label (objective-menu/objective-label objective-key)]
     (let [field (fn [label value]
                   [:div {:class ["border-r" "border-base-300" "px-3" "py-2"]}
                    [:span {:class ["block" "font-mono" "text-[0.56rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
                     label]
                    [:span {:class ["mt-0.5" "block" "text-[0.7rem]" "font-medium" "text-trading-text"]}
                     value]])
-          fields [(field "Objective"
-                         (opt-format/display-label (or (get-in draft [:objective :kind])
-                                                       (get-in result* [:solver :objective-kind]))))
+          fields [[:div {:class ["optimizer-provenance-objective"
+                                  "border-r"
+                                  "border-base-300"
+                                  "px-3"
+                                  "py-2"]}
+                   [:span {:class ["block" "font-mono" "text-[0.56rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+                    "Objective"]
+                   (objective-menu/objective-trigger objective-label)
+                   (objective-menu/objective-menu state draft result*)]
                   (field "Returns"
                          (opt-format/display-label (or (:return-model result*)
                                                        (get-in draft [:return-model :kind]))))

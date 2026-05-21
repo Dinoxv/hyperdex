@@ -85,6 +85,8 @@
           :list-sort :updated-desc
           :universe-search-query ""
           :universe-search-active-index 0
+          :objective-menu-open? false
+          :objective-menu-selection nil
           :black-litterman-editor {:selected-kind :absolute
                                    :drafts {:absolute {:instrument-id nil
                                                        :return-text ""

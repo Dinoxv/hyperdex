@@ -14,6 +14,21 @@
 (def set-portfolio-optimizer-risk-model-kind
   draft/set-portfolio-optimizer-risk-model-kind)
 
+(def open-portfolio-optimizer-objective-menu
+  draft/open-portfolio-optimizer-objective-menu)
+
+(def close-portfolio-optimizer-objective-menu
+  draft/close-portfolio-optimizer-objective-menu)
+
+(def handle-portfolio-optimizer-objective-menu-keydown
+  draft/handle-portfolio-optimizer-objective-menu-keydown)
+
+(def select-portfolio-optimizer-objective-menu-option
+  draft/select-portfolio-optimizer-objective-menu-option)
+
+(def apply-portfolio-optimizer-objective-menu-selection-and-run
+  draft/apply-portfolio-optimizer-objective-menu-selection-and-run)
+
 (def apply-portfolio-optimizer-setup-preset
   draft/apply-portfolio-optimizer-setup-preset)
 

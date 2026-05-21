@@ -212,6 +212,11 @@
    :actions/close-portfolio-volume-history ::common/no-args
    :actions/handle-portfolio-volume-history-keydown ::common/single-input-args
    :actions/set-portfolio-optimizer-objective-kind ::portfolio-optimizer-model-kind-args
+   :actions/open-portfolio-optimizer-objective-menu ::common/no-args
+   :actions/close-portfolio-optimizer-objective-menu ::common/no-args
+   :actions/handle-portfolio-optimizer-objective-menu-keydown ::common/key-args
+   :actions/select-portfolio-optimizer-objective-menu-option ::portfolio-optimizer-model-kind-args
+   :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args

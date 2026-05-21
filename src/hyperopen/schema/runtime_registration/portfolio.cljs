@@ -49,6 +49,16 @@
    [:actions/close-portfolio-volume-history :close-portfolio-volume-history]
    [:actions/handle-portfolio-volume-history-keydown :handle-portfolio-volume-history-keydown]
    [:actions/set-portfolio-optimizer-objective-kind :set-portfolio-optimizer-objective-kind]
+   [:actions/open-portfolio-optimizer-objective-menu
+    :open-portfolio-optimizer-objective-menu]
+   [:actions/close-portfolio-optimizer-objective-menu
+    :close-portfolio-optimizer-objective-menu]
+   [:actions/handle-portfolio-optimizer-objective-menu-keydown
+    :handle-portfolio-optimizer-objective-menu-keydown]
+   [:actions/select-portfolio-optimizer-objective-menu-option
+    :select-portfolio-optimizer-objective-menu-option]
+   [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+    :apply-portfolio-optimizer-objective-menu-selection-and-run]
    [:actions/set-portfolio-optimizer-return-model-kind :set-portfolio-optimizer-return-model-kind]
    [:actions/set-portfolio-optimizer-risk-model-kind :set-portfolio-optimizer-risk-model-kind]
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]

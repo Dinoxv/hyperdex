@@ -148,6 +148,21 @@
 (def set-portfolio-optimizer-objective-kind-action
   portfolio-optimizer-actions/set-portfolio-optimizer-objective-kind)
 
+(def open-portfolio-optimizer-objective-menu-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-objective-menu)
+
+(def close-portfolio-optimizer-objective-menu-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-objective-menu)
+
+(def handle-portfolio-optimizer-objective-menu-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-objective-menu-keydown)
+
+(def select-portfolio-optimizer-objective-menu-option-action
+  portfolio-optimizer-actions/select-portfolio-optimizer-objective-menu-option)
+
+(def apply-portfolio-optimizer-objective-menu-selection-and-run-action
+  portfolio-optimizer-actions/apply-portfolio-optimizer-objective-menu-selection-and-run)
+
 (def set-portfolio-optimizer-return-model-kind-action
   portfolio-optimizer-actions/set-portfolio-optimizer-return-model-kind)
 

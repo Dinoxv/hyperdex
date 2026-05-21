@@ -502,6 +502,126 @@ test("portfolio optimizer draft allocation row can be excluded and rerun @smoke 
   }).toBe(true);
 });
 
+test("portfolio optimizer draft objective menu changes objective and reruns frontier @smoke @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  await seedTwoAssetDraftScenario(page);
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize/draft",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
+  const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+  const minimumVolatility = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-option-minimum-volatility']"
+  );
+  const apply = page.locator("[data-role='portfolio-optimizer-objective-menu-apply']");
+
+  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+    .toBeVisible();
+  await expect(trigger).toContainText("Maximum Sharpe");
+  await trigger.click();
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Change objective");
+  await expect(apply).toBeDisabled();
+  await minimumVolatility.click();
+  await expect(minimumVolatility).toHaveAttribute("data-selected", "true");
+  await expect(apply).toBeEnabled();
+  await apply.click();
+
+  await expect(menu).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-recompute-banner']"))
+    .toBeVisible();
+  await expect.poll(async () => {
+    const draftObjective = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft",
+      "objective",
+      "kind"
+    ]);
+    return draftObjective;
+  }).toBe("minimum-variance");
+  await expect.poll(async () => {
+    const progress = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "optimization-progress"
+    ]);
+    return progress?.status;
+  }, { timeout: 15_000 }).toBe("succeeded");
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "last-successful-run",
+      "result"
+    ]);
+    return result?.solver?.["objective-kind"];
+  }).toBe("minimum-variance");
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "last-successful-run",
+      "result"
+    ]);
+    return result?.frontier?.length ?? 0;
+  }).toBeGreaterThan(0);
+  await expect(trigger).toContainText("Minimum volatility");
+});
+
+test("portfolio optimizer draft objective menu stays contained across viewports @smoke @regression", async ({ page }) => {
+  test.setTimeout(180_000);
+
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 900 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 }
+  ]) {
+    await test.step(`viewport ${viewport.width}`, async () => {
+      await page.setViewportSize(viewport);
+      await visitRoute(page, "/portfolio/optimize/new", {
+        routeModuleTimeoutMs: 30_000,
+        idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+      });
+
+      await seedRetainedDraftScenario(page);
+      await dispatch(page, [
+        ":actions/navigate",
+        "/portfolio/optimize/draft",
+        { "replace?": true }
+      ]);
+      await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+      const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
+      const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+
+      await trigger.scrollIntoViewIfNeeded();
+      await trigger.click();
+      await expect(menu).toBeVisible();
+      await expect(menu).toHaveCSS("background-color", "rgb(16, 19, 22)");
+
+      const box = await menu.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    });
+  }
+});
+
 test("portfolio optimizer draft add asset selector stays contained and focused across viewports @smoke @regression", async ({ page }) => {
   test.setTimeout(180_000);
 

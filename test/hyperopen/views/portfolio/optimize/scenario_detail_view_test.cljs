@@ -324,6 +324,77 @@
     (is (contains? strings "Recomputing recommendation"))
     (is (contains? strings "Keeping the previous allocation visible until the new run finishes."))))
 
+(deftest portfolio-optimizer-scenario-detail-objective-menu-renders-actions-test
+  (let [scenario-id "draft"
+        base-state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state base-state)
+        closed-view (portfolio-view/portfolio-view
+                     (assoc-in base-state
+                               [:portfolio :optimizer :last-successful-run]
+                               solved-run))
+        open-view (portfolio-view/portfolio-view
+                   (-> base-state
+                       (assoc-in [:portfolio :optimizer :last-successful-run]
+                                 solved-run)
+                       (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
+                                 true)
+                       (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
+                                 :max-sharpe)))
+        changed-view (portfolio-view/portfolio-view
+                      (-> base-state
+                          (assoc-in [:portfolio :optimizer :last-successful-run]
+                                    solved-run)
+                          (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
+                                    true)
+                          (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
+                                    :minimum-volatility)))
+        trigger (node-by-role closed-view
+                              "portfolio-optimizer-objective-menu-trigger")
+        menu (node-by-role open-view "portfolio-optimizer-objective-menu")
+        apply-current (node-by-role open-view
+                                    "portfolio-optimizer-objective-menu-apply")
+        apply-changed (node-by-role changed-view
+                                    "portfolio-optimizer-objective-menu-apply")
+        minimum-row (node-by-role open-view
+                                  "portfolio-optimizer-objective-menu-option-minimum-volatility")
+        use-my-views-row (node-by-role open-view
+                                       "portfolio-optimizer-objective-menu-option-use-my-views")
+        strings (set (collect-strings open-view))]
+    (is (some? trigger))
+    (is (= [[:actions/open-portfolio-optimizer-objective-menu]]
+           (click-actions trigger)))
+    (is (nil? (node-by-role closed-view "portfolio-optimizer-objective-menu")))
+    (is (some? menu))
+    (is (contains? (set (get-in menu [1 :class]))
+                   "optimizer-objective-menu"))
+    (is (= [[:actions/handle-portfolio-optimizer-objective-menu-keydown
+             [:event/key]]]
+           (get-in menu [1 :on :keydown])))
+    (is (contains? strings "Change objective"))
+    (is (contains? strings "Re-runs the solver with the same universe and constraints"))
+    (is (contains? strings "Minimum volatility"))
+    (is (contains? strings "Maximum Sharpe"))
+    (is (contains? strings "Target volatility · 12%"))
+    (is (contains? strings "Maximum return"))
+    (is (contains? strings "Use my views"))
+    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
+             :minimum-volatility]]
+           (click-actions minimum-row)))
+    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
+             :use-my-views]]
+           (click-actions use-my-views-row)))
+    (is (= true (get-in apply-current [1 :disabled])))
+    (is (nil? (click-actions apply-current)))
+    (is (= false (get-in apply-changed [1 :disabled])))
+    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
+           (click-actions apply-changed)))
+    (is (= [[:actions/close-portfolio-optimizer-objective-menu]]
+           (click-actions
+            (node-by-role open-view "portfolio-optimizer-objective-menu-cancel"))))
+    (is (= [[:actions/close-portfolio-optimizer-objective-menu]]
+           (click-actions
+            (node-by-role open-view "portfolio-optimizer-objective-menu-close"))))))
+
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_inputs"}

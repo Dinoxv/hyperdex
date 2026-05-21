@@ -10,6 +10,16 @@
    {:run-portfolio-optimizer actions/run-portfolio-optimizer
     :set-portfolio-optimizer-objective-kind
     actions/set-portfolio-optimizer-objective-kind
+    :open-portfolio-optimizer-objective-menu
+    actions/open-portfolio-optimizer-objective-menu
+    :close-portfolio-optimizer-objective-menu
+    actions/close-portfolio-optimizer-objective-menu
+    :handle-portfolio-optimizer-objective-menu-keydown
+    actions/handle-portfolio-optimizer-objective-menu-keydown
+    :select-portfolio-optimizer-objective-menu-option
+    actions/select-portfolio-optimizer-objective-menu-option
+    :apply-portfolio-optimizer-objective-menu-selection-and-run
+    actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :set-portfolio-optimizer-return-model-kind
     actions/set-portfolio-optimizer-return-model-kind
     :set-portfolio-optimizer-risk-model-kind

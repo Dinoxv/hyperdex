@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (def objective-models
@@ -32,6 +33,16 @@
    :use-my-views {:objective {:kind :max-sharpe}
                   :return-model {:kind :black-litterman
                                  :views []}}})
+
+(def objective-menu-options
+  {:minimum-volatility {:objective {:kind :minimum-variance}}
+   :max-sharpe {:objective {:kind :max-sharpe}}
+   :target-volatility {:objective {:kind :target-volatility
+                                   :target-volatility 0.12}}
+   :maximum-return {:objective {:kind :target-return
+                                :target-return 0.3}}
+   :use-my-views {:objective {:kind :max-sharpe}
+                  :return-model-kind :black-litterman}})
 
 (def numeric-constraint-keys
   #{:max-asset-weight
@@ -73,6 +84,96 @@
   (if-let [model (get models (common/normalize-keyword-like value))]
     (common/save-draft-path-values [[path model]])
     []))
+
+(defn- current-objective-menu-option
+  [state]
+  (let [objective-kind (get-in state (conj contracts/draft-objective-path :kind))
+        return-model-kind (get-in state (conj contracts/draft-return-model-path :kind))]
+    (cond
+      (= :black-litterman return-model-kind) :use-my-views
+      (= :minimum-variance objective-kind) :minimum-volatility
+      (= :target-volatility objective-kind) :target-volatility
+      (= :target-return objective-kind) :maximum-return
+      :else :max-sharpe)))
+
+(defn- objective-menu-model
+  [value]
+  (get objective-menu-options (common/normalize-keyword-like value)))
+
+(defn- objective-menu-model-for-state
+  [state value]
+  (when-let [model (objective-menu-model value)]
+    (if (= :black-litterman (:return-model-kind model))
+      (-> model
+          (dissoc :return-model-kind)
+          (assoc :return-model
+                 {:kind :black-litterman
+                  :views (vec (or (get-in state contracts/draft-return-model-views-path)
+                                  []))}))
+      model)))
+
+(defn open-portfolio-optimizer-objective-menu
+  [state]
+  [[:effects/save-many
+    [[contracts/ui-objective-menu-open-path true]
+     [contracts/ui-objective-menu-selection-path
+      (current-objective-menu-option state)]]]])
+
+(defn close-portfolio-optimizer-objective-menu
+  [_state]
+  [[:effects/save-many
+    [[contracts/ui-objective-menu-open-path false]
+     [contracts/ui-objective-menu-selection-path nil]]]])
+
+(defn handle-portfolio-optimizer-objective-menu-keydown
+  [state key]
+  (if (= "Escape" (some-> key str))
+    (close-portfolio-optimizer-objective-menu state)
+    []))
+
+(defn select-portfolio-optimizer-objective-menu-option
+  [_state option-key]
+  (if (objective-menu-model option-key)
+    [[:effects/save
+      contracts/ui-objective-menu-selection-path
+      (common/normalize-keyword-like option-key)]]
+    []))
+
+(defn- state-after-save-effect
+  [state effect]
+  (case (first effect)
+    :effects/save
+    (assoc-in state (second effect) (nth effect 2))
+
+    :effects/save-many
+    (reduce (fn [state* [path value]]
+              (assoc-in state* path value))
+            state
+            (second effect))
+
+    state))
+
+(defn- projected-state-after-save-effects
+  [state effects]
+  (reduce state-after-save-effect state effects))
+
+(defn apply-portfolio-optimizer-objective-menu-selection-and-run
+  [state]
+  (let [selection (or (get-in state contracts/ui-objective-menu-selection-path)
+                      (current-objective-menu-option state))]
+    (if-let [{:keys [objective return-model]} (objective-menu-model-for-state state selection)]
+      (let [path-values (cond-> [[contracts/draft-objective-path objective]]
+                          return-model
+                          (conj [contracts/draft-return-model-path return-model])
+
+                          :always
+                          (conj [contracts/ui-objective-menu-open-path false]
+                                [contracts/ui-objective-menu-selection-path nil]))
+            effects (common/save-draft-path-values path-values)
+            state* (projected-state-after-save-effects state effects)]
+        (into effects
+              (run-actions/run-portfolio-optimizer-from-draft state*)))
+      [])))
 
 (defn set-portfolio-optimizer-objective-kind
   [_state kind]

@@ -76,6 +76,73 @@
   (is (= []
          (actions/set-portfolio-optimizer-risk-model-kind {} "not-real"))))
 
+(deftest objective-menu-actions-select-apply-and-rerun-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
+                                               :objective {:kind :max-sharpe}
+                                               :return-model {:kind :historical-mean}
+                                               :metadata {:dirty? false}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :minimum-volatility}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio-ui :optimizer :objective-menu-open?] true]
+              [[:portfolio-ui :optimizer :objective-menu-selection] :max-sharpe]]]]
+           (actions/open-portfolio-optimizer-objective-menu state)))
+    (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-selection]
+             :target-volatility]]
+           (actions/select-portfolio-optimizer-objective-menu-option
+            state
+            "targetVolatility")))
+    (is (= [[:effects/save-many
+             [[[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]]]]
+           (actions/close-portfolio-optimizer-objective-menu state)))
+    (is (= [[:effects/save-many
+             [[[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]]]]
+           (actions/handle-portfolio-optimizer-objective-menu-keydown
+            state
+            "Escape")))
+    (is (= []
+           (actions/handle-portfolio-optimizer-objective-menu-keydown
+            state
+            "Enter")))
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :objective]
+               {:kind :minimum-variance}]
+              [[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+            state)))))
+
+(deftest objective-menu-apply-use-my-views-updates-return-model-and-reruns-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
+                                               :objective {:kind :minimum-variance}
+                                               :return-model {:kind :black-litterman
+                                                              :views [{:kind :absolute
+                                                                       :instrument-id "perp:BTC"
+                                                                       :return 0.2
+                                                                       :confidence 0.75
+                                                                       :weights {"perp:BTC" 1}}]}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :objective]
+               {:kind :max-sharpe}]
+              [[:portfolio :optimizer :draft :return-model]
+               {:kind :black-litterman
+                :views [{:kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return 0.2
+                         :confidence 0.75
+                         :weights {"perp:BTC" 1}}]}]
+              [[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+            state)))))
+
 (deftest set-draft-constraint-normalizes-supported-values-test
   (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :max-asset-weight]
                                 0.42]

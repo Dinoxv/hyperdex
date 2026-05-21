@@ -177,6 +177,8 @@
    :list-sort :updated-desc
    :universe-search-query ""
    :universe-search-active-index 0
+   :objective-menu-open? false
+   :objective-menu-selection nil
    :black-litterman-editor (bl-editor-model/default-editor-state)
    :workspace-panel :setup
    :results-tab :recommendation
