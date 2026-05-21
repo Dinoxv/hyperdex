@@ -232,33 +232,45 @@
      [:label {:class ["optimizer-objective-view-return-shell"
                       "flex"
                       "items-center"
-                      "gap-1"
+                      "gap-2"
                       "font-mono"
                       "text-[0.625rem]"
                       "text-trading-muted"]}
       [:span "return"]
-      [:input {:type "text"
-               :inputmode "decimal"
-               :class ["optimizer-objective-view-return-input"
-                       "border"
-                       "border-base-300"
-                       "px-2"
-                       "py-1"
-                       "text-right"
+      [:span {:class ["optimizer-objective-view-return-input-shell"
+                      "relative"
+                      "inline-flex"
+                      "items-center"]}
+       [:input {:type "text"
+                :inputmode "decimal"
+                :class ["optimizer-objective-view-return-input"
+                        "border"
+                        "border-base-300"
+                        "py-1"
+                        "pl-2"
+                        "pr-5"
+                        "text-right"
+                        "font-mono"
+                        "text-[0.6875rem]"
+                        "text-trading-text"
+                        "focus:outline-none"
+                        "focus:ring-0"
+                        "focus:ring-offset-0"]
+                :data-role (str "portfolio-optimizer-objective-menu-view-"
+                                instrument-id
+                                "-return")
+                :value (str (or (:return-text view-draft) ""))
+                :on {:input [[:actions/set-portfolio-optimizer-objective-menu-view-return
+                              instrument-id
+                              [:event.target/value]]]}}]
+       [:span {:class ["optimizer-objective-view-return-suffix"
+                       "pointer-events-none"
+                       "absolute"
+                       "right-2"
                        "font-mono"
-                       "text-[0.6875rem]"
-                       "text-trading-text"
-                       "focus:outline-none"
-                       "focus:ring-0"
-                       "focus:ring-offset-0"]
-               :data-role (str "portfolio-optimizer-objective-menu-view-"
-                               instrument-id
-                               "-return")
-               :value (str (or (:return-text view-draft) ""))
-               :on {:input [[:actions/set-portfolio-optimizer-objective-menu-view-return
-                             instrument-id
-                             [:event.target/value]]]}}]
-      [:span "%"]]
+                       "text-[0.625rem]"
+                       "text-trading-muted"]}
+        "%"]]]
      (into
       [:div {:class ["optimizer-objective-view-confidence"
                      "grid"

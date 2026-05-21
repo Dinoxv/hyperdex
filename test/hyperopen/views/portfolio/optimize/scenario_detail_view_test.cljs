@@ -5,7 +5,7 @@
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [click-actions collect-strings node-by-role]]))
+             :refer [click-actions collect-nodes collect-strings node-by-role]]))
 
 (defn- ready-scenario-state
   [scenario-id return-model]
@@ -374,8 +374,14 @@
                                        "portfolio-optimizer-objective-menu-option-use-my-views")
         inline-editor (node-by-role use-my-views-view
                                     "portfolio-optimizer-objective-menu-use-my-views-editor")
+        btc-row (node-by-role use-my-views-view
+                              "portfolio-optimizer-objective-menu-view-row-perp:BTC")
         btc-return (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-return-suffix (first (filter (fn [node]
+                                           (contains? (set (get-in node [1 :class]))
+                                                      "optimizer-objective-view-return-suffix"))
+                                         (collect-nodes btc-row vector?)))
         btc-confidence-medium (node-by-role use-my-views-view
                                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
         btc-remove (node-by-role use-my-views-view
@@ -415,6 +421,8 @@
     (is (some? inline-editor))
     (is (contains? (set (collect-strings inline-editor)) "Your return views"))
     (is (= "18" (get-in btc-return [1 :value])))
+    (is (contains? (set (get-in btc-return [1 :class])) "pr-5"))
+    (is (= ["%"] (collect-strings btc-return-suffix)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
              "perp:BTC"
              [:event.target/value]]]
