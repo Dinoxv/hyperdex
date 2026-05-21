@@ -606,11 +606,16 @@ test("portfolio optimizer draft objective menu stays contained across viewports 
 
       const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
       const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+      const backdrop = page.locator("[data-role='portfolio-optimizer-objective-menu-backdrop']");
 
       await trigger.scrollIntoViewIfNeeded();
+      const triggerBox = await trigger.boundingBox();
+      expect(triggerBox).not.toBeNull();
+
       await trigger.click();
       await expect(menu).toBeVisible();
       await expect(menu).toHaveCSS("background-color", "rgb(16, 19, 22)");
+      await expect(backdrop).toHaveCount(0);
 
       const box = await menu.boundingBox();
       expect(box).not.toBeNull();
@@ -618,6 +623,10 @@ test("portfolio optimizer draft objective menu stays contained across viewports 
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+      expect(box.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 2);
+      expect(Math.abs(box.x - triggerBox.x)).toBeLessThanOrEqual(
+        viewport.width >= 1280 ? 24 : 180
+      );
     });
   }
 });

@@ -350,6 +350,8 @@
                                     :minimum-volatility)))
         trigger (node-by-role closed-view
                               "portfolio-optimizer-objective-menu-trigger")
+        open-trigger (node-by-role open-view
+                                   "portfolio-optimizer-objective-menu-trigger")
         menu (node-by-role open-view "portfolio-optimizer-objective-menu")
         apply-current (node-by-role open-view
                                     "portfolio-optimizer-objective-menu-apply")
@@ -363,10 +365,18 @@
     (is (some? trigger))
     (is (= [[:actions/open-portfolio-optimizer-objective-menu]]
            (click-actions trigger)))
+    (is (= "true" (get-in trigger [1 :aria-haspopup])))
+    (is (= "false" (get-in trigger [1 :aria-expanded])))
+    (is (= "true" (get-in open-trigger [1 :aria-expanded])))
     (is (nil? (node-by-role closed-view "portfolio-optimizer-objective-menu")))
+    (is (nil? (node-by-role open-view "portfolio-optimizer-objective-menu-backdrop")))
     (is (some? menu))
     (is (contains? (set (get-in menu [1 :class]))
                    "optimizer-objective-menu"))
+    (is (contains? (set (get-in menu [1 :class]))
+                   "optimizer-objective-popover"))
+    (is (= "region" (get-in menu [1 :role])))
+    (is (nil? (get-in menu [1 :aria-modal])))
     (is (= [[:actions/handle-portfolio-optimizer-objective-menu-keydown
              [:event/key]]]
            (get-in menu [1 :on :keydown])))

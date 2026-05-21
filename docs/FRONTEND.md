@@ -27,6 +27,7 @@ If guidance conflicts, this document wins for UI runtime behavior and invariant 
 - MUST NOT conclude “looks good” or equivalent unless every required pass is explicitly accounted for.
 
 ## UI Interaction Runtime Rules (MUST)
+- MUST prefer anchored popovers, dropdowns, inline disclosure, or responsive sheets over full-screen modals for page-local, recoverable controls. Use modals only when a workflow requires focus isolation, route-level interruption, destructive confirmation, provider or wallet interaction, or multi-step state that would be risky to leave half-complete.
 - MUST apply user-visible UI state transitions first in an action pipeline (example: close dropdown immediately before unsubscribe/subscribe/fetch effects).
 - MUST batch related UI state writes caused by one interaction into a single state projection effect when feasible.
 - MUST keep effect-order authority centralized in runtime validation contract enforcement:

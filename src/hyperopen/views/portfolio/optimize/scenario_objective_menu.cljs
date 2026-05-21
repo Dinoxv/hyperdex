@@ -37,8 +37,12 @@
                     objective-menu-options))
       "Maximum Sharpe"))
 
+(defn objective-menu-open?
+  [state]
+  (true? (get-in state optimizer-contracts/ui-objective-menu-open-path)))
+
 (defn objective-trigger
-  [label]
+  [label open?]
   [:button {:type "button"
             :class ["optimizer-provenance-objective-trigger"
                     "group"
@@ -55,7 +59,8 @@
                     "focus:ring-0"
                     "focus:ring-offset-0"]
             :data-role "portfolio-optimizer-objective-menu-trigger"
-            :aria-haspopup "dialog"
+            :aria-haspopup "true"
+            :aria-expanded (if open? "true" "false")
             :on {:click [[:actions/open-portfolio-optimizer-objective-menu]]}}
    [:span {:class ["optimizer-provenance-objective-label"]} label]
    [:span {:class ["text-[0.6rem]" "text-trading-muted"]} "›"]])
@@ -115,82 +120,75 @@
 
 (defn objective-menu
   [state draft result]
-  (let [open? (true? (get-in state optimizer-contracts/ui-objective-menu-open-path))
+  (let [open? (objective-menu-open? state)
         current-key (current-objective-menu-key draft result)
         pending-key (or (get-in state optimizer-contracts/ui-objective-menu-selection-path)
                         current-key)
         apply-disabled? (= current-key pending-key)]
     (when open?
-      [:div {:class ["optimizer-objective-menu-backdrop"
-                     "fixed"
-                     "inset-0"
-                     "z-50"
-                     "flex"
-                     "items-center"
-                     "justify-center"
-                     "px-4"
-                     "py-6"]
-             :data-role "portfolio-optimizer-objective-menu-backdrop"}
-       [:section {:class ["optimizer-objective-menu"
-                          "w-full"
-                          "max-w-[360px]"
-                          "border"
-                          "shadow-2xl"]
-                  :data-role "portfolio-optimizer-objective-menu"
-                  :role "dialog"
-                  :tab-index -1
-                  :replicant/on-render objective-menu-mount-focus!
-                  :aria-modal "true"
-                  :aria-label "Change objective"
-                  :on {:keydown [[:actions/handle-portfolio-optimizer-objective-menu-keydown
-                                   [:event/key]]]}}
-        [:header {:class ["flex" "items-start" "justify-between" "gap-4" "border-b" "border-base-300" "px-4" "py-4"]}
-         [:div
-          [:p {:class ["font-mono" "text-[0.58rem]" "uppercase" "tracking-[0.18em]" "text-trading-muted/70"]}
-           "Edit"]
-          [:h2 {:class ["mt-1" "text-sm" "font-semibold" "text-trading-text"]}
-           "Change objective"]
-          [:p {:class ["mt-1.5" "text-[0.7rem]" "text-trading-muted"]}
-           "Re-runs the solver with the same universe and constraints"]]
+      [:section {:class ["optimizer-objective-menu"
+                         "optimizer-objective-popover"
+                         "absolute"
+                         "left-0"
+                         "top-full"
+                         "z-50"
+                         "mt-2"
+                         "border"
+                         "shadow-2xl"]
+                 :data-role "portfolio-optimizer-objective-menu"
+                 :role "region"
+                 :tab-index -1
+                 :replicant/on-render objective-menu-mount-focus!
+                 :aria-label "Change objective"
+                 :on {:keydown [[:actions/handle-portfolio-optimizer-objective-menu-keydown
+                                  [:event/key]]]}}
+       [:header {:class ["flex" "items-start" "justify-between" "gap-4" "border-b" "border-base-300" "px-3" "py-3"]}
+        [:div
+         [:p {:class ["font-mono" "text-[0.58rem]" "uppercase" "tracking-[0.18em]" "text-trading-muted/70"]}
+          "Edit"]
+         [:h2 {:class ["mt-1" "text-sm" "font-semibold" "text-trading-text"]}
+          "Change objective"]
+         [:p {:class ["mt-1.5" "text-[0.7rem]" "text-trading-muted"]}
+          "Re-runs the solver with the same universe and constraints"]]
+        [:button {:type "button"
+                  :class ["border-0"
+                          "bg-transparent"
+                          "px-1"
+                          "py-0"
+                          "text-sm"
+                          "text-trading-muted"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
+                  :aria-label "Close objective menu"
+                  :data-role "portfolio-optimizer-objective-menu-close"
+                  :on {:click [[:actions/close-portfolio-optimizer-objective-menu]]}}
+         "x"]]
+       (into
+        [:div {:class ["space-y-2" "px-3" "py-3"]}]
+        (map #(objective-menu-option % current-key pending-key)
+             objective-menu-options))
+       [:footer {:class ["flex" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-3" "py-3"]}
+        [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
+         "Esc to cancel"]
+        [:div {:class ["flex" "items-center" "gap-2"]}
          [:button {:type "button"
-                   :class ["border-0"
-                           "bg-transparent"
-                           "px-1"
-                           "py-0"
-                           "text-sm"
-                           "text-trading-muted"
-                           "focus:outline-none"
-                           "focus:ring-0"
-                           "focus:ring-offset-0"]
-                   :aria-label "Close objective menu"
-                   :data-role "portfolio-optimizer-objective-menu-close"
+                   :class ["border" "border-base-300" "bg-base-200/40" "px-3" "py-1.5" "text-[0.7rem]" "font-semibold" "text-trading-text"]
+                   :data-role "portfolio-optimizer-objective-menu-cancel"
                    :on {:click [[:actions/close-portfolio-optimizer-objective-menu]]}}
-          "x"]]
-        (into
-         [:div {:class ["space-y-2" "px-4" "py-4"]}]
-         (map #(objective-menu-option % current-key pending-key)
-              objective-menu-options))
-        [:footer {:class ["flex" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-4" "py-3"]}
-         [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
-          "Esc to cancel"]
-         [:div {:class ["flex" "items-center" "gap-2"]}
-          [:button {:type "button"
-                    :class ["border" "border-base-300" "bg-base-200/40" "px-3" "py-1.5" "text-[0.7rem]" "font-semibold" "text-trading-text"]
-                    :data-role "portfolio-optimizer-objective-menu-cancel"
-                    :on {:click [[:actions/close-portfolio-optimizer-objective-menu]]}}
-           "Cancel"]
-          [:button {:type "button"
-                    :class ["optimizer-primary-action"
-                            "border"
-                            "border-base-300"
-                            "px-3"
-                            "py-1.5"
-                            "text-[0.7rem]"
-                            "font-semibold"
-                            "disabled:cursor-not-allowed"
-                            "disabled:text-trading-muted"]
-                    :data-role "portfolio-optimizer-objective-menu-apply"
-                    :disabled apply-disabled?
-                    :on (when-not apply-disabled?
-                          {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]})}
-           "Apply & re-run"]]]]])))
+          "Cancel"]
+         [:button {:type "button"
+                   :class ["optimizer-primary-action"
+                           "border"
+                           "border-base-300"
+                           "px-3"
+                           "py-1.5"
+                           "text-[0.7rem]"
+                           "font-semibold"
+                           "disabled:cursor-not-allowed"
+                           "disabled:text-trading-muted"]
+                   :data-role "portfolio-optimizer-objective-menu-apply"
+                   :disabled apply-disabled?
+                   :on (when-not apply-disabled?
+                         {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]})}
+          "Apply & re-run"]]]])))

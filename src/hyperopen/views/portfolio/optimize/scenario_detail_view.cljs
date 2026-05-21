@@ -262,8 +262,13 @@
                                   "py-2"]}
                    [:span {:class ["block" "font-mono" "text-[0.56rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
                     "Objective"]
-                   (objective-menu/objective-trigger objective-label)
-                   (objective-menu/objective-menu state draft result*)]
+                   [:div {:class ["optimizer-objective-anchor"
+                                   "relative"
+                                   "inline-block"]}
+                    (objective-menu/objective-trigger
+                     objective-label
+                     (objective-menu/objective-menu-open? state))
+                    (objective-menu/objective-menu state draft result*)]]
                   (field "Returns"
                          (opt-format/display-label (or (:return-model result*)
                                                        (get-in draft [:return-model :kind]))))
