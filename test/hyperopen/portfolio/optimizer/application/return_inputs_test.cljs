@@ -25,6 +25,18 @@
     (is (near? 0.2 (get inputs "perp:BTC"))
         "Prefill should use the historical expected-return input for Sharpe, not BL equilibrium return.")))
 
+(deftest readiness-inputs-use-baseline-sharpe-return-estimator-before-black-litterman-is-applied-test
+  (let [inputs (return-inputs/readiness-inputs-by-instrument
+                {:status :ready
+                 :request {:universe [{:instrument-id "perp:BTC"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :periods-per-year 10
+                           :history {:return-series-by-instrument
+                                     {"perp:BTC" [0.01 0.03]}}}})]
+    (is (near? 0.2 (get inputs "perp:BTC"))
+        "Use my views should be able to prefill before the draft return model has switched to Black-Litterman.")))
+
 (deftest readiness-inputs-keep-single-asset-prefill-while-history-loading-test
   (let [inputs (return-inputs/readiness-inputs-by-instrument
                 {:status :blocked

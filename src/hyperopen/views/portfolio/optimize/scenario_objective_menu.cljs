@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
+            [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
@@ -189,15 +190,35 @@
                               "-icon-img")}]
        (subs asset-label 0 (min 1 (count asset-label))))]))
 
+(defn- result-return-inputs
+  [result]
+  (or (:expected-returns-by-instrument result) {}))
+
+(defn- readiness-return-inputs
+  [readiness]
+  (return-inputs/readiness-inputs-by-instrument readiness))
+
+(defn- objective-menu-return-inputs
+  [result readiness]
+  (merge (readiness-return-inputs readiness)
+         (result-return-inputs result)))
+
 (defn- inline-view-draft
-  [draft state instrument-id]
+  [draft state return-inputs-by-instrument instrument-id]
   (let [views (vec (get-in draft [:return-model :views]))
         view (active-absolute-view views instrument-id)
         ui-draft (get-in state (conj optimizer-contracts/ui-objective-menu-view-drafts-path
                                      (keyword instrument-id)))]
     (merge
-     {:return-text (if (some? (:return view))
+     {:return-text (cond
+                     (some? (:return view))
                      (bl-model/decimal->percent-text (:return view))
+
+                     (contains? return-inputs-by-instrument instrument-id)
+                     (bl-model/decimal->percent-text
+                      (get return-inputs-by-instrument instrument-id))
+
+                     :else
                      "")
       :confidence (bl-model/normalize-confidence-level
                    (or (:confidence-level view)
@@ -322,8 +343,9 @@
       "x"]]))
 
 (defn- inline-views-section
-  [draft state]
+  [draft state result readiness]
   (let [universe (vec (:universe draft))
+        return-inputs-by-instrument (objective-menu-return-inputs result readiness)
         order (default-view-order draft state)]
     [:section {:class ["optimizer-objective-views-section"
                        "border-t"
@@ -347,7 +369,11 @@
       (map (fn [instrument-id]
              (inline-view-row universe
                               instrument-id
-                              (inline-view-draft draft state instrument-id)))
+                              (inline-view-draft
+                               draft
+                               state
+                               return-inputs-by-instrument
+                               instrument-id)))
            order))
      [:button {:type "button"
                :class ["mt-2"
@@ -383,7 +409,9 @@
          (.focus node))))))
 
 (defn objective-menu
-  [state draft result]
+  ([state draft result]
+   (objective-menu state draft result nil))
+  ([state draft result readiness]
   (let [open? (objective-menu-open? state)
         current-key (current-objective-menu-key draft result)
         pending-key (or (get-in state optimizer-contracts/ui-objective-menu-selection-path)
@@ -434,7 +462,7 @@
         (map #(objective-menu-option % current-key pending-key)
              objective-menu-options))
        (when (= :use-my-views pending-key)
-         (inline-views-section draft state))
+         (inline-views-section draft state result readiness))
        [:footer {:class ["flex" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-3" "py-3"]}
         [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
          "Esc to cancel"]
@@ -458,4 +486,4 @@
                    :disabled apply-disabled?
                    :on (when-not apply-disabled?
                          {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]})}
-          "Apply & re-run"]]]])))
+          "Apply & re-run"]]]]))))

@@ -244,7 +244,7 @@
       "Rerun"]]))
 
 (defn- provenance-strip
-  [{:keys [state draft result scenario-id]}]
+  [{:keys [state draft result readiness scenario-id]}]
   (let [result* result
         constraints (:constraints draft)
         objective-key (objective-menu/current-objective-menu-key draft result*)
@@ -268,7 +268,7 @@
                     (objective-menu/objective-trigger
                      objective-label
                      (objective-menu/objective-menu-open? state))
-                    (objective-menu/objective-menu state draft result*)]]
+                    (objective-menu/objective-menu state draft result* readiness)]]
                   (field "Returns"
                          (opt-format/display-label (or (:return-model result*)
                                                        (get-in draft [:return-model :kind]))))

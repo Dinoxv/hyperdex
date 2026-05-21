@@ -1,6 +1,8 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
+            [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
@@ -137,16 +139,39 @@
       :else default-order)))
 
 (defn- objective-menu-inline-draft
-  [state views instrument-id]
+  [state views return-inputs-by-instrument instrument-id]
   (let [view (existing-absolute-view-by-instrument views instrument-id)
         ui-draft (get-in state (conj contracts/ui-objective-menu-view-drafts-path
                                      (keyword instrument-id)))]
     (merge
-     {:return-text (if (some? (:return view))
+     {:return-text (cond
+                     (some? (:return view))
                      (bl-model/decimal->percent-text (:return view))
+
+                     (contains? return-inputs-by-instrument instrument-id)
+                     (bl-model/decimal->percent-text
+                      (get return-inputs-by-instrument instrument-id))
+
+                     :else
                      "")
       :confidence (black-litterman-view-confidence-level view)}
      ui-draft)))
+
+(defn- result-return-inputs
+  [state]
+  (or (get-in state (conj contracts/last-successful-run-result-path
+                          :expected-returns-by-instrument))
+      {}))
+
+(defn- readiness-return-inputs
+  [state]
+  (return-inputs/readiness-inputs-by-instrument
+   (setup-readiness/build-readiness state)))
+
+(defn- objective-menu-return-inputs
+  [state]
+  (merge (readiness-return-inputs state)
+         (result-return-inputs state)))
 
 (defn- next-inline-view-id
   [views]
@@ -174,6 +199,7 @@
 (defn- objective-menu-inline-views
   [state]
   (let [views (vec (or (get-in state contracts/draft-return-model-views-path) []))
+        return-inputs-by-instrument (objective-menu-return-inputs state)
         ui-order (vec (keep common/non-blank-text
                             (get-in state contracts/ui-objective-menu-view-order-path)))
         order (objective-menu-inline-order state)
@@ -188,7 +214,11 @@
               (if-let [view (inline-draft->absolute-view
                              acc
                              instrument-id
-                             (objective-menu-inline-draft state views instrument-id))]
+                             (objective-menu-inline-draft
+                              state
+                              views
+                              return-inputs-by-instrument
+                              instrument-id))]
                 (conj acc view)
                 acc))
             preserved-views

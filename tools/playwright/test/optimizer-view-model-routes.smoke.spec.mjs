@@ -179,6 +179,10 @@ async function seedTwoAssetDraftScenario(page) {
       kw("target-weights-by-instrument"), map(["perp:BTC", 0.5, "perp:ETH", 0.5]),
       kw("current-weights-by-instrument"), map(["perp:BTC", 0.25, "perp:ETH", 0.15]),
       kw("labels-by-instrument"), map(["perp:BTC", "BTC", "perp:ETH", "ETH"]),
+      kw("expected-returns-by-instrument"), map([
+        "hl:perp:BTC", 0.195,
+        "hl:perp:ETH", 0.165
+      ]),
       kw("expected-return"), 0.12,
       kw("volatility"), 0.2,
       kw("return-model"), kw("historical-mean"),
@@ -625,6 +629,8 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   await expect(editor).toBeVisible();
   await expect(editor).toContainText("Your return views");
   await expect(menu.locator("select")).toHaveCount(0);
+  await expect(btcReturn).toHaveValue("19.5");
+  await expect(ethReturn).toHaveValue("16.5");
 
   await btcReturn.fill("18");
   await ethReturn.fill("16.5");

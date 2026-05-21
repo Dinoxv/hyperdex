@@ -225,6 +225,30 @@
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
 
+(deftest objective-menu-use-my-views-prefills-from-baseline-return-data-on-apply-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
+                                               :objective {:kind :minimum-variance}
+                                               :return-model {:kind :historical-mean}
+                                               :risk-model {:kind :sample-covariance}}
+                                      :last-successful-run
+                                      {:result {:expected-returns-by-instrument
+                                                {"perp:BTC" 0.2}}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views}}}]
+    (let [effects (actions/apply-portfolio-optimizer-objective-menu-selection-and-run state)
+          saved-values (second (first effects))
+          return-model (second (second saved-values))]
+      (is (= {:kind :black-litterman
+              :views [{:id "bl_view_1"
+                       :kind :absolute
+                       :instrument-id "perp:BTC"
+                       :return 0.2
+                       :confidence-level :medium
+                       :confidence 0.5
+                       :confidence-variance 0.5
+                       :horizon :3m
+                       :weights {"perp:BTC" 1}}]}
+             return-model)))))
+
 (deftest objective-menu-use-my-views-preserves-relative-views-and-removes-edited-absolute-rows-test
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
                                                            {:instrument-id "perp:ETH"}]

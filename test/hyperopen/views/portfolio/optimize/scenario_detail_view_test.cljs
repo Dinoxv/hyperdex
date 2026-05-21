@@ -58,6 +58,7 @@
              :current-weights [0.0]
              :target-weights-by-instrument {"perp:BTC" 1.0}
              :current-weights-by-instrument {"perp:BTC" 0.0}
+             :expected-returns-by-instrument {"perp:BTC" 0.2}
              :expected-return 0.2
              :volatility 1.0
              :performance {:shrunk-sharpe 0.2}
@@ -359,6 +360,14 @@
                                (assoc-in [:portfolio-ui :optimizer :objective-menu-view-drafts]
                                          {:perp:BTC {:return-text "18"
                                                      :confidence :medium}})))
+        use-my-views-prefilled-view (portfolio-view/portfolio-view
+                                     (-> base-state
+                                         (assoc-in [:portfolio :optimizer :last-successful-run]
+                                                   solved-run)
+                                         (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
+                                                   true)
+                                         (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
+                                                   :use-my-views)))
         trigger (node-by-role closed-view
                               "portfolio-optimizer-objective-menu-trigger")
         open-trigger (node-by-role open-view
@@ -380,6 +389,8 @@
                                "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
         btc-return (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-prefilled-return (node-by-role use-my-views-prefilled-view
+                                           "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-return-suffix (first (filter (fn [node]
                                            (contains? (set (get-in node [1 :class]))
                                                       "optimizer-objective-view-return-suffix"))
@@ -425,6 +436,7 @@
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
            (get-in btc-icon [1 :src])))
     (is (= "18" (get-in btc-return [1 :value])))
+    (is (= "20" (get-in btc-prefilled-return [1 :value])))
     (is (contains? (set (get-in btc-return [1 :class])) "pr-5"))
     (is (= ["%"] (collect-strings btc-return-suffix)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return

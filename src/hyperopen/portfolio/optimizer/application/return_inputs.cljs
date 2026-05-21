@@ -7,6 +7,6 @@
 (defn readiness-inputs-by-instrument
   [readiness]
   (let [request (:request readiness)]
-    (if (= :black-litterman (get-in request [:return-model :kind]))
+    (if request
       (engine-context/baseline-expected-return-inputs-by-instrument request)
       {})))
