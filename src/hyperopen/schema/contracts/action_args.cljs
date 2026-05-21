@@ -219,6 +219,7 @@
    :actions/handle-portfolio-optimizer-objective-menu-keydown ::common/key-args
    :actions/select-portfolio-optimizer-objective-menu-option ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-objective-menu-view-return ::portfolio-optimizer-instrument-value-args
+   :actions/step-portfolio-optimizer-objective-menu-view-return ::portfolio-optimizer-instrument-value-args
    :actions/set-portfolio-optimizer-objective-menu-view-confidence ::portfolio-optimizer-instrument-value-args
    :actions/remove-portfolio-optimizer-objective-menu-view ::portfolio-optimizer-instrument-id-args
    :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args

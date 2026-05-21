@@ -59,6 +59,8 @@
     :select-portfolio-optimizer-objective-menu-option]
    [:actions/set-portfolio-optimizer-objective-menu-view-return
     :set-portfolio-optimizer-objective-menu-view-return]
+   [:actions/step-portfolio-optimizer-objective-menu-view-return
+    :step-portfolio-optimizer-objective-menu-view-return]
    [:actions/set-portfolio-optimizer-objective-menu-view-confidence
     :set-portfolio-optimizer-objective-menu-view-confidence]
    [:actions/remove-portfolio-optimizer-objective-menu-view

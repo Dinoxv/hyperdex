@@ -180,6 +180,24 @@
             "perp:BTC"
             "high")))
     (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-view-drafts
+              :perp:BTC
+              :return-text]
+             "18.5"]]
+           (actions/step-portfolio-optimizer-objective-menu-view-return
+            state
+            "perp:BTC"
+            :up)))
+    (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-view-drafts
+              :perp:BTC
+              :return-text]
+             "17.5"]]
+           (actions/step-portfolio-optimizer-objective-menu-view-return
+            state
+            "perp:BTC"
+            "ArrowDown")))
+    (is (= [[:effects/save
              [:portfolio-ui :optimizer :objective-menu-view-order]
              ["perp:BTC" "perp:ETH" "perp:HYPE"]]]
            (actions/add-portfolio-optimizer-objective-menu-view

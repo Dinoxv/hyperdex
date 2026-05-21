@@ -618,6 +618,9 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   const btcHigh = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
   );
+  const btcStepDown = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-step-down']"
+  );
   const ethLow = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']"
   );
@@ -631,6 +634,11 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   await expect(menu.locator("select")).toHaveCount(0);
   await expect(btcReturn).toHaveValue("19.5");
   await expect(ethReturn).toHaveValue("16.5");
+  await btcReturn.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(btcReturn).toHaveValue("20");
+  await btcStepDown.click();
+  await expect(btcReturn).toHaveValue("19.5");
 
   await btcReturn.fill("18");
   await ethReturn.fill("16.5");

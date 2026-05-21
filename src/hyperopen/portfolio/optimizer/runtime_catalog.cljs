@@ -20,6 +20,8 @@
     actions/select-portfolio-optimizer-objective-menu-option
     :set-portfolio-optimizer-objective-menu-view-return
     actions/set-portfolio-optimizer-objective-menu-view-return
+    :step-portfolio-optimizer-objective-menu-view-return
+    actions/step-portfolio-optimizer-objective-menu-view-return
     :set-portfolio-optimizer-objective-menu-view-confidence
     actions/set-portfolio-optimizer-objective-menu-view-confidence
     :remove-portfolio-optimizer-objective-menu-view

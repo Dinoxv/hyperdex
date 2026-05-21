@@ -29,6 +29,9 @@
 (def set-portfolio-optimizer-objective-menu-view-return
   draft/set-portfolio-optimizer-objective-menu-view-return)
 
+(def step-portfolio-optimizer-objective-menu-view-return
+  draft/step-portfolio-optimizer-objective-menu-view-return)
+
 (def set-portfolio-optimizer-objective-menu-view-confidence
   draft/set-portfolio-optimizer-objective-menu-view-confidence)
 

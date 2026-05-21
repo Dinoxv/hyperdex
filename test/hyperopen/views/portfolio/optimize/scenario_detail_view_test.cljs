@@ -389,6 +389,10 @@
                                "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
         btc-return (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-step-up (node-by-role use-my-views-view
+                                  "portfolio-optimizer-objective-menu-view-perp:BTC-step-up")
+        btc-step-down (node-by-role use-my-views-view
+                                    "portfolio-optimizer-objective-menu-view-perp:BTC-step-down")
         btc-prefilled-return (node-by-role use-my-views-prefilled-view
                                            "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-return-suffix (first (filter (fn [node]
@@ -437,12 +441,26 @@
            (get-in btc-icon [1 :src])))
     (is (= "18" (get-in btc-return [1 :value])))
     (is (= "20" (get-in btc-prefilled-return [1 :value])))
-    (is (contains? (set (get-in btc-return [1 :class])) "pr-5"))
+    (is (contains? (set (get-in btc-return [1 :class])) "pr-9"))
     (is (= ["%"] (collect-strings btc-return-suffix)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
              "perp:BTC"
              [:event.target/value]]]
            (get-in btc-return [1 :on :input])))
+    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             [:event/key]]]
+           (get-in btc-return [1 :on :keydown])))
+    (is (= "Increase BTC return" (get-in btc-step-up [1 :aria-label])))
+    (is (= "Decrease BTC return" (get-in btc-step-down [1 :aria-label])))
+    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             :up]]
+           (click-actions btc-step-up)))
+    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             :down]]
+           (click-actions btc-step-down)))
     (is (= "true" (get-in btc-confidence-medium [1 :data-selected])))
     (is (= "medium" (get-in btc-confidence-medium [1 :data-tooltip])))
     (is (= "medium" (get-in btc-confidence-medium [1 :title])))

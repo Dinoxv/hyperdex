@@ -272,6 +272,40 @@
       (str (or value ""))]]
     []))
 
+(def ^:private inline-return-step-decimal
+  0.005)
+
+(defn- objective-menu-return-step-direction
+  [direction]
+  (case (common/normalize-keyword-like direction)
+    :up 1
+    :arrow-up 1
+    :down -1
+    :arrow-down -1
+    nil))
+
+(defn step-portfolio-optimizer-objective-menu-view-return
+  [state instrument-id direction]
+  (if-let [instrument-id* (common/non-blank-text instrument-id)]
+    (if-let [step-direction (objective-menu-return-step-direction direction)]
+      (let [views (vec (or (get-in state contracts/draft-return-model-views-path)
+                           []))
+            draft (objective-menu-inline-draft
+                   state
+                   views
+                   (objective-menu-return-inputs state)
+                   instrument-id*)
+            current (or (bl-model/parse-percent-text (:return-text draft))
+                        0)
+            next-value (+ current (* step-direction inline-return-step-decimal))]
+        [[:effects/save
+          (conj contracts/ui-objective-menu-view-drafts-path
+                (keyword instrument-id*)
+                :return-text)
+          (bl-model/decimal->percent-text next-value)]])
+      [])
+    []))
+
 (defn set-portfolio-optimizer-objective-menu-view-confidence
   [_state instrument-id confidence]
   (if-let [instrument-id* (common/non-blank-text instrument-id)]

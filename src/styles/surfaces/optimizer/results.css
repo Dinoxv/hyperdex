@@ -134,11 +134,11 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-return-input-shell {
-    width: 66px;
+    width: 82px;
   }
 
   .portfolio-optimizer .optimizer-objective-view-return-input {
-    width: 66px;
+    width: 82px;
     height: 24px;
     min-height: 24px;
     background-color: #0f1215;
@@ -147,7 +147,39 @@
 
   .portfolio-optimizer .optimizer-objective-view-return-suffix {
     top: 50%;
+    right: 17px;
     transform: translateY(-50%);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper {
+    top: 3px;
+    right: 3px;
+    width: 10px;
+    height: 18px;
+    opacity: 0.45;
+    transition: opacity 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-view-return-shell:is(:hover, :focus-within)
+    .optimizer-objective-view-stepper {
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper-button {
+    width: 10px;
+    height: 9px;
+    min-height: 9px;
+    background-color: transparent;
+    color: var(--optimizer-text-3);
+    font-size: 6px;
+    line-height: 1;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper-button:not(:disabled):hover,
+  .portfolio-optimizer .optimizer-objective-view-stepper-button:focus-visible {
+    background-color: transparent;
+    color: var(--optimizer-accent);
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence {

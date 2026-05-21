@@ -275,13 +275,13 @@
       (inline-view-icon instrument asset-label instrument-id)
       [:span {:class ["truncate" "text-[0.75rem]" "font-semibold" "text-trading-text"]}
        asset-label]]
-     [:label {:class ["optimizer-objective-view-return-shell"
-                      "flex"
-                      "items-center"
-                      "gap-2"
-                      "font-mono"
-                      "text-[0.625rem]"
-                      "text-trading-muted"]}
+     [:div {:class ["optimizer-objective-view-return-shell"
+                    "flex"
+                    "items-center"
+                    "gap-2"
+                    "font-mono"
+                    "text-[0.625rem]"
+                    "text-trading-muted"]}
       [:span "return"]
       [:span {:class ["optimizer-objective-view-return-input-shell"
                       "relative"
@@ -289,12 +289,13 @@
                       "items-center"]}
        [:input {:type "text"
                 :inputmode "decimal"
+                :aria-label (str asset-label " return")
                 :class ["optimizer-objective-view-return-input"
                         "border"
                         "border-base-300"
                         "py-1"
                         "pl-2"
-                        "pr-5"
+                        "pr-9"
                         "text-right"
                         "font-mono"
                         "text-[0.6875rem]"
@@ -308,15 +309,55 @@
                 :value (str (or (:return-text view-draft) ""))
                 :on {:input [[:actions/set-portfolio-optimizer-objective-menu-view-return
                               instrument-id
-                              [:event.target/value]]]}}]
+                              [:event.target/value]]]
+                     :keydown [[:actions/step-portfolio-optimizer-objective-menu-view-return
+                                instrument-id
+                                [:event/key]]]}}]
        [:span {:class ["optimizer-objective-view-return-suffix"
                        "pointer-events-none"
                        "absolute"
-                       "right-2"
                        "font-mono"
                        "text-[0.625rem]"
                        "text-trading-muted"]}
-        "%"]]]
+        "%"]
+       [:span {:class ["optimizer-objective-view-stepper"
+                       "absolute"
+                       "inline-flex"
+                       "flex-col"
+                       "overflow-hidden"]
+               :aria-hidden "false"}
+        [:button {:type "button"
+                  :class ["optimizer-objective-view-stepper-button"
+                          "border-0"
+                          "p-0"
+                          "font-mono"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
+                  :aria-label (str "Increase " asset-label " return")
+                  :data-role (str "portfolio-optimizer-objective-menu-view-"
+                                  instrument-id
+                                  "-step-up")
+                  :on {:click [[:actions/step-portfolio-optimizer-objective-menu-view-return
+                                instrument-id
+                                :up]]}}
+         "▲"]
+        [:button {:type "button"
+                  :class ["optimizer-objective-view-stepper-button"
+                          "border-0"
+                          "p-0"
+                          "font-mono"
+                          "focus:outline-none"
+                          "focus:ring-0"
+                          "focus:ring-offset-0"]
+                  :aria-label (str "Decrease " asset-label " return")
+                  :data-role (str "portfolio-optimizer-objective-menu-view-"
+                                  instrument-id
+                                  "-step-down")
+                  :on {:click [[:actions/step-portfolio-optimizer-objective-menu-view-return
+                                instrument-id
+                                :down]]}}
+         "▼"]]]]
      (into
       [:div {:class ["optimizer-objective-view-confidence"
                      "grid"

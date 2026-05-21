@@ -163,6 +163,9 @@
 (def set-portfolio-optimizer-objective-menu-view-return-action
   portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-return)
 
+(def step-portfolio-optimizer-objective-menu-view-return-action
+  portfolio-optimizer-actions/step-portfolio-optimizer-objective-menu-view-return)
+
 (def set-portfolio-optimizer-objective-menu-view-confidence-action
   portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-confidence)
 
