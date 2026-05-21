@@ -55,6 +55,20 @@
     :mixed-frequency :mixed-frequency
     kind))
 
+(defn missing-native-risk-history-warnings
+  [{:keys [risk-model history]}]
+  (let [risk-model* (or risk-model {:kind :diagonal-shrink})
+        model-kind (normalize-risk-model-kind (:kind risk-model*))
+        instrument-ids (vec (sorted-instrument-ids history))]
+    (if (mixed-frequency/mixed-frequency? model-kind
+                                           history
+                                           instrument-ids)
+      (vec (mixed-frequency/missing-native-risk-history-warnings
+            history
+            instrument-ids
+            (mixed-frequency/instrument-ids history instrument-ids)))
+      [])))
+
 (defn- matrix->mutable-array
   [matrix]
   (let [n (count matrix)

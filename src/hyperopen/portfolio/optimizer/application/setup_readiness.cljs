@@ -6,6 +6,7 @@
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.risk :as risk]
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private history-blocking-warning-codes
@@ -18,6 +19,7 @@
     :missing-vault-history
     :insufficient-vault-history
     :insufficient-common-history
+    :missing-native-risk-history
     :identity-ambiguous
     :instrument-kind-mismatch
     :proxy-mapping-unapproved
@@ -30,6 +32,7 @@
     :missing-return-history
     :missing-vault-address
     :missing-vault-history
+    :missing-native-risk-history
     :identity-ambiguous
     :validation-failed})
 
@@ -186,6 +189,9 @@
       :insufficient-common-history
       (observation-count-message warning "shared return")
 
+      :missing-native-risk-history
+      (str label ": no native optimizer price history returned for mixed-frequency risk.")
+
       :identity-ambiguous
       (str label ": missing backend optimizer history identity.")
 
@@ -324,14 +330,24 @@
        :request nil
        :warnings []}
       (let [request (with-cost-contexts state (build-request state draft))
+            risk-blocking-warnings (risk/missing-native-risk-history-warnings
+                                    {:risk-model (:risk-model request)
+                                     :history (:history request)})
+            request (cond-> request
+                      (seq risk-blocking-warnings)
+                      (update :warnings into risk-blocking-warnings))
             eligible? (boolean (seq (:universe request)))
             incomplete? (incomplete-history? requested-universe request)
+            risk-history-incomplete? (boolean (seq risk-blocking-warnings))
             missing-bl-views? (missing-black-litterman-views? request)
             runnable? (and eligible?
                            (not incomplete?)
+                           (not risk-history-incomplete?)
                            (not history-loading?)
                            (not missing-bl-views?))
-            blocking-warnings (if (or (not eligible?) incomplete?)
+            blocking-warnings (if (or (not eligible?)
+                                      incomplete?
+                                      risk-history-incomplete?)
                                 (blocking-history-warnings requested-universe
                                                           request)
                                 [])]
@@ -339,7 +355,7 @@
          :reason (cond
                    history-loading? :history-loading
                    (not eligible?) :no-eligible-history
-                   incomplete? :incomplete-history
+                   (or incomplete? risk-history-incomplete?) :incomplete-history
                    missing-bl-views? :missing-black-litterman-views
                    :else nil)
          :runnable? (boolean runnable?)

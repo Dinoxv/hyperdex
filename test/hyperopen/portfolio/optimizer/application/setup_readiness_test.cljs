@@ -292,6 +292,62 @@
     (is (= "Bad Perp: backend validation rejected optimizer history."
            (get-in readiness [:blocking-warnings 0 :message])))))
 
+(deftest build-readiness-blocks-api-v2-aligned-only-mixed-frequency-risk-test
+  (let [day-ms 86400000
+        vault-id "vault:0x1111111111111111111111111111111111111111"
+        readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft {:universe [{:instrument-id "perp:BTC"
+                                           :market-type :perp
+                                           :coin "BTC"
+                                           :name "Bitcoin"}
+                                          {:instrument-id vault-id
+                                           :market-type :vault
+                                           :coin vault-id
+                                           :vault-address "0x1111111111111111111111111111111111111111"
+                                           :name "Basis Vault"}]
+                               :risk-model {:kind :diagonal-shrink}}
+                       :history-data
+                       {:api-v2-history
+                        {:status :partial
+                         :common-calendar [0 (* 14 day-ms) (* 28 day-ms)]
+                         :return-calendar [(* 14 day-ms) (* 28 day-ms)]
+                         :aligned-returns-by-instrument
+                         {"perp:BTC" {:returns [0.1 0.05]}
+                          vault-id {:returns [0.02 0.03]}}
+                         :series-by-instrument
+                         {"perp:BTC" {:local-instrument-id "perp:BTC"
+                                      :instrument-id "hl:perp:BTC"
+                                      :lineage-kind :native
+                                      :points [{:time-ms 0
+                                                :close 100
+                                                :return nil}
+                                               {:time-ms (* 14 day-ms)
+                                                :close 110
+                                                :return 0.1}
+                                               {:time-ms (* 28 day-ms)
+                                                :close 115.5
+                                                :return 0.05}]
+                                      :funding {:status :available
+                                                :annualized-carry 0}}
+                          vault-id {:local-instrument-id vault-id
+                                    :instrument-id "hl:vault:basis"
+                                    :lineage-kind :vault-derived
+                                    :series-kind :return-index
+                                    :points []
+                                    :funding {:status :not-applicable}}}}}}}}))]
+    (is (= :blocked (:status readiness)))
+    (is (= :incomplete-history (:reason readiness)))
+    (is (= false (:runnable? readiness)))
+    (is (= [{:code :missing-native-risk-history
+             :instrument-id vault-id
+             :policy :mixed-frequency-requires-native-price-series
+             :message "Basis Vault: no native optimizer price history returned for mixed-frequency risk."}]
+           (mapv #(select-keys % [:code :instrument-id :policy :message])
+                 (:blocking-warnings readiness))))))
+
 (deftest build-readiness-keeps-api-v2-proxy-vault-and-funding-warnings-nonblocking-test
   (let [vault-id "vault:0x1111111111111111111111111111111111111111"
         readiness (setup-readiness/build-readiness
