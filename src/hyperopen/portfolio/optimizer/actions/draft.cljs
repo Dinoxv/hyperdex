@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
@@ -100,6 +101,99 @@
   [value]
   (get objective-menu-options (common/normalize-keyword-like value)))
 
+(defn- black-litterman-view-confidence-level
+  [view]
+  (bl-model/normalize-confidence-level
+   (or (:confidence-level view)
+       (bl-model/confidence-level-from-view view))))
+
+(defn- absolute-view?
+  [view]
+  (= :absolute (common/normalize-keyword-like (:kind view))))
+
+(defn- existing-absolute-view-by-instrument
+  [views instrument-id]
+  (some (fn [view]
+          (when (and (absolute-view? view)
+                     (= instrument-id (:instrument-id view)))
+            view))
+        views))
+
+(defn- objective-menu-inline-order
+  [state]
+  (let [ui-order (vec (keep common/non-blank-text
+                            (get-in state contracts/ui-objective-menu-view-order-path)))
+        views (vec (or (get-in state contracts/draft-return-model-views-path) []))
+        existing-order (vec (keep (fn [view]
+                                    (when (absolute-view? view)
+                                      (common/non-blank-text (:instrument-id view))))
+                                  views))
+        default-order (vec (take 3
+                                 (keep (comp common/non-blank-text :instrument-id)
+                                       (get-in state contracts/draft-universe-path))))]
+    (cond
+      (seq ui-order) ui-order
+      (seq existing-order) existing-order
+      :else default-order)))
+
+(defn- objective-menu-inline-draft
+  [state views instrument-id]
+  (let [view (existing-absolute-view-by-instrument views instrument-id)
+        ui-draft (get-in state (conj contracts/ui-objective-menu-view-drafts-path
+                                     (keyword instrument-id)))]
+    (merge
+     {:return-text (if (some? (:return view))
+                     (bl-model/decimal->percent-text (:return view))
+                     "")
+      :confidence (black-litterman-view-confidence-level view)}
+     ui-draft)))
+
+(defn- next-inline-view-id
+  [views]
+  (bl-model/next-view-id views))
+
+(defn- inline-draft->absolute-view
+  [views instrument-id draft]
+  (let [return-value (bl-model/parse-percent-text (:return-text draft))]
+    (when (some? return-value)
+      (let [existing (existing-absolute-view-by-instrument views instrument-id)
+            confidence-level (bl-model/normalize-confidence-level
+                              (:confidence draft))
+            confidence (bl-model/confidence-weight confidence-level)]
+        {:id (or (:id existing)
+                 (next-inline-view-id views))
+         :kind :absolute
+         :instrument-id instrument-id
+         :return return-value
+         :confidence-level confidence-level
+         :confidence confidence
+         :confidence-variance (bl-model/confidence-variance confidence)
+         :horizon (or (:horizon existing) :3m)
+         :weights {instrument-id 1}}))))
+
+(defn- objective-menu-inline-views
+  [state]
+  (let [views (vec (or (get-in state contracts/draft-return-model-views-path) []))
+        ui-order (vec (keep common/non-blank-text
+                            (get-in state contracts/ui-objective-menu-view-order-path)))
+        order (objective-menu-inline-order state)
+        edited-instruments (set order)
+        preserved-views (vec (remove (fn [view]
+                                       (and (absolute-view? view)
+                                            (or (seq ui-order)
+                                                (contains? edited-instruments
+                                                           (:instrument-id view)))))
+                                     views))]
+    (reduce (fn [acc instrument-id]
+              (if-let [view (inline-draft->absolute-view
+                             acc
+                             instrument-id
+                             (objective-menu-inline-draft state views instrument-id))]
+                (conj acc view)
+                acc))
+            preserved-views
+            order)))
+
 (defn- objective-menu-model-for-state
   [state value]
   (when-let [model (objective-menu-model value)]
@@ -108,8 +202,7 @@
           (dissoc :return-model-kind)
           (assoc :return-model
                  {:kind :black-litterman
-                  :views (vec (or (get-in state contracts/draft-return-model-views-path)
-                                  []))}))
+                  :views (objective-menu-inline-views state)}))
       model)))
 
 (defn open-portfolio-optimizer-objective-menu
@@ -138,6 +231,54 @@
       contracts/ui-objective-menu-selection-path
       (common/normalize-keyword-like option-key)]]
     []))
+
+(defn set-portfolio-optimizer-objective-menu-view-return
+  [_state instrument-id value]
+  (if-let [instrument-id* (common/non-blank-text instrument-id)]
+    [[:effects/save
+      (conj contracts/ui-objective-menu-view-drafts-path
+            (keyword instrument-id*)
+            :return-text)
+      (str (or value ""))]]
+    []))
+
+(defn set-portfolio-optimizer-objective-menu-view-confidence
+  [_state instrument-id confidence]
+  (if-let [instrument-id* (common/non-blank-text instrument-id)]
+    [[:effects/save
+      (conj contracts/ui-objective-menu-view-drafts-path
+            (keyword instrument-id*)
+            :confidence)
+      (bl-model/normalize-confidence-level confidence)]]
+    []))
+
+(defn remove-portfolio-optimizer-objective-menu-view
+  [state instrument-id]
+  (if-let [instrument-id* (common/non-blank-text instrument-id)]
+    (let [order (vec (remove #(= instrument-id* %)
+                             (objective-menu-inline-order state)))
+          drafts (dissoc (or (get-in state contracts/ui-objective-menu-view-drafts-path)
+                             {})
+                         (keyword instrument-id*))]
+      [[:effects/save-many
+        [[contracts/ui-objective-menu-view-order-path order]
+         [contracts/ui-objective-menu-view-drafts-path drafts]]]])
+    []))
+
+(defn add-portfolio-optimizer-objective-menu-view
+  [state]
+  (let [order (objective-menu-inline-order state)
+        present (set order)
+        next-id (some (fn [instrument]
+                        (let [instrument-id (:instrument-id instrument)]
+                          (when (and (common/non-blank-text instrument-id)
+                                     (not (contains? present instrument-id)))
+                            instrument-id)))
+                      (get-in state contracts/draft-universe-path))]
+    (if next-id
+      [[:effects/save contracts/ui-objective-menu-view-order-path
+        (conj (vec order) next-id)]]
+      [])))
 
 (defn- state-after-save-effect
   [state effect]

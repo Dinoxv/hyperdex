@@ -26,6 +26,18 @@
 (def select-portfolio-optimizer-objective-menu-option
   draft/select-portfolio-optimizer-objective-menu-option)
 
+(def set-portfolio-optimizer-objective-menu-view-return
+  draft/set-portfolio-optimizer-objective-menu-view-return)
+
+(def set-portfolio-optimizer-objective-menu-view-confidence
+  draft/set-portfolio-optimizer-objective-menu-view-confidence)
+
+(def remove-portfolio-optimizer-objective-menu-view
+  draft/remove-portfolio-optimizer-objective-menu-view)
+
+(def add-portfolio-optimizer-objective-menu-view
+  draft/add-portfolio-optimizer-objective-menu-view)
+
 (def apply-portfolio-optimizer-objective-menu-selection-and-run
   draft/apply-portfolio-optimizer-objective-menu-selection-and-run)
 

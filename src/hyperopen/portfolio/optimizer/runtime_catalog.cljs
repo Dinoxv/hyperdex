@@ -18,6 +18,14 @@
     actions/handle-portfolio-optimizer-objective-menu-keydown
     :select-portfolio-optimizer-objective-menu-option
     actions/select-portfolio-optimizer-objective-menu-option
+    :set-portfolio-optimizer-objective-menu-view-return
+    actions/set-portfolio-optimizer-objective-menu-view-return
+    :set-portfolio-optimizer-objective-menu-view-confidence
+    actions/set-portfolio-optimizer-objective-menu-view-confidence
+    :remove-portfolio-optimizer-objective-menu-view
+    actions/remove-portfolio-optimizer-objective-menu-view
+    :add-portfolio-optimizer-objective-menu-view
+    actions/add-portfolio-optimizer-objective-menu-view
     :apply-portfolio-optimizer-objective-menu-selection-and-run
     actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :set-portfolio-optimizer-return-model-kind

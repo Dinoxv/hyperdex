@@ -71,6 +71,10 @@
   (conj optimizer-ui-path :objective-menu-open?))
 (def ui-objective-menu-selection-path
   (conj optimizer-ui-path :objective-menu-selection))
+(def ui-objective-menu-view-order-path
+  (conj optimizer-ui-path :objective-menu-view-order))
+(def ui-objective-menu-view-drafts-path
+  (conj optimizer-ui-path :objective-menu-view-drafts))
 (def ui-black-litterman-editor-path
   (conj optimizer-ui-path :black-litterman-editor))
 (def ui-frontier-overlay-mode-path
@@ -143,6 +147,8 @@
    :optimizer-ui/draft-add-asset-open ui-draft-add-asset-open-path
    :optimizer-ui/objective-menu-open ui-objective-menu-open-path
    :optimizer-ui/objective-menu-selection ui-objective-menu-selection-path
+   :optimizer-ui/objective-menu-view-order ui-objective-menu-view-order-path
+   :optimizer-ui/objective-menu-view-drafts ui-objective-menu-view-drafts-path
    :optimizer-ui/black-litterman-editor ui-black-litterman-editor-path
    :optimizer-ui/frontier-overlay-mode ui-frontier-overlay-mode-path
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path})

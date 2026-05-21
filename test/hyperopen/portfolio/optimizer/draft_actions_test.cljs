@@ -131,10 +131,14 @@
                {:kind :max-sharpe}]
               [[:portfolio :optimizer :draft :return-model]
                {:kind :black-litterman
-                :views [{:kind :absolute
+                :views [{:id "bl_view_1"
+                         :kind :absolute
                          :instrument-id "perp:BTC"
                          :return 0.2
+                         :confidence-level :high
                          :confidence 0.75
+                         :confidence-variance 0.25
+                         :horizon :3m
                          :weights {"perp:BTC" 1}}]}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
@@ -142,6 +146,138 @@
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
+
+(deftest objective-menu-use-my-views-inline-actions-and-apply-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
+                                                           {:instrument-id "perp:ETH"}
+                                                           {:instrument-id "perp:HYPE"}]
+                                               :objective {:kind :minimum-variance}
+                                               :return-model {:kind :historical-mean}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views
+                                           :objective-menu-view-drafts
+                                           {:perp:BTC {:return-text "18"
+                                                       :confidence :medium}
+                                            :perp:ETH {:return-text "16.5"
+                                                       :confidence :low}
+                                            :perp:HYPE {:return-text "45"
+                                                        :confidence :high}}}}}]
+    (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-view-drafts
+              :perp:BTC
+              :return-text]
+             "19.25"]]
+           (actions/set-portfolio-optimizer-objective-menu-view-return
+            state
+            "perp:BTC"
+            "19.25")))
+    (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-view-drafts
+              :perp:BTC
+              :confidence]
+             :high]]
+           (actions/set-portfolio-optimizer-objective-menu-view-confidence
+            state
+            "perp:BTC"
+            "high")))
+    (is (= [[:effects/save
+             [:portfolio-ui :optimizer :objective-menu-view-order]
+             ["perp:BTC" "perp:ETH" "perp:HYPE"]]]
+           (actions/add-portfolio-optimizer-objective-menu-view
+            (assoc-in state
+                      [:portfolio-ui :optimizer :objective-menu-view-order]
+                      ["perp:BTC" "perp:ETH"]))))
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :objective]
+               {:kind :max-sharpe}]
+              [[:portfolio :optimizer :draft :return-model]
+               {:kind :black-litterman
+                :views [{:id "bl_view_1"
+                         :kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return 0.18
+                         :confidence-level :medium
+                         :confidence 0.5
+                         :confidence-variance 0.5
+                         :horizon :3m
+                         :weights {"perp:BTC" 1}}
+                        {:id "bl_view_2"
+                         :kind :absolute
+                         :instrument-id "perp:ETH"
+                         :return 0.165
+                         :confidence-level :low
+                         :confidence 0.25
+                         :confidence-variance 0.75
+                         :horizon :3m
+                         :weights {"perp:ETH" 1}}
+                        {:id "bl_view_3"
+                         :kind :absolute
+                         :instrument-id "perp:HYPE"
+                         :return 0.45
+                         :confidence-level :high
+                         :confidence 0.75
+                         :confidence-variance 0.25
+                         :horizon :3m
+                         :weights {"perp:HYPE" 1}}]}]
+              [[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+            state)))))
+
+(deftest objective-menu-use-my-views-preserves-relative-views-and-removes-edited-absolute-rows-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
+                                                           {:instrument-id "perp:ETH"}]
+                                               :objective {:kind :max-sharpe}
+                                               :return-model
+                                               {:kind :black-litterman
+                                                :views [{:id "abs-btc"
+                                                         :kind :absolute
+                                                         :instrument-id "perp:BTC"
+                                                         :return 0.1
+                                                         :confidence 0.25
+                                                         :weights {"perp:BTC" 1}}
+                                                        {:id "rel-eth-btc"
+                                                         :kind :relative
+                                                         :instrument-id "perp:ETH"
+                                                         :comparator-instrument-id "perp:BTC"
+                                                         :return 0.04
+                                                         :confidence 0.5
+                                                         :weights {"perp:ETH" 1
+                                                                   "perp:BTC" -1}}]}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views
+                                           :objective-menu-view-order ["perp:ETH"]
+                                           :objective-menu-view-drafts
+                                           {:perp:ETH {:return-text "12"
+                                                       :confidence :high}}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio-ui :optimizer :objective-menu-view-order] []]
+              [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]]]]
+           (actions/remove-portfolio-optimizer-objective-menu-view
+            state
+            "perp:ETH")))
+    (let [effects (actions/apply-portfolio-optimizer-objective-menu-selection-and-run state)
+          saved-values (second (first effects))
+          return-model (second (second saved-values))]
+      (is (= {:kind :black-litterman
+              :views [{:id "rel-eth-btc"
+                       :kind :relative
+                       :instrument-id "perp:ETH"
+                       :comparator-instrument-id "perp:BTC"
+                       :return 0.04
+                       :confidence 0.5
+                       :weights {"perp:ETH" 1
+                                 "perp:BTC" -1}}
+                      {:id "bl_view_2"
+                       :kind :absolute
+                       :instrument-id "perp:ETH"
+                       :return 0.12
+                       :confidence-level :high
+                       :confidence 0.75
+                       :confidence-variance 0.25
+                       :horizon :3m
+                       :weights {"perp:ETH" 1}}]}
+             return-model)))))
 
 (deftest set-draft-constraint-normalizes-supported-values-test
   (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :max-asset-weight]

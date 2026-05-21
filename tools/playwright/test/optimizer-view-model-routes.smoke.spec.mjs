@@ -580,6 +580,162 @@ test("portfolio optimizer draft objective menu changes objective and reruns fron
   await expect(trigger).toContainText("Minimum volatility");
 });
 
+test("portfolio optimizer draft objective menu captures use my views returns and confidence @smoke @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  await seedTwoAssetDraftScenario(page);
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize/draft",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
+  const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+  const useMyViews = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-option-use-my-views']"
+  );
+  const editor = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor']"
+  );
+  const btcReturn = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
+  );
+  const ethReturn = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']"
+  );
+  const btcHigh = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
+  );
+  const ethLow = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']"
+  );
+  const apply = page.locator("[data-role='portfolio-optimizer-objective-menu-apply']");
+
+  await trigger.click();
+  await expect(menu).toBeVisible();
+  await useMyViews.click();
+  await expect(editor).toBeVisible();
+  await expect(editor).toContainText("Your return views");
+  await expect(menu.locator("select")).toHaveCount(0);
+
+  await btcReturn.fill("18");
+  await ethReturn.fill("16.5");
+  await btcHigh.click();
+  await ethLow.click();
+  await expect(btcHigh).toHaveAttribute("data-selected", "true");
+  await expect(ethLow).toHaveAttribute("data-selected", "true");
+  await expect(apply).toBeEnabled();
+  await apply.click();
+
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => {
+    const returnModel = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft",
+      "return-model"
+    ]);
+    return {
+      kind: returnModel?.kind,
+      views: (returnModel?.views || []).map((view) => ({
+        instrumentId: view["instrument-id"],
+        value: view.return,
+        confidence: view.confidence,
+        confidenceLevel: view["confidence-level"]
+      }))
+    };
+  }).toEqual({
+    kind: "black-litterman",
+    views: [
+      {
+        instrumentId: "hl:perp:BTC",
+        value: 0.18,
+        confidence: 0.75,
+        confidenceLevel: "high"
+      },
+      {
+        instrumentId: "hl:perp:ETH",
+        value: 0.165,
+        confidence: 0.25,
+        confidenceLevel: "low"
+      }
+    ]
+  });
+});
+
+test("portfolio optimizer use my views objective popover stays usable across review widths @smoke @regression", async ({ page }) => {
+  test.setTimeout(180_000);
+
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 900 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 }
+  ]) {
+    await test.step(`viewport ${viewport.width}`, async () => {
+      await page.setViewportSize(viewport);
+      await visitRoute(page, "/portfolio/optimize/new", {
+        routeModuleTimeoutMs: 30_000,
+        idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+      });
+
+      await seedTwoAssetDraftScenario(page);
+      await dispatch(page, [
+        ":actions/navigate",
+        "/portfolio/optimize/draft",
+        { "replace?": true }
+      ]);
+      await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+      const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
+      const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+      const useMyViews = page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-option-use-my-views']"
+      );
+      const editor = page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor']"
+      );
+
+      await trigger.scrollIntoViewIfNeeded();
+      await trigger.click();
+      await expect(menu).toBeVisible();
+      await useMyViews.click();
+      await expect(editor).toBeVisible();
+      await expect(editor).toContainText("Your return views");
+      await expect(menu.locator("select")).toHaveCount(0);
+      await expect(menu.locator("input[type='number']")).toHaveCount(0);
+      await expect(menu.locator("[data-role$='confidence-high']")).toHaveCount(2);
+
+      const box = await menu.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + Math.min(box.height, viewport.height)).toBeLessThanOrEqual(
+        viewport.height + 1
+      );
+
+      await page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
+      ).fill("18");
+      await page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
+      ).click();
+      await expect(page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
+      )).toHaveAttribute("data-selected", "true");
+    });
+  }
+});
+
 test("portfolio optimizer draft objective menu stays contained across viewports @smoke @regression", async ({ page }) => {
   test.setTimeout(180_000);
 

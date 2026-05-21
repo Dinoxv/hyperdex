@@ -87,6 +87,8 @@
           :universe-search-active-index 0
           :objective-menu-open? false
           :objective-menu-selection nil
+          :objective-menu-view-order []
+          :objective-menu-view-drafts {}
           :black-litterman-editor {:selected-kind :absolute
                                    :drafts {:absolute {:instrument-id nil
                                                        :return-text ""

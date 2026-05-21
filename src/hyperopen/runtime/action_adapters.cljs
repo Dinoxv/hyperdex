@@ -160,6 +160,18 @@
 (def select-portfolio-optimizer-objective-menu-option-action
   portfolio-optimizer-actions/select-portfolio-optimizer-objective-menu-option)
 
+(def set-portfolio-optimizer-objective-menu-view-return-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-return)
+
+(def set-portfolio-optimizer-objective-menu-view-confidence-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-confidence)
+
+(def remove-portfolio-optimizer-objective-menu-view-action
+  portfolio-optimizer-actions/remove-portfolio-optimizer-objective-menu-view)
+
+(def add-portfolio-optimizer-objective-menu-view-action
+  portfolio-optimizer-actions/add-portfolio-optimizer-objective-menu-view)
+
 (def apply-portfolio-optimizer-objective-menu-selection-and-run-action
   portfolio-optimizer-actions/apply-portfolio-optimizer-objective-menu-selection-and-run)
 

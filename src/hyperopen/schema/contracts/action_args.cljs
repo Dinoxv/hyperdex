@@ -63,6 +63,8 @@
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
 (s/def ::portfolio-optimizer-model-kind-args ::common/keyword-or-string-args)
+(s/def ::portfolio-optimizer-instrument-value-args
+  (s/tuple ::common/non-empty-string any?))
 (s/def ::portfolio-optimizer-constraint-args
   (s/tuple ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-key-value-args
@@ -216,6 +218,10 @@
    :actions/close-portfolio-optimizer-objective-menu ::common/no-args
    :actions/handle-portfolio-optimizer-objective-menu-keydown ::common/key-args
    :actions/select-portfolio-optimizer-objective-menu-option ::portfolio-optimizer-model-kind-args
+   :actions/set-portfolio-optimizer-objective-menu-view-return ::portfolio-optimizer-instrument-value-args
+   :actions/set-portfolio-optimizer-objective-menu-view-confidence ::portfolio-optimizer-instrument-value-args
+   :actions/remove-portfolio-optimizer-objective-menu-view ::portfolio-optimizer-instrument-id-args
+   :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args
    :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args

@@ -348,6 +348,17 @@
                                     true)
                           (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
                                     :minimum-volatility)))
+        use-my-views-view (portfolio-view/portfolio-view
+                           (-> base-state
+                               (assoc-in [:portfolio :optimizer :last-successful-run]
+                                         solved-run)
+                               (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
+                                         true)
+                               (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
+                                         :use-my-views)
+                               (assoc-in [:portfolio-ui :optimizer :objective-menu-view-drafts]
+                                         {:perp:BTC {:return-text "18"
+                                                     :confidence :medium}})))
         trigger (node-by-role closed-view
                               "portfolio-optimizer-objective-menu-trigger")
         open-trigger (node-by-role open-view
@@ -361,6 +372,14 @@
                                   "portfolio-optimizer-objective-menu-option-minimum-volatility")
         use-my-views-row (node-by-role open-view
                                        "portfolio-optimizer-objective-menu-option-use-my-views")
+        inline-editor (node-by-role use-my-views-view
+                                    "portfolio-optimizer-objective-menu-use-my-views-editor")
+        btc-return (node-by-role use-my-views-view
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-confidence-medium (node-by-role use-my-views-view
+                                            "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
+        btc-remove (node-by-role use-my-views-view
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-remove")
         strings (set (collect-strings open-view))]
     (is (some? trigger))
     (is (= [[:actions/open-portfolio-optimizer-objective-menu]]
@@ -393,6 +412,25 @@
     (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
              :use-my-views]]
            (click-actions use-my-views-row)))
+    (is (some? inline-editor))
+    (is (contains? (set (collect-strings inline-editor)) "Your return views"))
+    (is (= "18" (get-in btc-return [1 :value])))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             [:event.target/value]]]
+           (get-in btc-return [1 :on :input])))
+    (is (= "true" (get-in btc-confidence-medium [1 :data-selected])))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
+             "perp:BTC"
+             :medium]]
+           (click-actions btc-confidence-medium)))
+    (is (= [[:actions/remove-portfolio-optimizer-objective-menu-view
+             "perp:BTC"]]
+           (click-actions btc-remove)))
+    (is (= [[:actions/add-portfolio-optimizer-objective-menu-view]]
+           (click-actions
+            (node-by-role use-my-views-view
+                          "portfolio-optimizer-objective-menu-add-view"))))
     (is (= true (get-in apply-current [1 :disabled])))
     (is (nil? (click-actions apply-current)))
     (is (= false (get-in apply-changed [1 :disabled])))

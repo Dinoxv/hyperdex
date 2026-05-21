@@ -179,6 +179,8 @@
    :universe-search-active-index 0
    :objective-menu-open? false
    :objective-menu-selection nil
+   :objective-menu-view-order []
+   :objective-menu-view-drafts {}
    :black-litterman-editor (bl-editor-model/default-editor-state)
    :workspace-panel :setup
    :results-tab :recommendation

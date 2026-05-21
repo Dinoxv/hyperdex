@@ -57,6 +57,14 @@
     :handle-portfolio-optimizer-objective-menu-keydown]
    [:actions/select-portfolio-optimizer-objective-menu-option
     :select-portfolio-optimizer-objective-menu-option]
+   [:actions/set-portfolio-optimizer-objective-menu-view-return
+    :set-portfolio-optimizer-objective-menu-view-return]
+   [:actions/set-portfolio-optimizer-objective-menu-view-confidence
+    :set-portfolio-optimizer-objective-menu-view-confidence]
+   [:actions/remove-portfolio-optimizer-objective-menu-view
+    :remove-portfolio-optimizer-objective-menu-view]
+   [:actions/add-portfolio-optimizer-objective-menu-view
+    :add-portfolio-optimizer-objective-menu-view]
    [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :apply-portfolio-optimizer-objective-menu-selection-and-run]
    [:actions/set-portfolio-optimizer-return-model-kind :set-portfolio-optimizer-return-model-kind]
