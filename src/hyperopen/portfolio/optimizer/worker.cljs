@@ -10,7 +10,7 @@
   [id type payload]
   (.postMessage js/self #js {:id id
                              :type type
-                             :payload (clj->js payload)}))
+                             :payload (wire/clj->worker-boundary payload)}))
 
 (defn- normalize-worker-request
   [request]

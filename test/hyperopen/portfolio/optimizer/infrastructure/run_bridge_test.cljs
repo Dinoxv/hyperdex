@@ -71,6 +71,29 @@
               :old? true}
              (get-in @store [:portfolio :optimizer :last-successful-run :result]))))))
 
+(deftest request-run-preserves-namespaced-instrument-metadata-over-worker-boundary-test
+  (let [{:keys [worker posted]} (fake-worker)
+        store (atom {:portfolio {:optimizer {:run-state {:status :idle}}}})
+        controller (run-bridge/make-controller {:store store
+                                                :worker-ref worker})
+        vault-id "vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+        backend-id (str "hl:" vault-id)]
+    (with-redefs [system/store store
+                  run-bridge/next-run-id (fn [] "run-1")]
+      (run-bridge/request-run! {:controller controller
+                                :request {:scenario-id "scenario-1"
+                                          :universe [{:instrument-id vault-id
+                                                      :market-type :vault
+                                                      :coin vault-id
+                                                      :vault-address "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+                                                      :optimizer-history/instrument-id backend-id}]}
+                                :request-signature {:seed 1}
+                                :computed-at-ms 100})
+      (is (= vault-id
+             (get-in @posted [0 :payload :universe 0 :instrument-id])))
+      (is (= backend-id
+             (get-in @posted [0 :payload :universe 0 :optimizer-history/instrument-id]))))))
+
 (deftest request-run-replaces-owned-worker-between-runs-test
   (let [worker-a (fake-worker)
         worker-b (fake-worker)

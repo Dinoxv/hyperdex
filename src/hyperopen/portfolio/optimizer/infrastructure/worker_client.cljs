@@ -67,5 +67,5 @@
    (when-let [worker (current-worker worker-ref)]
      (.postMessage worker #js {:id id
                                :type "run-optimizer"
-                               :payload (clj->js request)})
+                               :payload (wire/clj->worker-boundary request)})
      true)))

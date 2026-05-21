@@ -9,3 +9,14 @@
 (def normalize-wire-values contracts/normalize-wire-values)
 (def normalize-instrument-keyed-maps contracts/normalize-instrument-keyed-maps)
 (def normalize-worker-boundary contracts/normalize-worker-boundary)
+
+(defn- worker-key
+  [key]
+  (cond
+    (keyword? key) (subs (str key) 1)
+    (string? key) key
+    :else (str key)))
+
+(defn clj->worker-boundary
+  [value]
+  (clj->js value {:keyword-fn worker-key}))
