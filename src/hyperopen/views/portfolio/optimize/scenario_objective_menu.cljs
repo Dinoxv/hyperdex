@@ -170,26 +170,33 @@
 
 (defn- confidence-button
   [instrument-id selected-confidence [confidence label]]
-  [:button {:type "button"
-            :class ["optimizer-objective-view-confidence-button"
-                    "border"
-                    "border-base-300"
-                    "font-mono"
-                    "text-[0.58rem]"
-                    "font-semibold"
-                    "focus:outline-none"
-                    "focus:ring-0"
-                    "focus:ring-offset-0"]
-            :data-role (str "portfolio-optimizer-objective-menu-view-"
+  (let [tooltip-label (name confidence)
+        short-label (-> label
+                        (subs 0 1)
+                        str/upper-case)]
+    [:button {:type "button"
+              :class ["optimizer-objective-view-confidence-button"
+                      "border"
+                      "border-base-300"
+                      "font-mono"
+                      "text-[0.58rem]"
+                      "font-semibold"
+                      "focus:outline-none"
+                      "focus:ring-0"
+                      "focus:ring-offset-0"]
+              :data-role (str "portfolio-optimizer-objective-menu-view-"
+                              instrument-id
+                              "-confidence-"
+                              (name confidence))
+              :data-selected (str (= confidence selected-confidence))
+              :data-tooltip tooltip-label
+              :title tooltip-label
+              :aria-label (str "Set " tooltip-label " confidence")
+              :aria-pressed (str (= confidence selected-confidence))
+              :on {:click [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
                             instrument-id
-                            "-confidence-"
-                            (name confidence))
-            :data-selected (str (= confidence selected-confidence))
-            :aria-pressed (str (= confidence selected-confidence))
-            :on {:click [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
-                          instrument-id
-                          confidence]]}}
-   label])
+                            confidence]]}}
+     short-label]))
 
 (defn- inline-view-row
   [universe instrument-id view-draft]

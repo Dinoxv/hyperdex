@@ -420,6 +420,10 @@
              [:event.target/value]]]
            (get-in btc-return [1 :on :input])))
     (is (= "true" (get-in btc-confidence-medium [1 :data-selected])))
+    (is (= "medium" (get-in btc-confidence-medium [1 :data-tooltip])))
+    (is (= "medium" (get-in btc-confidence-medium [1 :title])))
+    (is (= "Set medium confidence" (get-in btc-confidence-medium [1 :aria-label])))
+    (is (= ["M"] (collect-strings btc-confidence-medium)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
              "perp:BTC"
              :medium]]

@@ -113,7 +113,7 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-row {
-    grid-template-columns: minmax(74px, 1fr) minmax(88px, 104px) 74px 18px;
+    grid-template-columns: minmax(86px, 1fr) minmax(88px, 104px) 66px 18px;
     background-color: #090b0d;
     border-color: var(--optimizer-border);
   }
@@ -133,14 +133,46 @@
 
   .portfolio-optimizer .optimizer-objective-view-confidence {
     height: 24px;
+    gap: 1px;
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence-button {
+    position: relative;
     min-height: 24px;
     height: 24px;
     border-radius: 0;
     background-color: var(--optimizer-surface);
     color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-confidence-button::after {
+    content: attr(data-tooltip);
+    pointer-events: none;
+    position: absolute;
+    right: 50%;
+    bottom: calc(100% + 6px);
+    z-index: 70;
+    transform: translateX(50%) translateY(2px);
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    opacity: 0;
+    padding: 5px 6px;
+    text-transform: capitalize;
+    transition:
+      opacity 120ms ease 420ms,
+      transform 120ms ease 420ms;
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-view-confidence-button:is(:hover, :focus-visible)::after {
+    opacity: 1;
+    transform: translateX(50%) translateY(0);
   }
 
   .portfolio-optimizer
