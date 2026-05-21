@@ -44,6 +44,13 @@
                     objective-menu-options))
       "Maximum Sharpe"))
 
+(defn- rendered-objective-menu-options
+  [current-key pending-key]
+  (if (and (= :use-my-views pending-key)
+           (not= :use-my-views current-key))
+    (filter #(= :use-my-views (:key %)) objective-menu-options)
+    objective-menu-options))
+
 (defn objective-menu-open?
   [state]
   (true? (get-in state optimizer-contracts/ui-objective-menu-open-path)))
@@ -407,6 +414,9 @@
         return-inputs-by-instrument (objective-menu-return-inputs result readiness)
         order (default-view-order draft state)]
     [:section {:class ["optimizer-objective-views-section"
+                       "flex"
+                       "min-h-0"
+                       "flex-col"
                        "border-t"
                        "border-base-300"
                        "px-3"
@@ -424,7 +434,10 @@
        [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted"]}
         "Annualized. Confidence sets how strongly each view pulls the posterior."]]]
      (into
-      [:div {:class ["space-y-1.5"]}]
+      [:div {:class ["optimizer-objective-view-rows"
+                     "min-h-0"
+                     "space-y-1.5"
+                     "overflow-y-auto"]}]
       (map (fn [instrument-id]
              (inline-view-row universe
                               instrument-id
@@ -452,9 +465,7 @@
                        "focus:ring-offset-0"]
                :data-role "portfolio-optimizer-objective-menu-add-view"
                :on {:click [[:actions/add-portfolio-optimizer-objective-menu-view]]}}
-      "+ Add a view"]
-     [:p {:class ["mt-3" "font-mono" "text-[0.625rem]" "leading-[1.45]" "text-trading-muted"]}
-      "Relative views (e.g. ETH > SOL by 4%) and per-view caveats - open full editor"]]))
+      "+ Add a view"]]))
 
 (defn- objective-menu-mount-focus!
   [render-arg]
@@ -477,6 +488,7 @@
         current-key (current-objective-menu-key draft result)
         pending-key (or (get-in state optimizer-contracts/ui-objective-menu-selection-path)
                         current-key)
+        rendered-options (rendered-objective-menu-options current-key pending-key)
         apply-disabled? (and (= current-key pending-key)
                              (not= :use-my-views pending-key))]
     (when open?
@@ -489,6 +501,8 @@
                          "mt-2"
                          "border"
                          "shadow-2xl"
+                         "flex"
+                         "flex-col"
                          "focus:outline-none"
                          "focus:ring-0"
                          "focus:ring-offset-0"]
@@ -499,7 +513,7 @@
                  :aria-label "Change objective"
                  :on {:keydown [[:actions/handle-portfolio-optimizer-objective-menu-keydown
                                   [:event/key]]]}}
-       [:header {:class ["flex" "items-start" "justify-between" "gap-4" "border-b" "border-base-300" "px-3" "py-3"]}
+       [:header {:class ["flex" "shrink-0" "items-start" "justify-between" "gap-4" "border-b" "border-base-300" "px-3" "py-3"]}
         [:div
          [:p {:class ["font-mono" "text-[0.58rem]" "uppercase" "tracking-[0.18em]" "text-trading-muted/70"]}
           "Edit"]
@@ -521,13 +535,18 @@
                   :data-role "portfolio-optimizer-objective-menu-close"
                   :on {:click [[:actions/close-portfolio-optimizer-objective-menu]]}}
          "x"]]
-       (into
-        [:div {:class ["space-y-2" "px-3" "py-3"]}]
-        (map #(objective-menu-option % current-key pending-key)
-             objective-menu-options))
-       (when (= :use-my-views pending-key)
-         (inline-views-section draft state result readiness))
-       [:footer {:class ["flex" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-3" "py-3"]}
+       [:div {:class ["optimizer-objective-menu-body"
+                      "flex"
+                      "flex-col"
+                      "min-h-0"
+                      "overflow-hidden"]}
+        (into
+         [:div {:class ["shrink-0" "space-y-2" "px-3" "py-3"]}]
+         (map #(objective-menu-option % current-key pending-key)
+              rendered-options))
+        (when (= :use-my-views pending-key)
+          (inline-views-section draft state result readiness))]
+       [:footer {:class ["flex" "shrink-0" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-3" "py-3"]}
         [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
          "Esc to cancel"]
         [:div {:class ["flex" "items-center" "gap-2"]}

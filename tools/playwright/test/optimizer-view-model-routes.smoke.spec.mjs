@@ -624,6 +624,8 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   const ethLow = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']"
   );
+  const addView = page.locator("[data-role='portfolio-optimizer-objective-menu-add-view']");
+  const cancel = page.locator("[data-role='portfolio-optimizer-objective-menu-cancel']");
   const apply = page.locator("[data-role='portfolio-optimizer-objective-menu-apply']");
 
   await trigger.click();
@@ -631,6 +633,10 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   await useMyViews.click();
   await expect(editor).toBeVisible();
   await expect(editor).toContainText("Your return views");
+  await expect(editor).not.toContainText("Relative views");
+  await expect(addView).toBeVisible();
+  await expect(cancel).toBeVisible();
+  await expect(apply).toBeVisible();
   await expect(menu.locator("select")).toHaveCount(0);
   await expect(btcReturn).toHaveValue("19.5");
   await expect(ethReturn).toHaveValue("16.5");
@@ -719,6 +725,8 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       const editor = page.locator(
         "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor']"
       );
+      const addView = page.locator("[data-role='portfolio-optimizer-objective-menu-add-view']");
+      const footerActions = page.locator("[data-role='portfolio-optimizer-objective-menu-apply']");
 
       await trigger.scrollIntoViewIfNeeded();
       await trigger.click();
@@ -726,6 +734,9 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       await useMyViews.click();
       await expect(editor).toBeVisible();
       await expect(editor).toContainText("Your return views");
+      await expect(editor).not.toContainText("Relative views");
+      await expect(addView).toBeInViewport({ ratio: 1 });
+      await expect(footerActions).toBeInViewport({ ratio: 1 });
       await expect(menu.locator("select")).toHaveCount(0);
       await expect(menu.locator("input[type='number']")).toHaveCount(0);
       await expect(menu.locator("[data-role$='confidence-high']")).toHaveCount(2);

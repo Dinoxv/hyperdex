@@ -403,7 +403,8 @@
                                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
         btc-remove (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-remove")
-        strings (set (collect-strings open-view))]
+        strings (set (collect-strings open-view))
+        use-my-views-strings (set (collect-strings use-my-views-view))]
     (is (some? trigger))
     (is (= [[:actions/open-portfolio-optimizer-objective-menu]]
            (click-actions trigger)))
@@ -437,6 +438,11 @@
            (click-actions use-my-views-row)))
     (is (some? inline-editor))
     (is (contains? (set (collect-strings inline-editor)) "Your return views"))
+    (is (not (contains? use-my-views-strings "Relative views (e.g. ETH > SOL by 4%) and per-view caveats - open full editor")))
+    (is (some? (node-by-role use-my-views-view
+                              "portfolio-optimizer-objective-menu-cancel")))
+    (is (some? (node-by-role use-my-views-view
+                              "portfolio-optimizer-objective-menu-apply")))
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
            (get-in btc-icon [1 :src])))
     (is (= "18" (get-in btc-return [1 :value])))
