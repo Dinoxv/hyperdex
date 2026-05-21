@@ -124,6 +124,11 @@
     color: #161105;
   }
 
+  .portfolio-optimizer .optimizer-objective-view-token:has(img) {
+    background-color: var(--optimizer-surface);
+    color: inherit;
+  }
+
   .portfolio-optimizer .optimizer-objective-view-return-shell {
     justify-content: flex-end;
   }

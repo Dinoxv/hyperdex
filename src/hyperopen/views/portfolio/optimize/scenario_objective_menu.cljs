@@ -3,6 +3,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
+            [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
 
 (def ^:private objective-menu-options
@@ -153,6 +154,41 @@
       instrument-id
       "Asset"))
 
+(defn- instrument-by-id
+  [universe instrument-id]
+  (some (fn [instrument]
+          (when (= instrument-id (:instrument-id instrument))
+            instrument))
+        universe))
+
+(defn- inline-view-icon
+  [instrument asset-label instrument-id]
+  (let [icon-url (asset-icon/market-icon-url instrument)]
+    [:span {:class ["optimizer-objective-view-token"
+                    "inline-flex"
+                    "h-5"
+                    "w-5"
+                    "shrink-0"
+                    "items-center"
+                    "justify-center"
+                    "overflow-hidden"
+                    "rounded-full"
+                    "font-mono"
+                    "text-[0.625rem]"
+                    "font-semibold"]
+            :data-role (str "portfolio-optimizer-objective-menu-view-"
+                            instrument-id
+                            "-icon")
+            :aria-hidden "true"}
+     (if (seq icon-url)
+       [:img {:class ["block" "h-5" "w-5" "rounded-full" "object-contain"]
+              :src icon-url
+              :alt ""
+              :data-role (str "portfolio-optimizer-objective-menu-view-"
+                              instrument-id
+                              "-icon-img")}]
+       (subs asset-label 0 (min 1 (count asset-label))))]))
+
 (defn- inline-view-draft
   [draft state instrument-id]
   (let [views (vec (get-in draft [:return-model :views]))
@@ -201,6 +237,7 @@
 (defn- inline-view-row
   [universe instrument-id view-draft]
   (let [asset-label (instrument-label universe instrument-id)
+        instrument (instrument-by-id universe instrument-id)
         selected-confidence (bl-model/normalize-confidence-level
                              (:confidence view-draft))]
     [:div {:class ["optimizer-objective-view-row"
@@ -214,19 +251,7 @@
            :data-role (str "portfolio-optimizer-objective-menu-view-row-"
                            instrument-id)}
      [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}
-      [:span {:class ["optimizer-objective-view-token"
-                      "inline-flex"
-                      "h-5"
-                      "w-5"
-                      "shrink-0"
-                      "items-center"
-                      "justify-center"
-                      "rounded-full"
-                      "font-mono"
-                      "text-[0.625rem]"
-                      "font-semibold"]
-              :aria-hidden "true"}
-       (subs asset-label 0 (min 1 (count asset-label)))]
+      (inline-view-icon instrument asset-label instrument-id)
       [:span {:class ["truncate" "text-[0.75rem]" "font-semibold" "text-trading-text"]}
        asset-label]]
      [:label {:class ["optimizer-objective-view-return-shell"

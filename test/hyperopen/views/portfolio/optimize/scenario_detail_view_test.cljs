@@ -376,6 +376,8 @@
                                     "portfolio-optimizer-objective-menu-use-my-views-editor")
         btc-row (node-by-role use-my-views-view
                               "portfolio-optimizer-objective-menu-view-row-perp:BTC")
+        btc-icon (node-by-role use-my-views-view
+                               "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
         btc-return (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-return-suffix (first (filter (fn [node]
@@ -420,6 +422,8 @@
            (click-actions use-my-views-row)))
     (is (some? inline-editor))
     (is (contains? (set (collect-strings inline-editor)) "Your return views"))
+    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
+           (get-in btc-icon [1 :src])))
     (is (= "18" (get-in btc-return [1 :value])))
     (is (contains? (set (get-in btc-return [1 :class])) "pr-5"))
     (is (= ["%"] (collect-strings btc-return-suffix)))
