@@ -10,21 +10,21 @@
             [nexus.registry :as nxr]))
 
 (def ^:private objective-menu-options
-  [{:key :minimum-volatility
-    :title "Minimum volatility"
-    :description "Smallest feasible sigma - defensive baseline"}
-   {:key :max-sharpe
+  [{:key :max-sharpe
     :title "Maximum Sharpe"
     :description "Best risk-adjusted return"}
+   {:key :minimum-volatility
+    :title "Minimum volatility"
+    :description "Smallest feasible sigma - defensive baseline"}
+   {:key :use-my-views
+    :title "Use my views"
+    :description "Black-Litterman: combine market reference with beliefs"}
    {:key :target-volatility
     :title "Target volatility · 12%"
     :description "Pin to a fixed level, max return at that sigma"}
    {:key :maximum-return
     :title "Maximum return"
-    :description "Aggressive. Drives toward the right of the frontier"}
-   {:key :use-my-views
-    :title "Use my views"
-    :description "Black-Litterman: combine market reference with beliefs"}])
+    :description "Aggressive. Drives toward the right of the frontier"}])
 
 (defn current-objective-menu-key
   [draft result]

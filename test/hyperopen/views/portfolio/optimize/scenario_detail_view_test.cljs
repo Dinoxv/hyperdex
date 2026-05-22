@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.scenario-detail-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.string :as str]
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
@@ -418,6 +419,11 @@
                                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
         btc-remove (node-by-role use-my-views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-remove")
+        option-roles (->> (collect-nodes menu vector?)
+                          (keep #(get-in % [1 :data-role]))
+                          (filter #(str/starts-with? %
+                                                     "portfolio-optimizer-objective-menu-option-"))
+                          vec)
         strings (set (collect-strings open-view))
         use-my-views-strings (set (collect-strings use-my-views-view))]
     (is (some? trigger))
@@ -445,6 +451,12 @@
     (is (contains? strings "Target volatility · 12%"))
     (is (contains? strings "Maximum return"))
     (is (contains? strings "Use my views"))
+    (is (= ["portfolio-optimizer-objective-menu-option-max-sharpe"
+            "portfolio-optimizer-objective-menu-option-minimum-volatility"
+            "portfolio-optimizer-objective-menu-option-use-my-views"
+            "portfolio-optimizer-objective-menu-option-target-volatility"
+            "portfolio-optimizer-objective-menu-option-maximum-return"]
+           option-roles))
     (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
              :minimum-volatility]]
            (click-actions minimum-row)))
