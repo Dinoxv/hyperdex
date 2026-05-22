@@ -1763,20 +1763,13 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   await page.locator("[data-role='portfolio-optimizer-run-draft']").click();
   await expect(page.locator("[data-role='portfolio-optimizer-progress-panel']"))
     .toContainText("Optimization", { timeout: 10_000 });
-  await expect(page.locator("[data-role='portfolio-optimizer-run-status-panel']"))
-    .toContainText("Succeeded", { timeout: 10_000 });
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
-    .toBeVisible();
-  await expect(page.locator("[data-role='portfolio-optimizer-last-successful-run']"))
-    .toContainText("Last successful result is available for comparison.");
-  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+  await expect(page).toHaveURL(/\/portfolio\/optimize\/draft/, {
+    timeout: 10_000
+  });
+  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
     .toHaveCount(0);
   await appendOptimizerBtcHistoryPoint(page);
-  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
-    .toBeVisible();
-  await page.locator("[data-role='portfolio-optimizer-view-weights']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(page).toHaveURL(/\/portfolio\/optimize\/draft/);
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
     .toContainText("Allocation");
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))

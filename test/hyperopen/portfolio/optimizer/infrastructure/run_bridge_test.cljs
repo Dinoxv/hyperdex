@@ -346,6 +346,25 @@
       (is (false?
            (get-in @store [:portfolio :optimizer :draft :metadata :dirty?]))))))
 
+(deftest worker-result-on-new-route-dispatches-navigation-to-draft-results-test
+  (let [dispatches (atom [])
+        store (atom {:router {:path "/portfolio/optimize/new"}
+                     :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
+                                              :run-state {:status :running
+                                                          :run-id "run-1"
+                                                          :request-signature {:seed 1}}}}})
+        controller (run-bridge/make-controller
+                    {:store store
+                     :dispatch! (fn [store* event actions]
+                                  (swap! dispatches conj [store* event actions]))})]
+    (run-bridge/handle-worker-message! controller
+                                       {:id "run-1"
+                                        :type "optimizer-result"
+                                        :payload {:status :solved}}
+                                       {:computed-at-ms 200})
+    (is (= [[store nil [[:actions/navigate "/portfolio/optimize/draft"]]]]
+           @dispatches))))
+
 (deftest normalized-worker-result-with-string-status-updates-successful-run-test
   (let [store (atom {:portfolio {:optimizer {:run-state {:status :running
                                                          :run-id "run-1"

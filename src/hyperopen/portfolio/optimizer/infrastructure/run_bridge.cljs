@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.run-bridge
-  (:require [hyperopen.portfolio.optimizer.application.run-bridge-workflow :as workflow]
+  (:require [nexus.registry :as nxr]
+            [hyperopen.portfolio.optimizer.application.run-bridge-workflow :as workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.infrastructure.worker-client :as worker-client]
             [hyperopen.system :as system]))
@@ -16,8 +17,9 @@
 
 (defn make-controller
   ([] (make-controller {}))
-  ([{:keys [store worker-ref worker-url]}]
+  ([{:keys [store dispatch! worker-ref worker-url]}]
    {:store (or store system/store)
+    :dispatch! (or dispatch! nxr/dispatch)
     :last-run-request (atom nil)
     :worker-url (or worker-url worker-client/default-worker-url)
     :owns-worker? (nil? worker-ref)
@@ -124,6 +126,14 @@
 
     nil))
 
+(defn- interpret-message-command!
+  [{:keys [store dispatch!]} command]
+  (case (:command/type command)
+    :optimizer.workflow/navigate
+    ((or dispatch! nxr/dispatch) store nil [[:actions/navigate (:path command)]])
+
+    nil))
+
 (defn request-run!
   [{:keys [controller request request-signature computed-at-ms store run-id]}]
   (let [controller* (or controller (make-controller {:store (or store system/store)}))
@@ -160,10 +170,15 @@
                              controller-or-message
                              message-or-opts)))
   ([controller message {:keys [computed-at-ms]}]
-   (swap! (:store controller)
-          (fn [state]
-            (:state (workflow/handle-worker-message
-                     {:state state
-                      :message message
-                      :computed-at-ms computed-at-ms}))))
+   (let [result (atom nil)]
+     (swap! (:store controller)
+            (fn [state]
+              (let [result* (workflow/handle-worker-message
+                             {:state state
+                              :message message
+                              :computed-at-ms computed-at-ms})]
+                (reset! result result*)
+                (:state result*))))
+     (doseq [command (:commands @result)]
+       (interpret-message-command! controller command)))
    nil))

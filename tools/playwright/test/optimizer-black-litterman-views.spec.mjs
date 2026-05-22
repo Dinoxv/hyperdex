@@ -490,8 +490,9 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
       firstConfidence: 0.75
     });
 
-  await expect(page.locator("[data-role='portfolio-optimizer-run-status-panel']"))
-    .toContainText("Succeeded", { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/portfolio\/optimize\/bl-draft-current/, {
+    timeout: 15_000
+  });
 
   await expect
     .poll(() => readBlackLittermanRunResult(page), {
@@ -509,13 +510,9 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
   expect(result.standaloneBtc).toBeGreaterThan(0);
 
   await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
-    .toBeVisible();
+    .toHaveCount(0);
   await seedOptimizerAccountValue(page, "2000");
-  await expect(page.locator("[data-role='portfolio-optimizer-view-weights']"))
-    .toBeVisible();
-  await page.locator("[data-role='portfolio-optimizer-view-weights']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(page).toHaveURL(/\/portfolio\/optimize\/bl-draft-current/);
   await expect(page.locator("[data-role='portfolio-optimizer-scenario-stale-banner']"))
     .toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))

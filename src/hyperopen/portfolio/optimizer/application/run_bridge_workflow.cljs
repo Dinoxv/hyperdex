@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.run-bridge-workflow
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (defn- run-state
   [state]
@@ -143,6 +144,25 @@
                   (failed-run-state (run-state state) computed-at-ms payload))
         (update-progress id progress/fail-progress computed-at-ms payload))))
 
+(defn- new-optimizer-route?
+  [state]
+  (= (:kind (portfolio-routes/parse-portfolio-route
+             (get-in state [:router :path])))
+     :optimize-new))
+
+(defn- result-path
+  [state]
+  (portfolio-routes/portfolio-optimize-scenario-path
+   (or (get-in state contracts/active-scenario-loaded-id-path)
+       "draft")))
+
+(defn- success-commands
+  [state state*]
+  (if (new-optimizer-route? state)
+    [{:command/type :optimizer.workflow/navigate
+      :path (result-path state*)}]
+    []))
+
 (defn handle-worker-message
   [{:keys [state message computed-at-ms]}]
   (let [{:keys [id type payload]} message
@@ -165,6 +185,11 @@
                  :optimizer-error
                  (apply-worker-error state id payload computed-at-ms)
 
-                 state)]
+                 state)
+        commands (if (and (contains? #{"optimizer-result" :optimizer-result} type)
+                          (= :solved (:status payload))
+                          (not (stale-message? state id)))
+                   (success-commands state state*)
+                   [])]
     {:state state*
-     :commands []}))
+     :commands commands}))

@@ -111,3 +111,26 @@
            (get-in result [:state :portfolio :optimizer :last-successful-run])))
     (is (false?
          (get-in result [:state :portfolio :optimizer :draft :metadata :dirty?])))))
+
+(deftest handle-worker-message-navigates-new-route-to-current-draft-result-test
+  (let [state {:router {:path "/portfolio/optimize/new"}
+               :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
+                                        :optimization-progress
+                                        (progress/begin-progress
+                                         {:run-id "run-1"
+                                          :scenario-id nil
+                                          :request {:scenario-id nil}
+                                          :started-at-ms 100})
+                                        :run-state {:status :running
+                                                    :run-id "run-1"
+                                                    :scenario-id nil
+                                                    :request-signature {:seed 1}}}}}
+        result (workflow/handle-worker-message
+                {:state state
+                 :message {:id "run-1"
+                           :type "optimizer-result"
+                           :payload {:status :solved}}
+                 :computed-at-ms 400})]
+    (is (= [{:command/type :optimizer.workflow/navigate
+             :path "/portfolio/optimize/draft"}]
+           (:commands result)))))

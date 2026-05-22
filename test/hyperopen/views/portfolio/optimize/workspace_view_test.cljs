@@ -162,11 +162,9 @@
                    (assoc-in state
                              [:portfolio :optimizer :last-successful-run]
                              (solved-run-for-state state)))
-        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
-    (is (= "button" (get-in view-weights-link [1 :type])))
-    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
-           (click-actions view-weights-link)))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights"))
+        "The new setup route should auto-navigate after a successful run instead of exposing a View weights button.")
     (is (= "button" (get-in results-link [1 :type])))
     (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
            (click-actions results-link)))))
@@ -185,10 +183,9 @@
                    (assoc-in state*
                              [:portfolio :optimizer :last-successful-run]
                              (solved-run-for-state state*)))
-        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
-    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
-           (click-actions view-weights-link)))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights"))
+        "The setup action bar should not require a second click after optimization succeeds.")
     (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
            (click-actions results-link)))))
 
@@ -205,10 +202,8 @@
                    (assoc-in [:webdata2 :clearinghouseState :marginSummary :accountValue]
                              "2000"))
         view-node (portfolio-view/portfolio-view state*)
-        view-weights-link (node-by-role view-node "portfolio-optimizer-view-weights")
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
-    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
-           (click-actions view-weights-link)))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights")))
     (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
            (click-actions results-link)))))
 

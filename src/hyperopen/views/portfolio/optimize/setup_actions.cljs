@@ -31,7 +31,7 @@
     :else "stabilized historical returns"))
 
 (defn setup-bottom-actions
-  [{:keys [draft running? run-triggerable? saving-scenario? solved-run? result-path]}]
+  [{:keys [draft running? run-triggerable? saving-scenario? solved-run?]}]
   (let [asset-count (count (:universe draft))
         black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
@@ -67,13 +67,6 @@
                :disabled (or (not solved-run?) saving-scenario?)
                :on {:click [[:actions/save-portfolio-optimizer-scenario-from-current]]}}
       (if saving-scenario? "Saving" "Save draft")]
-     (when solved-run?
-       [:button {:type "button"
-                 :class ["border" "border-warning/60" "bg-warning/10" "px-3" "py-1.5"
-                         "text-[0.6875rem]" "font-medium" "text-warning"]
-                 :data-role "portfolio-optimizer-view-weights"
-                 :on {:click [[:actions/navigate result-path]]}}
-        "View weights"])
      [:div {:class ["flex" "max-w-full" "flex-col" "items-start" "gap-1.5" "font-mono"
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}
       [:div {:class ["flex" "items-center" "gap-2" "text-[0.6875rem]" "font-semibold"
