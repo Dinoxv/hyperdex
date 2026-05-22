@@ -130,13 +130,9 @@
                                     (when (absolute-view? view)
                                       (common/non-blank-text (:instrument-id view))))
                                   views))
-        default-order (vec (take 3
-                                 (keep (comp common/non-blank-text :instrument-id)
-                                       (get-in state contracts/draft-universe-path))))]
-    (cond
-      (seq ui-order) ui-order
-      (seq existing-order) existing-order
-      :else default-order)))
+        universe-order (vec (keep (comp common/non-blank-text :instrument-id)
+                                  (get-in state contracts/draft-universe-path)))]
+    (vec (distinct (concat universe-order existing-order ui-order)))))
 
 (defn- objective-menu-inline-draft
   [state views return-inputs-by-instrument instrument-id]
@@ -178,15 +174,15 @@
   (bl-model/next-view-id views))
 
 (defn- inline-draft->absolute-view
-  [views instrument-id draft]
+  [existing-views id-views instrument-id draft]
   (let [return-value (bl-model/parse-percent-text (:return-text draft))]
     (when (some? return-value)
-      (let [existing (existing-absolute-view-by-instrument views instrument-id)
+      (let [existing (existing-absolute-view-by-instrument existing-views instrument-id)
             confidence-level (bl-model/normalize-confidence-level
                               (:confidence draft))
             confidence (bl-model/confidence-weight confidence-level)]
         {:id (or (:id existing)
-                 (next-inline-view-id views))
+                 (next-inline-view-id id-views))
          :kind :absolute
          :instrument-id instrument-id
          :return return-value
@@ -200,18 +196,16 @@
   [state]
   (let [views (vec (or (get-in state contracts/draft-return-model-views-path) []))
         return-inputs-by-instrument (objective-menu-return-inputs state)
-        ui-order (vec (keep common/non-blank-text
-                            (get-in state contracts/ui-objective-menu-view-order-path)))
         order (objective-menu-inline-order state)
         edited-instruments (set order)
         preserved-views (vec (remove (fn [view]
                                        (and (absolute-view? view)
-                                            (or (seq ui-order)
-                                                (contains? edited-instruments
-                                                           (:instrument-id view)))))
+                                            (contains? edited-instruments
+                                                       (:instrument-id view))))
                                      views))]
     (reduce (fn [acc instrument-id]
               (if-let [view (inline-draft->absolute-view
+                             views
                              acc
                              instrument-id
                              (objective-menu-inline-draft

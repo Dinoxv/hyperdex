@@ -353,6 +353,19 @@
                            (-> base-state
                                (assoc-in [:portfolio :optimizer :last-successful-run]
                                          solved-run)
+                               (assoc-in [:portfolio :optimizer :draft :universe]
+                                         [{:instrument-id "perp:BTC"
+                                           :market-type :perp
+                                           :coin "BTC"}
+                                          {:instrument-id "perp:ETH"
+                                           :market-type :perp
+                                           :coin "ETH"}
+                                          {:instrument-id "perp:SOL"
+                                           :market-type :perp
+                                           :coin "SOL"}
+                                          {:instrument-id "perp:DOGE"
+                                           :market-type :perp
+                                           :coin "DOGE"}])
                                (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
                                          true)
                                (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
@@ -393,6 +406,8 @@
                                   "portfolio-optimizer-objective-menu-view-perp:BTC-step-up")
         btc-step-down (node-by-role use-my-views-view
                                     "portfolio-optimizer-objective-menu-view-perp:BTC-step-down")
+        doge-return (node-by-role use-my-views-view
+                                  "portfolio-optimizer-objective-menu-view-perp:DOGE-return")
         btc-prefilled-return (node-by-role use-my-views-prefilled-view
                                            "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-return-suffix (first (filter (fn [node]
@@ -446,6 +461,7 @@
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
            (get-in btc-icon [1 :src])))
     (is (= "18" (get-in btc-return [1 :value])))
+    (is (some? doge-return))
     (is (= "20" (get-in btc-prefilled-return [1 :value])))
     (is (contains? (set (get-in btc-return [1 :class])) "pr-9"))
     (is (= ["%"] (collect-strings btc-return-suffix)))
@@ -475,13 +491,9 @@
              "perp:BTC"
              :medium]]
            (click-actions btc-confidence-medium)))
-    (is (= [[:actions/remove-portfolio-optimizer-objective-menu-view
-             "perp:BTC"]]
-           (click-actions btc-remove)))
-    (is (= [[:actions/add-portfolio-optimizer-objective-menu-view]]
-           (click-actions
-            (node-by-role use-my-views-view
-                          "portfolio-optimizer-objective-menu-add-view"))))
+    (is (nil? btc-remove))
+    (is (nil? (node-by-role use-my-views-view
+                            "portfolio-optimizer-objective-menu-add-view")))
     (is (= true (get-in apply-current [1 :disabled])))
     (is (nil? (click-actions apply-current)))
     (is (= false (get-in apply-changed [1 :disabled])))

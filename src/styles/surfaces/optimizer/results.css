@@ -129,7 +129,7 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-row {
-    grid-template-columns: minmax(86px, 1fr) minmax(102px, 118px) 66px 18px;
+    grid-template-columns: minmax(86px, 1fr) minmax(102px, 118px) 66px;
     column-gap: 10px;
     min-height: 46px;
     background-color: #090b0d;
@@ -252,7 +252,7 @@
 
   @media (max-width: 360px) {
     .portfolio-optimizer .optimizer-objective-view-row {
-      grid-template-columns: minmax(0, 1fr) 18px;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .portfolio-optimizer .optimizer-objective-view-return-shell,

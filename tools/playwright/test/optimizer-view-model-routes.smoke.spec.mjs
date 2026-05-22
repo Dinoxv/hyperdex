@@ -640,7 +640,7 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   await expect(editor).toBeVisible();
   await expect(editor).toContainText("Your return views");
   await expect(editor).not.toContainText("Relative views");
-  await expect(addView).toBeVisible();
+  await expect(addView).toHaveCount(0);
   await expect(cancel).toBeVisible();
   await expect(apply).toBeVisible();
   await expect(menu.locator("select")).toHaveCount(0);
@@ -813,7 +813,7 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       await expect(editor).toBeVisible();
       await expect(editor).toContainText("Your return views");
       await expect(editor).not.toContainText("Relative views");
-      await expect(addView).toBeInViewport({ ratio: 1 });
+      await expect(addView).toHaveCount(0);
       await expect(footerActions).toBeInViewport({ ratio: 1 });
       await expect(menu.locator("select")).toHaveCount(0);
       await expect(menu.locator("input[type='number']")).toHaveCount(0);

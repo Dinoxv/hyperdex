@@ -142,11 +142,8 @@
                                 (when (absolute-view? view)
                                   (:instrument-id view)))
                               views))
-        universe-order (vec (take 3 (keep :instrument-id (:universe draft))))]
-    (cond
-      (seq ui-order) ui-order
-      (seq view-order) view-order
-      :else universe-order)))
+        universe-order (vec (keep :instrument-id (:universe draft)))]
+    (vec (distinct (concat universe-order view-order ui-order)))))
 
 (defn- instrument-label
   [universe instrument-id]
@@ -389,24 +386,7 @@
                      "grid-cols-3"]
              :aria-label (str asset-label " confidence")}]
       (map #(confidence-button instrument-id selected-confidence %)
-           bl-model/confidence-options))
-     [:button {:type "button"
-               :class ["border-0"
-                       "bg-transparent"
-                       "px-1"
-                       "py-0"
-                       "text-sm"
-                       "text-trading-muted"
-                       "focus:outline-none"
-                       "focus:ring-0"
-                       "focus:ring-offset-0"]
-               :aria-label (str "Remove " asset-label " view")
-               :data-role (str "portfolio-optimizer-objective-menu-view-"
-                               instrument-id
-                               "-remove")
-               :on {:click [[:actions/remove-portfolio-optimizer-objective-menu-view
-                             instrument-id]]}}
-      "x"]]))
+           bl-model/confidence-options))]))
 
 (defn views-editor-section
   ([draft state result readiness]
@@ -461,25 +441,6 @@
                                return-inputs-by-instrument
                                instrument-id)))
            order))
-     [:button {:type "button"
-               :class ["mt-2"
-                       "w-full"
-                       "border"
-                       "border-dashed"
-                       "border-base-300"
-                       "bg-transparent"
-                       "px-3"
-                       "py-2"
-                       "text-left"
-                       "text-[0.6875rem]"
-                       "font-semibold"
-                       "text-trading-muted"
-                       "focus:outline-none"
-                       "focus:ring-0"
-                       "focus:ring-offset-0"]
-               :data-role "portfolio-optimizer-objective-menu-add-view"
-               :on {:click [[:actions/add-portfolio-optimizer-objective-menu-view]]}}
-      "+ Add a view"]
      (when include-apply?
        [:button {:type "button"
                  :class ["optimizer-primary-action"

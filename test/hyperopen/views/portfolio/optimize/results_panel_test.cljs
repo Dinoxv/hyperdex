@@ -55,7 +55,10 @@
                            :symbol "PURR/USDC"}
                           {:instrument-id "perp:ETH"
                            :market-type :perp
-                           :coin "ETH"}]
+                           :coin "ETH"}
+                          {:instrument-id "perp:SOL"
+                           :market-type :perp
+                           :coin "SOL"}]
                :objective {:kind :max-sharpe}
                :return-model {:kind :black-litterman
                               :views [{:id "bl_view_1"
@@ -80,6 +83,8 @@
                            "portfolio-optimizer-results-your-views-editor-rows")
         btc-return (node-by-role editor
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        sol-return (node-by-role editor
+                                 "portfolio-optimizer-objective-menu-view-perp:SOL-return")
         btc-confidence-high (node-by-role
                              editor
                              "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
@@ -93,6 +98,7 @@
     (is (contains? strings "Your views"))
     (is (contains? strings "Change annualized return views and confidence, then rerun the recommendation."))
     (is (= "19.5" (node-attr btc-return :value)))
+    (is (some? sol-return))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
              "perp:BTC"
              [:event.target/value]]]
@@ -102,8 +108,7 @@
              "perp:BTC"
              :high]]
            (click-actions btc-confidence-high)))
-    (is (= [[:actions/add-portfolio-optimizer-objective-menu-view]]
-           (click-actions add-view)))
+    (is (nil? add-view))
     (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions apply)))))
 

@@ -219,9 +219,7 @@
             state
             "perp:BTC"
             "ArrowDown")))
-    (is (= [[:effects/save
-             [:portfolio-ui :optimizer :objective-menu-view-order]
-             ["perp:BTC" "perp:ETH" "perp:HYPE"]]]
+    (is (= []
            (actions/add-portfolio-optimizer-objective-menu-view
             (assoc-in state
                       [:portfolio-ui :optimizer :objective-menu-view-order]
@@ -315,7 +313,7 @@
                                            {:perp:ETH {:return-text "12"
                                                        :confidence :high}}}}}]
     (is (= [[:effects/save-many
-             [[[:portfolio-ui :optimizer :objective-menu-view-order] []]
+             [[[:portfolio-ui :optimizer :objective-menu-view-order] ["perp:BTC"]]
               [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]]]]
            (actions/remove-portfolio-optimizer-objective-menu-view
             state
@@ -325,14 +323,23 @@
           return-model (second (second saved-values))]
       (is (= {:kind :black-litterman
               :views [{:id "rel-eth-btc"
-                       :kind :relative
-                       :instrument-id "perp:ETH"
-                       :comparator-instrument-id "perp:BTC"
+                      :kind :relative
+                      :instrument-id "perp:ETH"
+                      :comparator-instrument-id "perp:BTC"
                        :return 0.04
                        :confidence 0.5
                        :weights {"perp:ETH" 1
                                  "perp:BTC" -1}}
-                      {:id "bl_view_2"
+                      {:id "abs-btc"
+                       :kind :absolute
+                       :instrument-id "perp:BTC"
+                       :return 0.1
+                       :confidence-level :low
+                       :confidence 0.25
+                       :confidence-variance 0.75
+                       :horizon :3m
+                       :weights {"perp:BTC" 1}}
+                      {:id "bl_view_3"
                        :kind :absolute
                        :instrument-id "perp:ETH"
                        :return 0.12
