@@ -249,15 +249,14 @@
                                    :solver :fixture-solver
                                    :weights (case (:objective-kind problem)
                                               :target-return
-                                              (let [floor (get-in problem [:inequalities 0 :lower] 0)]
-                                                (if (> floor 0.05)
-                                                  [0.2 0.8]
-                                                  [0.5 0.5]))
+                                              (if (= [1 1] (:upper-bounds problem))
+                                                [0 1]
+                                                [0.3 0.7])
 
                                               :return-tilted
                                               (if (= [1 1] (:upper-bounds problem))
                                                 [0 1]
-                                                [0.8 0.2])
+                                                [0.3 0.7])
 
                                               [0.5 0.5])})})]
     (is (= :solved (:status result)))
@@ -353,6 +352,34 @@
     (is (= :target-solve (get-in result [:frontier-summary :source])))
     (is (= 1 (get-in result [:frontier-summary :point-count])))
     (is (= 1 (count (:frontier result))))
+    (is (some #(= :display-frontier-unavailable (:code %))
+              (:warnings result)))))
+
+(deftest display-frontier-ignores-solved-results-with-impossible-weights-test
+  (let [impossible-weight 2143289344
+        calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :minimum-variance
+                                   :frontier-points 3})
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights (case (:objective-kind problem)
+                                              :minimum-variance
+                                              [0.5 0.5]
+
+                                              :return-tilted
+                                              [0.8 0.2]
+
+                                              :target-return
+                                              [impossible-weight impossible-weight])})})]
+    (is (= :solved (:status result)))
+    (is (= [0.5 0.5] (:target-weights result)))
+    (is (some #(= :target-return (:objective-kind %)) @calls))
+    (is (not-any? #(= [impossible-weight impossible-weight] (:weights %))
+                  (:frontier result)))
     (is (some #(= :display-frontier-unavailable (:code %))
               (:warnings result)))))
 

@@ -148,7 +148,7 @@
                 {:solve-problem (fn [_problem]
                                   {:status :solved
                                    :solver :fixture-solver
-                                   :weights [0.31 0.3 0.39]})})
+                                   :weights [0.6 0.2 0.2]})})
         standalone (overlay-by-id result :standalone)]
     (is (= :solved (:status result)))
     (is (pos? (get-in standalone [btc-id :expected-return]))
