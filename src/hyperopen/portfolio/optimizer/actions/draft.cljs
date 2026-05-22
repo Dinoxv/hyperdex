@@ -233,7 +233,10 @@
           (assoc :return-model
                  {:kind :black-litterman
                   :views (objective-menu-inline-views state)}))
-      model)))
+      (cond-> model
+        (= :black-litterman
+           (get-in state (conj contracts/draft-return-model-path :kind)))
+        (assoc :return-model {:kind :historical-mean})))))
 
 (defn open-portfolio-optimizer-objective-menu
   [state]

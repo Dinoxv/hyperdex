@@ -603,6 +603,9 @@ test("portfolio optimizer draft objective menu captures use my views returns and
 
   const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
   const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
+  const maximumSharpe = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-option-max-sharpe']"
+  );
   const useMyViews = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-option-use-my-views']"
   );
@@ -743,6 +746,29 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   expect(rowBox?.height ?? 0).toBeGreaterThanOrEqual(44);
   expect(returnBox?.height ?? 0).toBeGreaterThanOrEqual(28);
   expect(confidenceBox?.height ?? 0).toBeGreaterThanOrEqual(28);
+
+  await maximumSharpe.click();
+  await expect(maximumSharpe).toHaveAttribute("data-selected", "true");
+  await expect(apply).toBeEnabled();
+  await apply.click();
+
+  await expect(menu).toHaveCount(0);
+  await expect(railEditor).toHaveCount(0);
+  await expect(trigger).toContainText("Maximum Sharpe");
+  await expect.poll(async () => {
+    const draft = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft"
+    ]);
+    return {
+      objective: draft?.objective?.kind,
+      returnModel: draft?.["return-model"]?.kind
+    };
+  }).toEqual({
+    objective: "max-sharpe",
+    returnModel: "historical-mean"
+  });
 });
 
 test("portfolio optimizer use my views objective popover stays usable across review widths @smoke @regression", async ({ page }) => {

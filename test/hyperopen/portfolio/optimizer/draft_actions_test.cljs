@@ -147,6 +147,28 @@
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
 
+(deftest objective-menu-apply-leaving-use-my-views-restores-baseline-return-model-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
+                                               :objective {:kind :max-sharpe}
+                                               :return-model {:kind :black-litterman
+                                                              :views [{:kind :absolute
+                                                                       :instrument-id "perp:BTC"
+                                                                       :return 0.2
+                                                                       :confidence 0.75
+                                                                       :weights {"perp:BTC" 1}}]}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :minimum-volatility}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :objective]
+               {:kind :minimum-variance}]
+              [[:portfolio :optimizer :draft :return-model]
+               {:kind :historical-mean}]
+              [[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+            state)))))
+
 (deftest objective-menu-use-my-views-inline-actions-and-apply-test
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
                                                            {:instrument-id "perp:ETH"}
