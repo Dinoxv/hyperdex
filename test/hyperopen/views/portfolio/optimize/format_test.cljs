@@ -24,8 +24,20 @@
 (deftest formats-optimizer-labels-test
   (is (= "partially-blocked" (opt-format/keyword-label :partially-blocked)))
   (is (= "N/A" (opt-format/keyword-label nil)))
-  (is (= "Maximum Sharpe" (opt-format/display-label :max-sharpe)))
-  (is (= "Black-Litterman" (opt-format/display-label :black-litterman)))
-  (is (= "Ledoit-Wolf covariance" (opt-format/display-label :ledoit-wolf-dense)))
+  (doseq [[value label] [[:minimum-variance "Minimum variance"]
+                         [:max-sharpe "Maximum Sharpe"]
+                         [:target-volatility "Target volatility"]
+                         [:target-return "Target return"]
+                         [:historical-mean "Historical mean"]
+                         [:ew-mean "EW mean"]
+                         [:black-litterman "Black-Litterman"]
+                         [:diagonal-shrink "Stabilized covariance"]
+                         [:ledoit-wolf-dense "Ledoit-Wolf covariance"]
+                         [:mixed-frequency "Mixed-frequency covariance"]
+                         [:sample-covariance "Sample covariance"]]]
+    (is (= label (opt-format/display-label value)))
+    (is (= label (opt-format/display-label (name value)))))
   (is (= "custom-kind" (opt-format/display-label :custom-kind)))
+  (is (= "custom-kind" (opt-format/display-label "custom-kind")))
+  (is (= "N/A" (opt-format/display-label nil)))
   (is (= "N/A" (opt-format/format-time nil))))

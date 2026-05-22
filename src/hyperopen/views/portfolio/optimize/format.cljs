@@ -72,24 +72,31 @@
      (some? value) (str value)
      :else fallback)))
 
+(def ^:private display-labels
+  {:minimum-variance "Minimum variance"
+   :max-sharpe "Maximum Sharpe"
+   :target-volatility "Target volatility"
+   :target-return "Target return"
+   :historical-mean "Historical mean"
+   :ew-mean "EW mean"
+   :black-litterman "Black-Litterman"
+   :diagonal-shrink "Stabilized covariance"
+   :ledoit-wolf-dense "Ledoit-Wolf covariance"
+   :mixed-frequency "Mixed-frequency covariance"
+   :sample-covariance "Sample covariance"})
+
+(defn- display-label-key
+  [value]
+  (cond
+    (keyword? value) value
+    (string? value) (keyword value)
+    :else value))
+
 (defn display-label
   [value]
-  (case (cond
-          (keyword? value) value
-          (string? value) (keyword value)
-          :else value)
-    :minimum-variance "Minimum variance"
-    :max-sharpe "Maximum Sharpe"
-    :target-volatility "Target volatility"
-    :target-return "Target return"
-    :historical-mean "Historical mean"
-    :ew-mean "EW mean"
-    :black-litterman "Black-Litterman"
-    :diagonal-shrink "Stabilized covariance"
-    :ledoit-wolf-dense "Ledoit-Wolf covariance"
-    :mixed-frequency "Mixed-frequency covariance"
-    :sample-covariance "Sample covariance"
-    (keyword-label value)))
+  (get display-labels
+       (display-label-key value)
+       (keyword-label value)))
 
 (defn format-time
   [ms]
