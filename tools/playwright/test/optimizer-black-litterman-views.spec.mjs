@@ -207,21 +207,10 @@ async function seedBlackLittermanPendingBtcRunState(page) {
     seedPatch(optimizerPath("market-cap-by-coin"), stringMap([["BTC", 100], ["ETH", 100]])),
     seedPatch(optimizerPath("runtime", "as-of-ms"), 5000),
     seedPatch(optimizerPath("history-load-state"), { status: keyword("idle") }),
-    seedPatch(optimizerUiPath("black-litterman-editor"), {
-      "selected-kind": keyword("absolute"),
-      drafts: {
-        absolute: {
-          "instrument-id": "perp:BTC",
-          "return-text": "20",
-          "return-text-touched?": true,
-          confidence: keyword("high"),
-          horizon: keyword("1y"),
-          notes: ""
-        }
-      },
-      "editing-view-id": null,
-      errors: {},
-      "clear-confirmation-open?": false
+    seedPatch(optimizerUiPath("objective-menu-view-order"), ["perp:BTC"]),
+    seedPatch(optimizerUiPath("objective-menu-view-drafts", "perp:BTC"), {
+      "return-text": "20",
+      confidence: keyword("high")
     })
   ]);
 }
@@ -291,17 +280,13 @@ async function seedBlackLittermanDirtyRetainedResultState(page) {
 }
 
 async function readBlackLittermanDraftViews(page) {
-  const [views, errors] = await Promise.all([
-    readOptimizerState(page, optimizerPath("draft", "return-model", "views")),
-    readOptimizerState(page, optimizerUiPath("black-litterman-editor", "errors"))
-  ]);
+  const views = await readOptimizerState(page, optimizerPath("draft", "return-model", "views"));
   const firstView = views?.[0] || null;
   return {
     count: views?.length || 0,
     firstInstrumentId: firstView?.["instrument-id"] || null,
     firstReturn: firstView?.return ?? null,
-    firstConfidence: firstView?.confidence ?? null,
-    errorCount: Array.isArray(errors) ? errors.length : Object.keys(errors || {}).length
+    firstConfidence: firstView?.confidence ?? null
   };
 }
 
@@ -404,19 +389,6 @@ async function seedBlackLittermanVaultPreviewState(page) {
   return { vaultId };
 }
 
-async function widthRatio(child, parent) {
-  const [childBox, parentBox] = await Promise.all([
-    child.boundingBox(),
-    parent.boundingBox()
-  ]);
-
-  if (!childBox || !parentBox || parentBox.width === 0) {
-    return 0;
-  }
-
-  return childBox.width / parentBox.width;
-}
-
 async function visitOptimizerNew(page) {
   const routeSurface = page.locator("[data-role='portfolio-optimizer-setup-route-surface']");
   let lastError = null;
@@ -442,7 +414,7 @@ async function visitOptimizerNew(page) {
   throw lastError;
 }
 
-test("portfolio optimizer use my views editor flow exposes the Edit Views contract @regression", async ({ page }) => {
+test("portfolio optimizer use my views setup editor uses compact row controls @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 900, height: 900 });
@@ -451,53 +423,27 @@ test("portfolio optimizer use my views editor flow exposes the Edit Views contra
   await seedMarkets(page);
   await seedBlackLittermanEditorState(page);
 
-  const panel = page.locator("[data-role='portfolio-optimizer-black-litterman-panel']");
-  await expect(panel).toContainText("EDIT VIEWS");
-  await expect(panel).toContainText("Tell the model what you believe");
-  await expect(panel).toContainText("ACTIVE VIEWS (2/10)");
-  await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
-    .toContainText("HYPE expected return +45% annualized");
-  await expect(panel).toContainText("ETH > SOL by 5% annualized");
-  await expect(panel.locator("select")).toHaveCount(0);
+  const editor = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']");
+  await expect(editor).toBeVisible();
+  await expect(editor).toContainText("Your views");
+  await expect(editor).toContainText("Change annualized return views and confidence");
+  await expect(page.locator("[data-role='portfolio-optimizer-black-litterman-panel']"))
+    .toHaveCount(0);
+  await expect(editor.locator("select")).toHaveCount(0);
 
-  const instrumentGrid = panel.locator(
-    "[data-role='portfolio-optimizer-black-litterman-editor-instrument-grid']"
+  const hypeReturn = page.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:HYPE-return']");
+  const hypeConfidence = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-perp:HYPE-confidence-high']"
   );
-  const assetOptions = panel.locator(
-    "[data-role='portfolio-optimizer-black-litterman-editor-asset-options']"
-  );
-  const comparatorOptions = panel.locator(
-    "[data-role='portfolio-optimizer-black-litterman-editor-comparator-options']"
-  );
+  await expect(hypeReturn).toHaveValue("45");
+  await expect(hypeConfidence).toHaveAttribute("data-selected", "true");
 
-  await expect(assetOptions).toBeVisible();
-  await expect(comparatorOptions).toHaveCount(0);
-  await expect
-    .poll(() => widthRatio(assetOptions, instrumentGrid), {
-      message: "absolute asset selector should span the instrument editor grid",
-      timeout: 4_000
-    })
-    .toBeGreaterThan(0.95);
-
-  await page.locator("[data-role='portfolio-optimizer-black-litterman-editor-type-relative']").click();
-  await expect(comparatorOptions).toBeVisible();
-  await expect
-    .poll(() => widthRatio(assetOptions, instrumentGrid), {
-      message: "relative asset selector should share the grid with comparator",
-      timeout: 4_000
-    })
-    .toBeLessThan(0.65);
-  await page.locator("[data-role='portfolio-optimizer-black-litterman-editor-type-absolute']").click();
-  await expect(comparatorOptions).toHaveCount(0);
-
-  await page.locator("[data-role='portfolio-optimizer-black-litterman-active-view-view-2-remove']").click();
-  await expect(panel).toContainText("ACTIVE VIEWS (1/10)");
-
-  await page.locator("[data-role='portfolio-optimizer-black-litterman-clear-all']").click();
-  await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-clear-confirm']"))
-    .toBeVisible();
-  await page.locator("[data-role='portfolio-optimizer-black-litterman-clear-cancel']").click();
-  await expect(panel).toContainText(/views adjust expected returns only/i);
+  await hypeReturn.fill("12.5");
+  await page.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:HYPE-confidence-low']")
+    .click();
+  await expect(hypeReturn).toHaveValue("12.5");
+  await expect(page.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:HYPE-confidence-low']"))
+    .toHaveAttribute("data-selected", "true");
 });
 
 test("portfolio optimizer use my views prepopulates absolute return while history is loading @regression", async ({ page }) => {
@@ -508,11 +454,11 @@ test("portfolio optimizer use my views prepopulates absolute return while histor
 
   await seedBlackLittermanAutomaticReturnState(page);
 
-  const panel = page.locator("[data-role='portfolio-optimizer-black-litterman-panel']");
-  const returnInput = panel.locator("[data-role='portfolio-optimizer-black-litterman-editor-return']");
+  const editor = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']");
+  const returnInput = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:BTC-return']");
+  await expect(page.locator("[data-role='portfolio-optimizer-black-litterman-panel']"))
+    .toHaveCount(0);
   await expect(returnInput).toHaveValue("7.3");
-  await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
-    .toContainText("BTC expected return +7.3% annualized");
 });
 
 test("portfolio optimizer run applies a valid pending BTC view through the worker result @regression", async ({ page }) => {
@@ -524,11 +470,11 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
   await seedBlackLittermanPendingBtcRunState(page);
   await seedOptimizerAccountValue(page, "1000");
 
-  const panel = page.locator("[data-role='portfolio-optimizer-black-litterman-panel']");
-  await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-preview-text']"))
-    .toContainText("BTC expected return +20% annualized");
-  await expect(panel.locator("[data-role='portfolio-optimizer-black-litterman-pending-view-status']"))
-    .toContainText("Pending view will apply on run.");
+  const editor = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']");
+  await expect(editor.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:BTC-return']"))
+    .toHaveValue("20");
+  await expect(editor.locator("[data-role='portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high']"))
+    .toHaveAttribute("data-selected", "true");
 
   await page.locator("[data-role='portfolio-optimizer-run-draft']").click();
 
@@ -541,8 +487,7 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
       count: 1,
       firstInstrumentId: "perp:BTC",
       firstReturn: 0.2,
-      firstConfidence: 0.75,
-      errorCount: 0
+      firstConfidence: 0.75
     });
 
   await expect(page.locator("[data-role='portfolio-optimizer-run-status-panel']"))
@@ -611,9 +556,16 @@ test("portfolio optimizer use my views preview renders vertical bars across revi
     const chartShell = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-chart-shell']");
     const cards = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-insight-cards']");
     const actionBar = page.locator("[data-role='portfolio-optimizer-setup-bottom-actions']");
+    const editor = page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']");
     await preview.scrollIntoViewIfNeeded();
 
     await expect(workspace).toBeVisible();
+    await expect(editor).toBeVisible();
+    await expect(editor).toContainText("Your views");
+    await expect(editor.locator("[data-role='portfolio-optimizer-objective-menu-view-vault:0x3333333333333333333333333333333333333333-return']"))
+      .toHaveValue("4");
+    await expect(page.locator("[data-role='portfolio-optimizer-black-litterman-panel']"))
+      .toHaveCount(0);
     await expect(workspace).toContainText("What the model assumes and what your views change");
     await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-heading']")).toHaveCount(0);
     await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-panel']")).toHaveCount(0);

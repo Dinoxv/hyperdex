@@ -2,8 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.black-litterman-views-panel :as bl-panel]
-            [hyperopen.test-support.hiccup :as hiccup]
-            [hyperopen.views.portfolio-view :as portfolio-view]))
+            [hyperopen.test-support.hiccup :as hiccup]))
 
 (defn- deep-merge
   [& maps]
@@ -21,66 +20,68 @@
 
 (defn- optimizer-view
   [& overrides]
-  (portfolio-view/portfolio-view
-   (apply deep-merge
-          {:router {:path "/portfolio/optimize/new"}
-           :portfolio
-           {:optimizer
-            {:draft
-             {:universe [{:instrument-id "perp:BTC"
-                          :market-type :perp
-                          :coin "BTC"
-                          :symbol "BTC-USDC"}
-                         {:instrument-id "perp:ETH"
-                          :market-type :perp
-                          :coin "ETH"
-                          :symbol "ETH-USDC"}
-                         {:instrument-id "perp:SOL"
-                          :market-type :perp
-                          :coin "SOL"
-                          :symbol "SOL-USDC"}
-                         {:instrument-id "perp:HYPE"
-                          :market-type :perp
-                          :coin "HYPE"
-                          :symbol "HYPE-USDC"}]
-              :objective {:kind :max-sharpe}
-              :return-model {:kind :black-litterman
-                             :views [{:id "view-1"
-                                      :kind :absolute
-                                      :instrument-id "perp:HYPE"
-                                      :return 0.45
-                                      :confidence 0.75
-                                      :horizon :1y
-                                      :notes "Momentum conviction"}
-                                     {:id "view-2"
-                                      :kind :relative
-                                      :instrument-id "perp:ETH"
-                                      :comparator-instrument-id "perp:SOL"
-                                      :direction :outperform
-                                      :return 0.05
-                                      :confidence 0.5
-                                      :horizon :6m
-                                      :notes "Pair view"}]}
-              :risk-model {:kind :diagonal-shrink}}}}
-           :portfolio-ui
-           {:optimizer
-            {:black-litterman-editor
-             {:selected-kind :absolute
-              :drafts {:absolute {:instrument-id "perp:HYPE"
-                                  :return-text "45"
-                                  :confidence :high
-                                  :horizon :1y
-                                  :notes "Momentum conviction"}
-                       :relative {:instrument-id "perp:ETH"
-                                  :comparator-instrument-id "perp:SOL"
-                                  :direction :outperform
-                                  :return-text "5"
-                                  :confidence :medium
-                                  :horizon :6m
-                                  :notes "Pair view"}}
-              :editing-view-id nil
-              :clear-confirmation-open? false}}}}
-          overrides)))
+  (let [state (apply deep-merge
+                     {:portfolio
+                      {:optimizer
+                       {:draft
+                        {:universe [{:instrument-id "perp:BTC"
+                                     :market-type :perp
+                                     :coin "BTC"
+                                     :symbol "BTC-USDC"}
+                                    {:instrument-id "perp:ETH"
+                                     :market-type :perp
+                                     :coin "ETH"
+                                     :symbol "ETH-USDC"}
+                                    {:instrument-id "perp:SOL"
+                                     :market-type :perp
+                                     :coin "SOL"
+                                     :symbol "SOL-USDC"}
+                                    {:instrument-id "perp:HYPE"
+                                     :market-type :perp
+                                     :coin "HYPE"
+                                     :symbol "HYPE-USDC"}]
+                         :objective {:kind :max-sharpe}
+                         :return-model {:kind :black-litterman
+                                        :views [{:id "view-1"
+                                                 :kind :absolute
+                                                 :instrument-id "perp:HYPE"
+                                                 :return 0.45
+                                                 :confidence 0.75
+                                                 :horizon :1y
+                                                 :notes "Momentum conviction"}
+                                                {:id "view-2"
+                                                 :kind :relative
+                                                 :instrument-id "perp:ETH"
+                                                 :comparator-instrument-id "perp:SOL"
+                                                 :direction :outperform
+                                                 :return 0.05
+                                                 :confidence 0.5
+                                                 :horizon :6m
+                                                 :notes "Pair view"}]}
+                         :risk-model {:kind :diagonal-shrink}}}}
+                      :portfolio-ui
+                      {:optimizer
+                       {:black-litterman-editor
+                        {:selected-kind :absolute
+                         :drafts {:absolute {:instrument-id "perp:HYPE"
+                                             :return-text "45"
+                                             :confidence :high
+                                             :horizon :1y
+                                             :notes "Momentum conviction"}
+                                  :relative {:instrument-id "perp:ETH"
+                                             :comparator-instrument-id "perp:SOL"
+                                             :direction :outperform
+                                             :return-text "5"
+                                             :confidence :medium
+                                             :horizon :6m
+                                             :notes "Pair view"}}
+                         :editing-view-id nil
+                         :clear-confirmation-open? false}}}}
+                     overrides)]
+    (bl-panel/black-litterman-views-panel
+     (get-in state [:portfolio :optimizer :draft])
+     nil
+     (get-in state [:portfolio-ui :optimizer :black-litterman-editor]))))
 
 (deftest portfolio-optimizer-workspace-renders-edit-views-panel-copy-preview-and-add-action-test
   (let [view-node (optimizer-view)

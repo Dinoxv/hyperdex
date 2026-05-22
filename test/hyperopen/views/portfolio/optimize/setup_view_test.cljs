@@ -157,21 +157,56 @@
                     :portfolio {:optimizer
                                 {:draft {:universe [{:instrument-id "perp:BTC"
                                                      :market-type :perp
-                                                     :coin "BTC"}
+                                                     :coin "BTC"
+                                                     :icon-url "https://app.hyperliquid.xyz/coins/BTC.svg"}
                                                     {:instrument-id "perp:ETH"
                                                      :market-type :perp
                                                      :coin "ETH"}]
                                          :objective {:kind :max-sharpe}
                                          :return-model {:kind :black-litterman
-                                                        :views []}
+                                                        :views [{:id "view-1"
+                                                                 :kind :absolute
+                                                                 :instrument-id "perp:BTC"
+                                                                 :return 0.7
+                                                                 :confidence-level :high
+                                                                 :confidence 0.75
+                                                                 :weights {"perp:BTC" 1}}]}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:long-only? false}}}}})
+        inline-editor (node-by-role view-node
+                                    "portfolio-optimizer-setup-use-my-views-editor")
+        btc-row (node-by-role view-node
+                              "portfolio-optimizer-objective-menu-view-row-perp:BTC")
+        btc-icon (node-by-role view-node
+                               "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
+        btc-return (node-by-role view-node
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-confidence-high (node-by-role
+                             view-node
+                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
+        run-button (node-by-role view-node "portfolio-optimizer-run-draft")
         strings (set (collect-strings view-node))]
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-use-my-views-context")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-black-litterman-panel")))
+    (is (some? inline-editor))
+    (is (some? btc-row))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-black-litterman-panel")))
     (is (= "true"
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-setup-preset-use-my-views")
                    [1 :aria-pressed])))
     (is (contains? strings "Use my views"))
-    (is (contains? strings "Black-Litterman Views"))))
+    (is (contains? (set (collect-strings inline-editor)) "Your views"))
+    (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
+           (get-in btc-icon [1 :src])))
+    (is (= "70" (get-in btc-return [1 :value])))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             [:event.target/value]]]
+           (input-actions btc-return)))
+    (is (= "true" (get-in btc-confidence-high [1 :data-selected])))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
+             "perp:BTC"
+             :high]]
+           (click-actions btc-confidence-high)))
+    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
+           (click-actions run-button)))))

@@ -79,7 +79,7 @@
     (is (str/includes? output-text "(+"))
     (is (some? action-bar))
     (is (= false (get-in run-button [1 :disabled])))
-    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
+    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions run-button)))
     (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
            (click-actions save-button)))))

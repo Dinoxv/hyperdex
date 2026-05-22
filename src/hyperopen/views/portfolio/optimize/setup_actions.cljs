@@ -33,6 +33,7 @@
 (defn setup-bottom-actions
   [{:keys [draft running? run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [asset-count (count (:universe draft))
+        black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
         model-copy (action-model-label (get-in draft [:return-model :kind])
                                        (get-in draft [:risk-model :kind]))]
@@ -53,7 +54,9 @@
                        "disabled:shadow-none"]
                :data-role "portfolio-optimizer-run-draft"
                :disabled (not run-triggerable?)
-               :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
+               :on {:click [(if black-litterman?
+                               [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]
+                               [:actions/run-portfolio-optimizer-from-draft])]}}
       (if running? "Running Optimization" "Run optimization")]
      [:button {:type "button"
                :class ["border" "border-base-300" "bg-base-200/30" "px-3" "py-2"

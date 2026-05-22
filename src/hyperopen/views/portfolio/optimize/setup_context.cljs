@@ -1,15 +1,15 @@
 (ns hyperopen.views.portfolio.optimize.setup-context
   (:require [hyperopen.portfolio.routes :as portfolio-routes]
-            [hyperopen.views.portfolio.optimize.black-litterman-views-panel :as black-litterman-views-panel]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.run-status-panel :as run-status-panel]
+            [hyperopen.views.portfolio.optimize.scenario-objective-menu :as scenario-objective-menu]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel :as setup-readiness-panel]))
 
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
 (defn context-rail
-  [{:keys [draft editor-state readiness snapshot preview-snapshot run-state optimization-progress
+  [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
            history-load-state last-successful-run current-result? result-path]}]
   (let [bl? (= :black-litterman (get-in draft [:return-model :kind]))
         progress-visible? (contains? #{:running :succeeded :failed}
@@ -37,10 +37,14 @@
        (if bl? "Edit views" "Why this preset is safe")]
       (if bl?
         [:div {:class ["mt-3"]}
-         (black-litterman-views-panel/black-litterman-views-panel
+         (scenario-objective-menu/views-editor-section
           draft
+          state
+          (:result last-successful-run)
           readiness
-          editor-state)]
+          {:container-role "portfolio-optimizer-setup-use-my-views-editor"
+           :title "Your views"
+           :description "Change annualized return views and confidence, then run the recommendation."})]
         [:div {:class ["mt-3" "space-y-3" "text-[0.6875rem]" "leading-[1.55]" "text-trading-muted"]}
          [:p "Stabilized inputs reduce dependence on a single historical window."]
          [:p "Minimum variance does not rely on return forecasts."]

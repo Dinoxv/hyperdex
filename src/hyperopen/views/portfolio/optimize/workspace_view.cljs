@@ -58,6 +58,7 @@
                            :solved-run? current-result?
                            :result-path result-path})
       (setup-context/context-rail {:draft draft
+                                   :state state
                                    :editor-state editor-state
                                    :readiness readiness
                                    :snapshot snapshot
