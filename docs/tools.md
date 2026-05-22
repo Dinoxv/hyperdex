@@ -76,6 +76,13 @@ Use this file as the single starting point for what actions this repo provides t
 
 Development note: Local watch commands that invoke `css:watch` recompile Tailwind to `/hyperopen/resources/public/css/main.css`, but CSS-only edits are not live-swapped into the current browser tab; refresh the page to see them. Shadow's `:after-load` reload path applies to ClojureScript changes, not standalone CSS changes.
 
+Nightly mutation dependency and recovery notes:
+- Fresh worktrees may not have `node_modules/` installed even when `package.json` and `package-lock.json` are current. Before starting a long nightly mutation run, run `test -d node_modules/lucide || npm ci` from `/hyperopen`; this restores the locked JavaScript dependency tree without editing dependency manifests.
+- If `npm run mutate:nightly` stops with `Nightly mutation coverage build failed.`, reproduce the coverage step directly with `npm run coverage` and read the underlying error. Errors such as `Cannot find module 'lucide/dist/esm/icons/external-link.js'`, `shadow-cljs: command not found`, or missing declared packages mean the local dependency tree is absent or incomplete. Run `npm ci`, then rerun `npm run mutate:nightly`.
+- Do not use `--skip-coverage` after a failed coverage build unless `coverage/lcov.info` already exists and was produced from the current tree. Mutation results are not trustworthy when coverage is red or stale.
+- If coverage completed and the later target sweep was interrupted for an environment reason, rerun `bb tools/mutate_nightly.clj --skip-coverage` to reuse the existing coverage and avoid paying the coverage rebuild again. This reruns the configured target list from the start; it does not resume partway through a target.
+- After any successful rerun, inspect the newest `target/mutation/nightly/**/summary.md` and `summary.json`. Treat dependency restoration as environment recovery in the handoff, and reserve follow-up candidates for actual survivors, uncovered selected mutants, regressions, or target failures.
+
 ## 10) Formal tooling
 
 Use `tools/formal.clj` for the repo-local Lean workflow. The wrapper stays out of the proof-execution path in normal repo commands, but the wrapper's own Babashka tests run in `npm run check`.

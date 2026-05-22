@@ -41,6 +41,7 @@ Usage guidance:
 - Prefer `bb -m dev.check-delimiters --changed` immediately after CLJ/CLJS/EDN edits when you want a cheap reader-level syntax preflight before `shadow-cljs` compiles or tests.
 - Prefer `clojure-lsp` for symbol-accurate references, rename planning, and editor-backed definition jumps once a persistent LSP session is available.
 - Prefer `tools/shadow-nrepl-port` over global process scans when you need the live Shadow nREPL for the current worktree; it reads `target/shadow-cljs/nrepl.port` from the worktree root and verifies the listener is still alive.
+- Before long mutation sweeps in a fresh worktree, run `test -d node_modules/lucide || npm ci`; if `npm run mutate:nightly` fails during coverage with missing declared JavaScript packages, restore dependencies with `npm ci` and rerun the sweep. See `/hyperopen/docs/tools.md` for the full recovery rules.
 - For live local bug investigation, start with the browser attach/inspection commands when the question is about a running tab, console output, DOM state, or user interaction.
 - Browser attach requires a compatible Chromium/CDP endpoint, such as Chrome or Brave launched with `--remote-debugging-port=<port>`. It cannot retroactively attach to a normal browser session that was started without remote debugging.
 - Escalate to `tools/shadow-nrepl-port` only when you need to inspect runtime state or evaluate ClojureScript inside the current local build.
