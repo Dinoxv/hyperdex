@@ -4,6 +4,10 @@
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
+(defn- near?
+  [expected actual]
+  (< (js/Math.abs (- expected actual)) 0.000001))
+
 (deftest run-optimization-locates-current-portfolio-outside-selected-universe-test
   (let [day-ms 86400000
         selected-history {"BTC" [{:time-ms 0 :close "100"}
@@ -64,3 +68,65 @@
         "The current marker should keep outside-universe current holdings.")
     (is (pos? (:current-volatility result)))
     (is (not (zero? (:current-expected-return result))))))
+
+(deftest run-optimization-scores-current-portfolio-with-black-litterman-views-test
+  (let [btc-id "perp:BTC"
+        one-year-interval [{:dt-days 365.2425
+                            :dt-years 1}]
+        history {:calendar [0 1 2 3 4 5]
+                 :return-calendar [1 2 3 4 5]
+                 :return-series-by-instrument
+                 {btc-id [-0.1 -0.05 0 0.05 0.1]}
+                 :expected-return-series-by-instrument
+                 {btc-id [-0.13]}
+                 :expected-return-intervals-by-instrument
+                 {btc-id one-year-interval}
+                 :funding-by-instrument
+                 {btc-id {:source :missing-market-funding-history
+                          :annualized-carry 0}}
+                 :freshness {:as-of-ms 6
+                             :oldest-common-ms 0
+                             :latest-common-ms 5
+                             :age-ms 1
+                             :stale? false}}
+        request {:scenario-id "current-bl-views"
+                 :universe [{:instrument-id btc-id
+                             :market-type :perp
+                             :coin "BTC"
+                             :shortable? true}]
+                 :current-portfolio {:capital {:nav-usdc 10000}
+                                     :by-instrument {btc-id {:instrument-id btc-id
+                                                            :market-type :perp
+                                                            :coin "BTC"
+                                                            :weight 1}}}
+                 :current-portfolio-history history
+                 :return-model {:kind :black-litterman
+                                :views [{:id "btc-view"
+                                         :kind :absolute
+                                         :instrument-id btc-id
+                                         :weights {btc-id 1}
+                                         :return 0.2
+                                         :confidence 0.75
+                                         :confidence-variance 0.25}]}
+                 :risk-model {:kind :sample-covariance}
+                 :objective {:kind :minimum-variance}
+                 :constraints {:long-only? true
+                               :max-asset-weight 1
+                               :rebalance-tolerance 0.001}
+                 :history history
+                 :black-litterman-prior {:source :market-cap
+                                         :weights-by-instrument {btc-id 1}}
+                 :warnings []
+                 :as-of-ms 6}
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [1]})})
+        effective-return (get-in result [:expected-returns-by-instrument btc-id])]
+    (is (= :solved (:status result)))
+    (is (pos? effective-return)
+        "The optimizer should use the positive Black-Litterman posterior for BTC.")
+    (is (near? effective-return (:current-expected-return result))
+        "The current portfolio marker should use the same view-adjusted forward return.")))

@@ -115,11 +115,18 @@
       return-model)))
 
 (defn- current-portfolio-return-estimate
-  [request]
-  (returns/estimate-expected-returns
-   {:return-model (current-portfolio-return-model request)
-    :periods-per-year (:periods-per-year request)
-    :history (:current-portfolio-history request)}))
+  [request effective-return-result]
+  (let [baseline (returns/estimate-expected-returns
+                  {:return-model (current-portfolio-return-model request)
+                   :periods-per-year (:periods-per-year request)
+                   :history (:current-portfolio-history request)})
+        effective-returns (:expected-returns-by-instrument effective-return-result)]
+    (if (and (= :black-litterman (return-model-kind request))
+             (seq effective-returns))
+      (-> baseline
+          (assoc :model :black-litterman)
+          (update :expected-returns-by-instrument merge effective-returns))
+      baseline)))
 
 (defn expected-return-vector
   [return-result instrument-ids]
@@ -202,14 +209,15 @@
    :problems []})
 
 (defn- current-portfolio-analysis
-  [request]
+  [request effective-return-result]
   (when-let [history (:current-portfolio-history request)]
     (let [risk-result (risk/estimate-risk-model
                        {:risk-model (:risk-model request)
                         :periods-per-year (:periods-per-year request)
                         :history history})
           instrument-ids (:instrument-ids risk-result)
-          return-result (current-portfolio-return-estimate request)
+          return-result (current-portfolio-return-estimate request
+                                                          effective-return-result)
           expected-returns (expected-return-vector return-result instrument-ids)
           weights (current-weights request instrument-ids)]
       {:risk-result risk-result
@@ -249,7 +257,8 @@
              :detail (or (some-> (:model return-result) name)
                          "estimated")})
          expected-returns (expected-return-vector return-result instrument-ids)
-         current-portfolio-analysis* (current-portfolio-analysis request)]
+         current-portfolio-analysis* (current-portfolio-analysis request
+                                                                 return-result)]
      (if (= :invalid (:status return-result))
        {:risk-result risk-result
         :return-result return-result
