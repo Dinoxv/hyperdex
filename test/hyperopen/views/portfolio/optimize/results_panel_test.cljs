@@ -76,6 +76,8 @@
                     :frontier-overlay-mode :standalone})
         editor (node-by-role view-node
                              "portfolio-optimizer-results-your-views-editor")
+        rows (node-by-role editor
+                           "portfolio-optimizer-results-your-views-editor-rows")
         btc-return (node-by-role editor
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-confidence-high (node-by-role
@@ -87,6 +89,7 @@
                             "portfolio-optimizer-results-your-views-apply")
         strings (set (collect-strings editor))]
     (is (some? editor))
+    (is (contains? (set (node-attr rows :class)) "overflow-x-hidden"))
     (is (contains? strings "Your views"))
     (is (contains? strings "Change annualized return views and confidence, then rerun the recommendation."))
     (is (= "19.5" (node-attr btc-return :value)))

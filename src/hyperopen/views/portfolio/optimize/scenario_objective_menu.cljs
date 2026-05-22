@@ -449,7 +449,9 @@
       [:div {:class ["optimizer-objective-view-rows"
                      "min-h-0"
                      "space-y-1.5"
-                     "overflow-y-auto"]}]
+                     "overflow-x-hidden"
+                     "overflow-y-auto"]
+             :data-role (str container-role "-rows")}]
       (map (fn [instrument-id]
              (inline-view-row universe
                               instrument-id
