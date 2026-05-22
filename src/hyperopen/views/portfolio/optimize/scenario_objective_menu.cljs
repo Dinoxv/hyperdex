@@ -408,21 +408,32 @@
                              instrument-id]]}}
       "x"]]))
 
-(defn- inline-views-section
-  [draft state result readiness]
+(defn views-editor-section
+  ([draft state result readiness]
+   (views-editor-section draft state result readiness {}))
+  ([draft state result readiness {:keys [container-role title description extra-class
+                                         include-apply? apply-role]
+                                  :or {container-role
+                                       "portfolio-optimizer-objective-menu-use-my-views-editor"
+                                       title "Your return views"
+                                       description
+                                       "Annualized. Confidence sets how strongly each view pulls the posterior."
+                                       apply-role
+                                       "portfolio-optimizer-objective-menu-apply"}}]
   (let [universe (vec (:universe draft))
         return-inputs-by-instrument (objective-menu-return-inputs result readiness)
         order (default-view-order draft state)]
-    [:section {:class ["optimizer-objective-views-section"
-                       "flex"
-                       "min-h-0"
-                       "shrink-0"
-                       "flex-col"
-                       "border-t"
-                       "border-base-300"
-                       "px-3"
-                       "py-3"]
-               :data-role "portfolio-optimizer-objective-menu-use-my-views-editor"}
+    [:section {:class (cond-> ["optimizer-objective-views-section"
+                               "flex"
+                               "min-h-0"
+                               "shrink-0"
+                               "flex-col"
+                               "border-t"
+                               "border-base-300"
+                               "px-3"
+                               "py-3"]
+                        extra-class (conj extra-class))
+               :data-role container-role}
      [:div {:class ["mb-3" "flex" "items-start" "justify-between" "gap-3"]}
       [:div
        [:p {:class ["font-mono"
@@ -431,9 +442,9 @@
                     "uppercase"
                     "tracking-[0.18em]"
                     "text-warning"]}
-        "Your return views"]
+        title]
        [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted"]}
-        "Annualized. Confidence sets how strongly each view pulls the posterior."]]]
+        description]]]
      (into
       [:div {:class ["optimizer-objective-view-rows"
                      "min-h-0"
@@ -466,7 +477,25 @@
                        "focus:ring-offset-0"]
                :data-role "portfolio-optimizer-objective-menu-add-view"
                :on {:click [[:actions/add-portfolio-optimizer-objective-menu-view]]}}
-      "+ Add a view"]]))
+      "+ Add a view"]
+     (when include-apply?
+       [:button {:type "button"
+                 :class ["optimizer-primary-action"
+                         "mt-2"
+                         "w-full"
+                         "border"
+                         "border-base-300"
+                         "px-3"
+                         "py-2"
+                         "text-left"
+                         "text-[0.6875rem]"
+                         "font-semibold"
+                         "focus:outline-none"
+                         "focus:ring-0"
+                         "focus:ring-offset-0"]
+                 :data-role apply-role
+                 :on {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]}}
+        "Apply & re-run"])])))
 
 (defn- objective-menu-mount-focus!
   [render-arg]
@@ -546,7 +575,7 @@
          (map #(objective-menu-option % current-key pending-key)
               rendered-options))
         (when (= :use-my-views pending-key)
-          (inline-views-section draft state result readiness))]
+          (views-editor-section draft state result readiness))]
        [:footer {:class ["flex" "shrink-0" "items-center" "justify-between" "gap-3" "border-t" "border-base-300" "px-3" "py-3"]}
         [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
          "Esc to cancel"]

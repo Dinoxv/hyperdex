@@ -306,6 +306,17 @@
     background-color: var(--optimizer-bg);
   }
 
+  .portfolio-optimizer .optimizer-results-right-panel {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-results-your-views-editor {
+    border-top-width: 0;
+    border-left: 1px solid var(--optimizer-border);
+    border-bottom: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+  }
+
   .portfolio-optimizer .optimizer-target-exposure-table {
     border-radius: 0;
     background-color: var(--optimizer-bg);

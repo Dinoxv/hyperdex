@@ -27,6 +27,7 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-results-left-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-center-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-right-panel")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-results-your-views-editor")))
     (is (some? (node-by-role view-node "portfolio-optimizer-trust-caution-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-svg")))
@@ -43,6 +44,65 @@
     (is (contains? strings "How much to trust this"))
     (is (contains? strings "low-invested-exposure"))
     (is (contains? strings "partially-blocked"))))
+
+(deftest results-panel-renders-use-my-views-editor-in-right-rail-test
+  (let [draft {:universe [{:instrument-id "perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"}
+                          {:instrument-id "spot:PURR"
+                           :market-type :spot
+                           :coin "PURR"
+                           :symbol "PURR/USDC"}
+                          {:instrument-id "perp:ETH"
+                           :market-type :perp
+                           :coin "ETH"}]
+               :objective {:kind :max-sharpe}
+               :return-model {:kind :black-litterman
+                              :views [{:id "bl_view_1"
+                                       :kind :absolute
+                                       :instrument-id "perp:BTC"
+                                       :return 0.18
+                                       :confidence-level :medium
+                                       :confidence 0.5
+                                       :weights {"perp:BTC" 1}}]}}
+        state {:portfolio-ui {:optimizer {:objective-menu-view-drafts
+                                          {:perp:BTC {:return-text "19.5"
+                                                      :confidence :high}}}}}
+        view-node (results-panel/results-panel
+                   {:result solved-result
+                    :computed-at-ms 2600}
+                   draft
+                   {:state state
+                    :frontier-overlay-mode :standalone})
+        editor (node-by-role view-node
+                             "portfolio-optimizer-results-your-views-editor")
+        btc-return (node-by-role editor
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-confidence-high (node-by-role
+                             editor
+                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
+        add-view (node-by-role editor
+                               "portfolio-optimizer-objective-menu-add-view")
+        apply (node-by-role editor
+                            "portfolio-optimizer-results-your-views-apply")
+        strings (set (collect-strings editor))]
+    (is (some? editor))
+    (is (contains? strings "Your views"))
+    (is (contains? strings "Change annualized return views and confidence, then rerun the recommendation."))
+    (is (= "19.5" (node-attr btc-return :value)))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
+             "perp:BTC"
+             [:event.target/value]]]
+           (get-in btc-return [1 :on :input])))
+    (is (= "true" (node-attr btc-confidence-high :data-selected)))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
+             "perp:BTC"
+             :high]]
+           (click-actions btc-confidence-high)))
+    (is (= [[:actions/add-portfolio-optimizer-objective-menu-view]]
+           (click-actions add-view)))
+    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
+           (click-actions apply)))))
 
 (deftest results-panel-allocation-add-asset-selector-renders-closed-and-open-states-test
   (let [draft {:universe [{:instrument-id "perp:BTC"

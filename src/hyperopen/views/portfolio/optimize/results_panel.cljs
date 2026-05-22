@@ -4,7 +4,23 @@
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-rebalance-preview :as rebalance-preview]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
+            [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
+
+(defn- active-views-editor
+  [state draft result readiness]
+  (when (= :use-my-views (objective-menu/current-objective-menu-key draft result))
+    (objective-menu/views-editor-section
+     draft
+     state
+     result
+     readiness
+     {:container-role "portfolio-optimizer-results-your-views-editor"
+      :title "Your views"
+      :description "Change annualized return views and confidence, then rerun the recommendation."
+      :extra-class "optimizer-results-your-views-editor"
+      :include-apply? true
+      :apply-role "portfolio-optimizer-results-your-views-apply"})))
 
 (defn results-panel
   ([last-successful-run]
@@ -12,6 +28,7 @@
   ([last-successful-run draft]
    (results-panel last-successful-run draft nil))
   ([last-successful-run draft {:keys [state stale? include-rebalance? frontier-overlay-mode
+                                      readiness
                                       constrain-frontier?]
                                :or {include-rebalance? true
                                     frontier-overlay-mode :standalone}}]
@@ -36,6 +53,7 @@
            constrain-frontier?)]
          [:div {:class ["optimizer-results-right-panel" "min-h-0"]
                 :data-role "portfolio-optimizer-results-right-panel"}
+          (active-views-editor state draft result readiness)
           (diagnostics-rail/trust-diagnostics-rail result)]]
         (when include-rebalance?
           (rebalance-preview/rebalance-preview result))]))))

@@ -385,6 +385,7 @@
            optimization-progress
            frontier-overlay-mode
            state
+           readiness
            constrain-frontier?] :as model}]
   (into
    [:section {:class ["space-y-0"]
@@ -398,6 +399,7 @@
                    last-successful-run
                    draft
                    {:state state
+                    :readiness readiness
                     :stale? (and stale? (not running?))
                     :frontier-overlay-mode frontier-overlay-mode
                     :constrain-frontier? constrain-frontier?

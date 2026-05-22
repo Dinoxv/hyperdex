@@ -704,18 +704,42 @@ test("portfolio optimizer draft objective menu captures use my views returns and
     return progress?.status;
   }, { timeout: 15_000 }).toBe("succeeded");
 
+  const railEditor = page.locator("[data-role='portfolio-optimizer-results-your-views-editor']");
+  const railApply = page.locator("[data-role='portfolio-optimizer-results-your-views-apply']");
+  await expect(railEditor).toBeVisible();
+  await expect(railEditor).toContainText("Your views");
+  await expect(railEditor).not.toContainText("Your return views");
+  await expect(railApply).toBeVisible();
+  await expect(btcReturn).toHaveValue("18");
+  await btcReturn.fill("18.5");
+  await railApply.click();
+  await expect.poll(async () => {
+    const returnModel = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft",
+      "return-model"
+    ]);
+    return returnModel?.views?.find((view) => view["instrument-id"] === "hl:perp:BTC")?.return;
+  }).toBe(0.185);
+
   await trigger.click();
   await expect(menu).toBeVisible();
   await expect(editor).toBeVisible();
-  await expect(btcRow).toBeInViewport({ ratio: 1 });
-  await expect(btcReturn).toHaveValue("18");
-  await expect(ethReturn).toHaveValue("16.5");
-  await expect(btcHigh).toHaveAttribute("data-selected", "true");
-  await expect(ethLow).toHaveAttribute("data-selected", "true");
+  const editorBtcRow = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-row-hl:perp:BTC']");
+  const editorBtcReturn = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']");
+  const editorEthReturn = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']");
+  const editorBtcHigh = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']");
+  const editorEthLow = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']");
+  await expect(editorBtcRow).toBeInViewport({ ratio: 1 });
+  await expect(editorBtcReturn).toHaveValue("18.5");
+  await expect(editorEthReturn).toHaveValue("16.5");
+  await expect(editorBtcHigh).toHaveAttribute("data-selected", "true");
+  await expect(editorEthLow).toHaveAttribute("data-selected", "true");
 
-  const rowBox = await btcRow.boundingBox();
-  const returnBox = await btcReturn.boundingBox();
-  const confidenceBox = await btcHigh.boundingBox();
+  const rowBox = await editorBtcRow.boundingBox();
+  const returnBox = await editorBtcReturn.boundingBox();
+  const confidenceBox = await editorBtcHigh.boundingBox();
   expect(rowBox?.height ?? 0).toBeGreaterThanOrEqual(44);
   expect(returnBox?.height ?? 0).toBeGreaterThanOrEqual(28);
   expect(confidenceBox?.height ?? 0).toBeGreaterThanOrEqual(28);
