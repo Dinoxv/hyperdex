@@ -18,6 +18,12 @@
    :execution-assumptions {:default-order-type :market}
    :metadata {:dirty? false}})
 
+(defn- draft-with-black-litterman-views
+  [views]
+  (assoc (contracts/migrate-draft sample-draft)
+         :return-model {:kind :black-litterman
+                        :views (vec views)}))
+
 (def sample-solved-result
   {:status :solved
    :scenario-id "scn_contract"
@@ -257,6 +263,90 @@
     (doseq [invalid-draft invalid-drafts]
       (is (false? (s/valid? ::contracts/draft invalid-draft))
           (s/explain-str ::contracts/draft invalid-draft)))))
+
+(deftest black-litterman-view-contract-accepts-supported-shapes-test
+  (let [valid-views [["absolute instrument view"
+                      {:kind :absolute
+                       :instrument-id "perp:BTC"
+                       :return 0.12
+                       :confidence 0.75
+                       :direction :outperform}]
+                     ["absolute weighted view"
+                      {:kind :absolute
+                       :weights {"perp:BTC" 1.0}
+                       :return -0.02
+                       :confidence-variance 0.1}]
+                     ["relative comparator view"
+                      {:kind :relative
+                       :instrument-id "perp:BTC"
+                       :comparator-instrument-id "perp:ETH"
+                       :return 0.03
+                       :confidence 0.5
+                       :confidence-variance 0.2
+                       :direction :underperform}]
+                     ["relative long-short view"
+                      {:kind :relative
+                       :long-instrument-id "perp:SOL"
+                       :short-instrument-id "perp:BTC"
+                       :return 0.04}]
+                     ["relative weighted view"
+                      {:kind :relative
+                       :weights {"perp:BTC" 0.5
+                                 "perp:ETH" -0.5}
+                       :return 0.01}]]]
+    (doseq [[label view] valid-views]
+      (let [draft (draft-with-black-litterman-views [view])]
+        (is (s/valid? ::contracts/draft draft)
+            (str label ": " (s/explain-str ::contracts/draft draft)))))))
+
+(deftest black-litterman-view-contract-rejects-malformed-shapes-test
+  (let [invalid-views [["unknown view kind"
+                        {:kind :tilted
+                         :instrument-id "perp:BTC"
+                         :return 0.1}]
+                       ["missing return"
+                        {:kind :absolute
+                         :instrument-id "perp:BTC"}]
+                       ["non-finite return"
+                        {:kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return js/NaN}]
+                       ["non-finite confidence"
+                        {:kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return 0.1
+                         :confidence "high"}]
+                       ["invalid direction"
+                        {:kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return 0.1
+                         :direction :sideways}]
+                       ["weights must be a map"
+                        {:kind :absolute
+                         :instrument-id "perp:BTC"
+                         :return 0.1
+                         :weights [["perp:BTC" 1.0]]}]
+                       ["absolute view needs an instrument or weights"
+                        {:kind :absolute
+                         :instrument-id " "
+                         :return 0.1}]
+                       ["relative comparator instruments must differ"
+                        {:kind :relative
+                         :instrument-id "perp:BTC"
+                         :comparator-instrument-id "perp:BTC"
+                         :return 0.1}]
+                       ["relative long-short instruments must differ"
+                        {:kind :relative
+                         :long-instrument-id "perp:BTC"
+                         :short-instrument-id "perp:BTC"
+                         :return 0.1}]
+                       ["relative view needs a pair or weights"
+                        {:kind :relative
+                         :return 0.1}]]]
+    (doseq [[label view] invalid-views]
+      (let [draft (draft-with-black-litterman-views [view])]
+        (is (false? (s/valid? ::contracts/draft draft))
+            label)))))
 
 (deftest engine-request-contract-rejects-malformed-nested-shapes-test
   (let [request (contract-fixtures/valid-engine-request)
