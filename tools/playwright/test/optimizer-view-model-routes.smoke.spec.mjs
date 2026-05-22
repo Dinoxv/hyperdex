@@ -612,6 +612,9 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   const btcReturn = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
   );
+  const btcRow = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-row-hl:perp:BTC']"
+  );
   const ethReturn = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']"
   );
@@ -691,6 +694,31 @@ test("portfolio optimizer draft objective menu captures use my views returns and
       }
     ]
   });
+
+  await expect.poll(async () => {
+    const progress = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "optimization-progress"
+    ]);
+    return progress?.status;
+  }, { timeout: 15_000 }).toBe("succeeded");
+
+  await trigger.click();
+  await expect(menu).toBeVisible();
+  await expect(editor).toBeVisible();
+  await expect(btcRow).toBeInViewport({ ratio: 1 });
+  await expect(btcReturn).toHaveValue("18");
+  await expect(ethReturn).toHaveValue("16.5");
+  await expect(btcHigh).toHaveAttribute("data-selected", "true");
+  await expect(ethLow).toHaveAttribute("data-selected", "true");
+
+  const rowBox = await btcRow.boundingBox();
+  const returnBox = await btcReturn.boundingBox();
+  const confidenceBox = await btcHigh.boundingBox();
+  expect(rowBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(returnBox?.height ?? 0).toBeGreaterThanOrEqual(28);
+  expect(confidenceBox?.height ?? 0).toBeGreaterThanOrEqual(28);
 });
 
 test("portfolio optimizer use my views objective popover stays usable across review widths @smoke @regression", async ({ page }) => {

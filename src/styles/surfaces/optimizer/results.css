@@ -76,7 +76,7 @@
 
   .portfolio-optimizer .optimizer-objective-popover {
     width: min(440px, calc(100vw - 1rem));
-    max-height: min(620px, calc(100vh - 18rem));
+    max-height: min(760px, calc(100vh - 5rem));
     overflow: hidden;
     border-radius: 0;
     box-shadow: 0 18px 48px rgb(0 0 0 / 0.42);
@@ -131,6 +131,7 @@
   .portfolio-optimizer .optimizer-objective-view-row {
     grid-template-columns: minmax(86px, 1fr) minmax(102px, 118px) 66px 18px;
     column-gap: 10px;
+    min-height: 46px;
     background-color: #090b0d;
     border-color: var(--optimizer-border);
   }
@@ -155,8 +156,8 @@
 
   .portfolio-optimizer .optimizer-objective-view-return-input {
     width: 82px;
-    height: 24px;
-    min-height: 24px;
+    height: 28px;
+    min-height: 28px;
     background-color: #0f1215;
     border-color: var(--optimizer-border-strong);
   }
@@ -168,10 +169,10 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-stepper {
-    top: 3px;
+    top: 4px;
     right: 3px;
     width: 10px;
-    height: 18px;
+    height: 20px;
     opacity: 0.45;
     transition: opacity 120ms ease;
   }
@@ -184,8 +185,8 @@
 
   .portfolio-optimizer .optimizer-objective-view-stepper-button {
     width: 10px;
-    height: 9px;
-    min-height: 9px;
+    height: 10px;
+    min-height: 10px;
     background-color: transparent;
     color: var(--optimizer-text-3);
     font-size: 6px;
@@ -199,14 +200,14 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence {
-    height: 24px;
+    min-height: 28px;
     gap: 1px;
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence-button {
     position: relative;
-    min-height: 24px;
-    height: 24px;
+    min-height: 28px;
+    height: 28px;
     border-radius: 0;
     background-color: var(--optimizer-surface);
     color: var(--optimizer-text-3);
@@ -249,7 +250,7 @@
     color: #191407;
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: 360px) {
     .portfolio-optimizer .optimizer-objective-view-row {
       grid-template-columns: minmax(0, 1fr) 18px;
     }

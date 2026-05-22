@@ -494,6 +494,33 @@
            (click-actions
             (node-by-role open-view "portfolio-optimizer-objective-menu-close"))))))
 
+(deftest portfolio-optimizer-scenario-detail-objective-menu-rehydrates-loaded-views-test
+  (let [scenario-id "draft"
+        base-state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state base-state)
+        view-node (portfolio-view/portfolio-view
+                   (-> base-state
+                       (assoc-in [:portfolio :optimizer :last-successful-run]
+                                 solved-run)
+                       (assoc-in [:portfolio :optimizer :draft :return-model]
+                                 {:kind :black-litterman
+                                  :views [{:id "bl_view_1"
+                                           :kind "absolute"
+                                           :instrument-id "perp:BTC"
+                                           :return 0.18
+                                           :confidence-level "high"
+                                           :confidence 0.75
+                                           :weights {"perp:BTC" 1}}]})
+                       (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
+                                 true)))
+        btc-return (node-by-role view-node
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-confidence-high (node-by-role
+                             view-node
+                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")]
+    (is (= "18" (get-in btc-return [1 :value])))
+    (is (= "true" (get-in btc-confidence-high [1 :data-selected])))))
+
 (deftest portfolio-optimizer-inputs-tab-renders-read-only-audit-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_inputs"}

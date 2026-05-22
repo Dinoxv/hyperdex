@@ -123,7 +123,7 @@
 
 (defn- absolute-view?
   [view]
-  (= :absolute (:kind view)))
+  (= :absolute (bl-model/normalize-view-kind (:kind view))))
 
 (defn- active-absolute-view
   [views instrument-id]
@@ -416,6 +416,7 @@
     [:section {:class ["optimizer-objective-views-section"
                        "flex"
                        "min-h-0"
+                       "shrink-0"
                        "flex-col"
                        "border-t"
                        "border-base-300"
@@ -539,7 +540,7 @@
                       "flex"
                       "flex-col"
                       "min-h-0"
-                      "overflow-hidden"]}
+                      "overflow-y-auto"]}
         (into
          [:div {:class ["shrink-0" "space-y-2" "px-3" "py-3"]}]
          (map #(objective-menu-option % current-key pending-key)

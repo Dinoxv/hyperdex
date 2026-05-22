@@ -28,8 +28,13 @@
 
 (defn- retained-unsaved-run?
   [state]
-  (and (nil? (get-in state contracts/active-scenario-loaded-id-path))
-       (some? (get-in state contracts/last-successful-run-path))))
+  (let [loaded-id (get-in state contracts/active-scenario-loaded-id-path)
+        draft-id (get-in state contracts/draft-id-path)
+        draft-status (get-in state contracts/draft-status-path)]
+    (and (some? (get-in state contracts/last-successful-run-path))
+         (contains? #{nil :draft} draft-status)
+         (or (nil? loaded-id)
+             (= loaded-id draft-id)))))
 
 (defn- retained-unsaved-route?
   [state scenario-id]

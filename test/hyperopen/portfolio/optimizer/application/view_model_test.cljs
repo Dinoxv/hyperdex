@@ -175,6 +175,11 @@
                             :scenario-load-state {:status :loading
                                                   :scenario-id "draft"}}}}
         model (view-model/scenario-detail-model state {:scenario-id "draft"})
+        computed-model (view-model/scenario-detail-model
+                        (assoc-in state
+                                  [:portfolio :optimizer :active-scenario :loaded-id]
+                                  "draft-current")
+                        {:scenario-id "draft"})
         unnamed-model (view-model/scenario-detail-model
                        (assoc-in state [:portfolio :optimizer :draft :name] nil)
                        {:scenario-id "draft"})]
@@ -186,6 +191,10 @@
             :status :computed}
            (:active-scenario model)))
     (is (= [btc-instrument] (get-in model [:state :portfolio :optimizer :draft :universe])))
+    (is (false? (:loading? computed-model)))
+    (is (= retained-run (:last-successful-run computed-model)))
+    (is (= [btc-instrument]
+           (get-in computed-model [:state :portfolio :optimizer :draft :universe])))
     (is (= "Unsaved Optimization" (:scenario-name unnamed-model)))))
 
 (deftest universe-section-model-projects-search-candidates-test
