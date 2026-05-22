@@ -42,41 +42,82 @@
 (def ^:dynamic *submit-order!* trading-api/submit-order!)
 (def ^:dynamic *dispatch!* nxr/dispatch)
 
-(defn- override-bool
-  [m key-a key-b fallback]
-  (let [value (if (contains? m key-a)
-                (get m key-a)
-                (get m key-b))]
-    (if (boolean? value)
-      value
-      fallback)))
+(def ^:private optimizer-history-api-override-fields
+  [{:target :enabled?
+    :aliases [:enabled? :enabled]
+    :kind :boolean
+    :fallback false}
+   {:target :base-url
+    :aliases [:base-url :baseUrl]
+    :kind :value}
+   {:target :proxy-policy
+    :aliases [:proxy-policy :proxyPolicy]
+    :kind :keyword}
+   {:target :include-aligned-returns?
+    :aliases [:include-aligned-returns? :includeAlignedReturns]
+    :kind :boolean
+    :fallback true}
+   {:target :fallback-to-legacy?
+    :aliases [:fallback-to-legacy? :fallbackToLegacy]
+    :kind :boolean
+    :fallback true}])
+
+(defn- first-present-alias
+  [m aliases]
+  (some (fn [alias]
+          (when (contains? m alias)
+            [alias (get m alias)]))
+        aliases))
+
+(defn- first-truthy-alias-value
+  [m aliases]
+  (some #(get m %) aliases))
+
+(defn- boolean-override-entry
+  [m target aliases fallback]
+  (when-let [[_alias value] (first-present-alias m aliases)]
+    [target (if (boolean? value)
+              value
+              fallback)]))
+
+(defn- boolean-override-field-entry
+  [m {:keys [target aliases fallback]}]
+  (boolean-override-entry m target aliases fallback))
+
+(defn- keyword-override-field-entry
+  [m {:keys [target aliases]}]
+  (when-let [value (first-truthy-alias-value m aliases)]
+    [target (coercion/normalize-keyword-like value)]))
+
+(defn- value-override-field-entry
+  [m {:keys [target aliases]}]
+  (when-let [value (first-truthy-alias-value m aliases)]
+    [target value]))
+
+(def ^:private override-field-entry-fn-by-kind
+  {:boolean boolean-override-field-entry
+   :keyword keyword-override-field-entry
+   :value value-override-field-entry})
+
+(defn- override-field-entry
+  [m {:keys [kind] :as field}]
+  (when-let [entry-fn (get override-field-entry-fn-by-kind kind)]
+    (entry-fn m field)))
+
+(defn- normalize-optimizer-history-api-browser-override
+  [m]
+  (reduce (fn [acc field]
+            (if-let [[target value] (override-field-entry m field)]
+              (assoc acc target value)
+              acc))
+          {}
+          optimizer-history-api-override-fields))
 
 (defn- optimizer-history-api-browser-override
   []
   (when-let [raw (aget js/globalThis "__HYPEROPEN_OPTIMIZER_HISTORY_API__")]
-    (let [m (js->clj raw :keywordize-keys true)]
-      (cond-> {}
-        (or (contains? m :enabled?) (contains? m :enabled))
-        (assoc :enabled? (override-bool m :enabled? :enabled false))
-        (or (:base-url m) (:baseUrl m))
-        (assoc :base-url (or (:base-url m) (:baseUrl m)))
-        (or (:proxy-policy m) (:proxyPolicy m))
-        (assoc :proxy-policy (coercion/normalize-keyword-like
-                              (or (:proxy-policy m) (:proxyPolicy m))))
-        (or (contains? m :include-aligned-returns?)
-            (contains? m :includeAlignedReturns))
-        (assoc :include-aligned-returns?
-               (override-bool m
-                              :include-aligned-returns?
-                              :includeAlignedReturns
-                              true))
-        (or (contains? m :fallback-to-legacy?)
-            (contains? m :fallbackToLegacy))
-        (assoc :fallback-to-legacy?
-               (override-bool m
-                              :fallback-to-legacy?
-                              :fallbackToLegacy
-                              true))))))
+    (normalize-optimizer-history-api-browser-override
+     (js->clj raw :keywordize-keys true))))
 
 (defn- optimizer-history-api-config
   []
