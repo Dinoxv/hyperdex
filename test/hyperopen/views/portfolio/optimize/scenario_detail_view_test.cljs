@@ -231,7 +231,7 @@
         worse-risk (scenario-kpi-delta-classes 0.1 0.14 0.24 0.32)
         lower-return (scenario-kpi-delta-classes 0.14 0.1 0.32 0.24)]
     (is (contains? (:volatility improved-risk) "text-trading-green"))
-    (is (contains? (:volatility worse-risk) "text-trading-red"))
+    (is (contains? (:volatility worse-risk) "text-warning"))
     (is (contains? (:expected-return improved-risk) "text-trading-green"))
     (is (contains? (:expected-return lower-return) "text-warning"))))
 

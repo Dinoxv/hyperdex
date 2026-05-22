@@ -186,7 +186,7 @@
                  (str (opt-format/format-pct-delta vol-delta) " · annualized")
                  "annualized")
                (kpi-delta-class vol-delta
-                                {:positive "text-trading-red"
+                                {:positive "text-warning"
                                  :negative "text-trading-green"}))
      (kpi-card "portfolio-optimizer-scenario-kpi-expected-return"
                "Expected Return · current → target"
