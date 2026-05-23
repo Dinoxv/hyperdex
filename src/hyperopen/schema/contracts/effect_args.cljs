@@ -96,7 +96,7 @@
    :effects/unsubscribe-orderbook ::common/coin-args
    :effects/unsubscribe-trades ::common/coin-args
    :effects/unsubscribe-webdata2 ::common/address-args
-   :effects/connect-wallet ::common/no-args
+   :effects/connect-wallet ::common/optional-string-args
    :effects/disconnect-wallet ::common/no-args
    :effects/enable-agent-trading ::enable-agent-trading-args
    :effects/set-agent-storage-mode ::common/set-agent-storage-mode-args

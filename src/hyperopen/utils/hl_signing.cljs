@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [clojure.walk :as walk]
             [hyperopen.platform :as platform]
+            [hyperopen.wallet.provider-registry :as provider-registry]
             ["@noble/secp256k1" :as secp]
             ["../vendor/msgpack" :as msgpack]
             ["../vendor/keccak" :as keccak]))
@@ -395,7 +396,7 @@
 
 (defn- sign-typed-data!
   [address typed-data]
-  (let [provider (.-ethereum js/globalThis)]
+  (let [provider (provider-registry/provider)]
     (if-not provider
       (js/Promise.reject (js/Error. "No wallet provider found. Connect your wallet first."))
       (-> (promise-race [(try-sign-typed-data! provider address typed-data)
@@ -461,7 +462,7 @@
                        :v (+ 27 recovery)})))))))
 
 (defn sign-l1-action!
-  "Uses window.ethereum to sign typed data. Returns a promise resolving
+  "Uses the selected wallet provider to sign typed data. Returns a promise resolving
    to {:connectionId :r :s :v :sig}."
   [address action nonce & {:keys [vault-address expires-after is-mainnet]
                            :or {vault-address nil

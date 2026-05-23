@@ -137,7 +137,39 @@
                 (run-approval {:wallet-chain-id nil
                                :is-mainnet false})])
           (.then (fn [_]
-                   (is (= ["0xexplicit" "0xwallet" "0xdefault-testnet"] @captured-chain-ids))
+                   (is (= ["0xexplicit" "0xdefault-mainnet" "0xdefault-testnet"]
+                          @captured-chain-ids))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest approve-agent-request-ignores-unrelated-wallet-chain-id-test
+  (async done
+    (let [captured-chain-id (atom nil)]
+      (-> (agent-runtime/approve-agent-request!
+           {:store (atom {:wallet {:address "0xowner"
+                                   :chain-id "0x1"}})
+            :owner-address "0xowner"
+            :agent-address "0xagent"
+            :private-key "0xpriv"
+            :storage-mode :session
+            :is-mainnet true
+            :persist-session? false
+            :now-ms-fn (fn [] 1700000000250)
+            :normalize-storage-mode identity
+            :default-signature-chain-id-for-environment (fn [mainnet?]
+                                                          (if mainnet?
+                                                            "0xa4b1"
+                                                            "0x66eee"))
+            :build-approve-agent-action (fn [_ _ & {:keys [signature-chain-id]}]
+                                          (reset! captured-chain-id signature-chain-id)
+                                          {:signatureChainId signature-chain-id})
+            :approve-agent! (fn [& _]
+                              (js/Promise.resolve (ok-response)))
+            :persist-agent-session-by-mode! (fn [& _] true)
+            :runtime-error-message (fn [err] (str err))
+            :exchange-response-error (fn [resp] (pr-str resp))})
+          (.then (fn [_]
+                   (is (= "0xa4b1" @captured-chain-id))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 

@@ -9,6 +9,8 @@
 (deftest connect-and-disconnect-wallet-actions-emit-effects-test
   (is (= [[:effects/connect-wallet]]
          (wallet-actions/connect-wallet-action {})))
+  (is (= [[:effects/connect-wallet "legacy:coinbase"]]
+         (wallet-actions/connect-wallet-action {} "legacy:coinbase")))
   (is (= [[:effects/disconnect-wallet]]
          (wallet-actions/disconnect-wallet-action {}))))
 

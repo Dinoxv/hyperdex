@@ -322,6 +322,78 @@
       (wallet/request-connection! store)
       (is (= ["request failed"] @error-calls)))))
 
+(deftest request-connection-selects-legacy-coinbase-provider-test
+  (async done
+    (let [store (atom {:wallet {:connected? false
+                                :address nil
+                                :connecting? false
+                                :error nil
+                                :agent {:status :not-ready
+                                        :storage-mode :local}}})
+          original-window (aget js/globalThis "window")
+          original-global-provider (aget js/globalThis "ethereum")
+          window* (or original-window #js {})
+          original-window-provider (aget window* "ethereum")
+          coinbase-calls (atom [])
+          metamask-calls (atom [])
+          coinbase #js {:isCoinbaseWallet true
+                        :request (fn [payload]
+                                   (let [method (aget payload "method")]
+                                     (swap! coinbase-calls conj method)
+                                     (case method
+                                       "eth_requestAccounts"
+                                       (js/Promise.resolve
+                                        #js ["0x1111111111111111111111111111111111111111"])
+                                       "eth_chainId"
+                                       (js/Promise.resolve "0xa4b1")
+                                       (js/Promise.resolve nil))))}
+          metamask #js {:isMetaMask true
+                        :request (fn [payload]
+                                   (swap! metamask-calls conj (aget payload "method"))
+                                   (js/Promise.reject
+                                    (js/Error. "wrong provider")))}]
+      (try
+        (aset js/globalThis "window" window*)
+        (aset js/globalThis "ethereum" metamask)
+        (aset metamask "providers" #js [metamask coinbase])
+        (aset window* "ethereum" metamask)
+        (wallet/reset-provider-registry!)
+        (wallet/request-connection! store "legacy:coinbase")
+        (js/setTimeout
+         (fn []
+           (try
+             (is (= ["eth_requestAccounts" "eth_chainId"]
+                    @coinbase-calls))
+             (is (= [] @metamask-calls))
+             (is (= true (get-in @store [:wallet :connected?])))
+             (is (= "0x1111111111111111111111111111111111111111"
+                    (get-in @store [:wallet :address])))
+             (is (= "0xa4b1" (get-in @store [:wallet :chain-id])))
+             (is (= "legacy:coinbase"
+                    (get-in @store [:wallet :selected-provider-id])))
+             (finally
+               (wallet/reset-provider-registry!)
+               (aset window* "ethereum" original-window-provider)
+               (if (some? original-window)
+                 (aset js/globalThis "window" original-window)
+                 (js-delete js/globalThis "window"))
+               (if (some? original-global-provider)
+                 (aset js/globalThis "ethereum" original-global-provider)
+                 (js-delete js/globalThis "ethereum"))
+               (done))))
+         0)
+        (catch :default err
+          (wallet/reset-provider-registry!)
+          (aset window* "ethereum" original-window-provider)
+          (if (some? original-window)
+            (aset js/globalThis "window" original-window)
+            (js-delete js/globalThis "window"))
+          (if (some? original-global-provider)
+            (aset js/globalThis "ethereum" original-global-provider)
+            (js-delete js/globalThis "ethereum"))
+          (is false (str "Unexpected error: " err))
+          (done))))))
+
 (deftest notify-connected-catches-handler-errors-and-warns-test
   (let [warns (atom [])
         original-console (.-console js/globalThis)]

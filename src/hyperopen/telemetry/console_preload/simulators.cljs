@@ -187,6 +187,7 @@
     (case method
       "eth_accounts" (handle-accounts-request config)
       "eth_requestAccounts" (handle-request-accounts-request config)
+      "eth_chainId" (promise-resolve (:chain-id config))
       ("eth_signTypedData_v4" "eth_signTypedData") (handle-typed-data-request config)
       "wallet_switchEthereumChain" (handle-switch-chain-request provider params config)
       (promise-resolve nil))))

@@ -185,6 +185,25 @@
           (cleanup-simulator-state! browser-state)
           ((async-support/unexpected-error done) err))))))
 
+(deftest wallet-simulator-chain-id-request-success-test
+  (async done
+    (let [browser-state (capture-browser-state)]
+      (try
+        (let [provider (install-provider! #js {:chainId "0xa4b1"})]
+          (-> (.request provider #js {:method "eth_chainId"})
+              (.then (fn [chain-id]
+                       (try
+                         (is (= "0xa4b1" chain-id))
+                         (finally
+                           (cleanup-simulator-state! browser-state)
+                           (done)))))
+              (.catch (fn [err]
+                        (cleanup-simulator-state! browser-state)
+                        ((async-support/unexpected-error done) err)))))
+        (catch :default err
+          (cleanup-simulator-state! browser-state)
+          ((async-support/unexpected-error done) err))))))
+
 (deftest wallet-simulator-typed-data-request-success-test
   (async done
     (let [browser-state (capture-browser-state)]

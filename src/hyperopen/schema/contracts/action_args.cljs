@@ -103,7 +103,7 @@
   {:actions/init-websockets ::common/no-args
    :actions/subscribe-to-asset ::common/coin-args
    :actions/subscribe-to-webdata2 ::common/address-args
-   :actions/connect-wallet ::common/no-args
+   :actions/connect-wallet ::common/optional-string-args
    :actions/disconnect-wallet ::common/no-args
    :actions/open-mobile-header-menu ::common/no-args
    :actions/close-mobile-header-menu ::common/no-args

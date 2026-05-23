@@ -1,16 +1,14 @@
 (ns hyperopen.wallet.core
   (:require [clojure.string :as str]
             [hyperopen.wallet.agent-lockbox :as agent-lockbox]
-            [hyperopen.wallet.agent-session :as agent-session]))
+            [hyperopen.wallet.agent-session :as agent-session]
+            [hyperopen.wallet.provider-registry :as provider-registry]))
 
 ;; ---------- Provider helpers -------------------------------------------------
 
 (declare listeners-installed?
          provider-listener-state
          provider-listener-store)
-
-(defonce ^:private provider-override
-  (atom nil))
 
 (defonce ^:private provider-listener-state
   (atom nil))
@@ -20,13 +18,15 @@
 
 (defn set-provider-override!
   [provider]
-  (reset! provider-override provider)
-  provider)
+  (provider-registry/set-provider-override! provider))
 
 (defn clear-provider-override!
   []
-  (reset! provider-override nil)
-  true)
+  (provider-registry/clear-provider-override!))
+
+(defn reset-provider-registry!
+  []
+  (provider-registry/reset-provider-registry!))
 
 (defn- provider-remove-listener!
   [provider event-name handler]
@@ -61,8 +61,7 @@
   true)
 
 (defn ^js provider []
-  (or @provider-override
-      (some-> js/globalThis .-window .-ethereum)))
+  (provider-registry/provider))
 
 (defn has-provider? [] (some? (provider)))
 
@@ -154,6 +153,8 @@
               :chain-id (:chain-id wallet-state) ; keep last chain id
               :connecting? false
               :error nil
+              :providers (:providers wallet-state)
+              :selected-provider-id (:selected-provider-id wallet-state)
               :agent (agent-session/default-agent-state :storage-mode storage-mode
                                                         :local-protection-mode local-protection-mode
                                                         :passkey-supported? passkey-supported?)}))))
@@ -198,6 +199,31 @@
   (swap! store update-in [:wallet] merge {:error (.-message e)
                                           :connecting? false}))
 
+(defn- selected-provider-for-request
+  [store provider-id]
+  (provider-registry/install-discovery! store)
+  (let [provider* (if (seq provider-id)
+                    (some-> (provider-registry/select-provider! provider-id)
+                            :provider)
+                    (when (has-provider?)
+                      (provider)))]
+    (provider-registry/sync-provider-list! store)
+    provider*))
+
+(defn- refresh-chain-id!
+  [store provider*]
+  (try
+    (when (and (some? provider*)
+               (fn? (.-request provider*)))
+      (-> (.request provider* (clj->js {:method "eth_chainId"}))
+          (.then (fn [chain-id]
+                   (when (some? chain-id)
+                     (set-chain! store chain-id))
+                   chain-id))
+          (.catch (fn [_] nil))))
+    (catch :default _
+      nil)))
+
 (defn- apply-accounts-connection!
   ([store accounts]
    (apply-accounts-connection! store accounts nil))
@@ -211,31 +237,39 @@
 (defn ->js [m] (clj->js m))
 
 (defn check-connection! [store]
-  (if-not (has-provider?)
+  (let [provider* (selected-provider-for-request store nil)]
+    (if-not provider*
     (set-disconnected! store)
-    (-> (.request (provider) (->js {:method "eth_accounts"}))
-        (.then (fn [accounts]
-                 (apply-accounts-connection! store accounts)))
-        (.catch #(set-error! store %)))))
+      (-> (.request provider* (->js {:method "eth_accounts"}))
+          (.then (fn [accounts]
+                   (apply-accounts-connection! store accounts)
+                   (refresh-chain-id! store provider*)))
+          (.catch #(set-error! store %))))))
 
 ;; Only call this from a user gesture (button click)
-(defn request-connection! [store]
-  (if-not (has-provider?)
-    (set-disconnected! store)
-    (do
-      ;; Set connecting state
-      (swap! store update-in [:wallet] merge {:connecting? true :error nil})
-      ;; Request accounts
-      (-> (.request (provider) (->js {:method "eth_requestAccounts"}))
-          (.then (fn [accounts]
-                   (apply-accounts-connection! store accounts true)))
-          (.catch #(set-error! store %))))))
+(defn request-connection!
+  ([store]
+   (request-connection! store nil))
+  ([store provider-id]
+   (let [provider* (selected-provider-for-request store provider-id)]
+     (if-not provider*
+       (set-disconnected! store)
+       (do
+         ;; Set connecting state
+         (swap! store update-in [:wallet] merge {:connecting? true :error nil})
+         ;; Request accounts
+         (-> (.request provider* (->js {:method "eth_requestAccounts"}))
+             (.then (fn [accounts]
+                      (apply-accounts-connection! store accounts true)
+                      (refresh-chain-id! store provider*)))
+             (.catch #(set-error! store %))))))))
 
 ;; ---------- Event listeners (accounts/chain) --------------------------------
 
 (defonce listeners-installed? (atom false))
 
 (defn attach-listeners! [store]
+  (provider-registry/install-discovery! store)
   (reset! provider-listener-store store)
   (let [provider* (provider)
         current-listeners @provider-listener-state]
@@ -281,6 +315,7 @@
           (reset! listeners-installed? true))))))
 
 (defn init-wallet! [store]
+  (provider-registry/install-discovery! store)
   (attach-listeners! store)
   (check-connection! store))
 

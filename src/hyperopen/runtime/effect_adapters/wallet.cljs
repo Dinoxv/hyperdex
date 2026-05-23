@@ -12,11 +12,14 @@
             [hyperopen.wallet.core :as wallet]))
 
 (defn connect-wallet
-  [_ store]
-  (wallet-connection-runtime/connect-wallet!
-   {:store store
-    :log-fn telemetry/log!
-    :request-connection! wallet/request-connection!}))
+  ([_ store]
+   (connect-wallet nil store nil))
+  ([_ store provider-id]
+   (wallet-connection-runtime/connect-wallet!
+    {:store store
+     :provider-id provider-id
+     :log-fn telemetry/log!
+     :request-connection! wallet/request-connection!})))
 
 (defn set-agent-storage-mode
   [_ store storage-mode]

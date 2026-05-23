@@ -39,9 +39,7 @@
       (try
         (let [nonce (now-ms-fn)
               normalized-storage-mode (normalize-storage-mode storage-mode)
-              wallet-chain-id (get-in @store [:wallet :chain-id])
               resolved-signature-chain-id (or signature-chain-id
-                                              wallet-chain-id
                                               (default-signature-chain-id-for-environment is-mainnet))
               format-agent-name* (or format-agent-name-with-valid-until
                                      (fn [name _server-time-ms _days-valid]

@@ -1,7 +1,8 @@
 (ns hyperopen.utils.hl-signing-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [async deftest is testing]]
-            [hyperopen.utils.hl-signing :as signing]))
+            [hyperopen.utils.hl-signing :as signing]
+            [hyperopen.wallet.core :as wallet]))
 
 (defn- bytes->vec [bytes]
   (vec (array-seq bytes)))
@@ -226,15 +227,16 @@
                   :signatureChainId "0xa4b1"
                   :agentAddress "0x9999999999999999999999999999999999999999"
                   :agentName ""
-                  :nonce 1700000000999}]
-      (set! (.-ethereum js/globalThis)
-            #js {:request (fn [payload]
-                            (let [method (aget payload "method")
-                                  params (array-seq (aget payload "params"))]
-                              (swap! calls conj {:method method :params params})
-                              (if (= 1 (count @calls))
-                                (js/Promise.reject (js/Error. "unsupported typed data format"))
-                                (js/Promise.resolve signature))))})
+                  :nonce 1700000000999}
+          provider #js {:request (fn [payload]
+                                   (let [method (aget payload "method")
+                                         params (array-seq (aget payload "params"))]
+                                     (swap! calls conj {:method method :params params})
+                                     (if (= 1 (count @calls))
+                                       (js/Promise.reject (js/Error. "unsupported typed data format"))
+                                       (js/Promise.resolve signature))))}]
+      (wallet/reset-provider-registry!)
+      (wallet/set-provider-override! provider)
       (-> (signing/sign-approve-agent-action! address action)
           (.then (fn [signed]
                    (let [result (js->clj signed :keywordize-keys true)]
@@ -247,31 +249,93 @@
                      (is (= (str "0x" r) (:r result)))
                      (is (= (str "0x" s) (:s result)))
                      (is (= 28 (:v result)))
+                     (wallet/reset-provider-registry!)
                      (set! (.-ethereum js/globalThis) original-provider)
                      (done))))
           (.catch (fn [err]
+                    (wallet/reset-provider-registry!)
                     (set! (.-ethereum js/globalThis) original-provider)
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
 (deftest sign-approve-agent-action-errors-when-provider-missing-test
   (async done
-    (let [original-provider (.-ethereum js/globalThis)
+    (let [window* (.-window js/globalThis)
+          original-provider (.-ethereum js/globalThis)
+          original-window-provider (some-> window* (aget "ethereum"))
           address "0x1234567890abcdef1234567890abcdef12345678"
           action {:hyperliquidChain "Mainnet"
                   :signatureChainId "0xa4b1"
                   :agentAddress "0x9999999999999999999999999999999999999999"
                   :agentName ""
                   :nonce 1700000000999}]
+      (wallet/reset-provider-registry!)
       (set! (.-ethereum js/globalThis) nil)
+      (when window*
+        (js-delete window* "ethereum"))
       (-> (signing/sign-approve-agent-action! address action)
           (.then (fn [_]
+                   (wallet/reset-provider-registry!)
+                   (when window*
+                     (if (some? original-window-provider)
+                       (aset window* "ethereum" original-window-provider)
+                       (js-delete window* "ethereum")))
                    (set! (.-ethereum js/globalThis) original-provider)
                    (is false "Expected signing to fail when provider is missing")
                    (done)))
           (.catch (fn [err]
+                    (wallet/reset-provider-registry!)
+                    (when window*
+                      (if (some? original-window-provider)
+                        (aset window* "ethereum" original-window-provider)
+                        (js-delete window* "ethereum")))
                     (set! (.-ethereum js/globalThis) original-provider)
                     (let [message (or (some-> err .-message str)
                                       (str err))]
                       (is (str/includes? message "No wallet provider found.")))
+                    (done)))))))
+
+(deftest sign-approve-agent-action-uses-selected-wallet-provider-test
+  (async done
+    (let [original-provider (.-ethereum js/globalThis)
+          calls (atom [])
+          r (apply str (repeat 64 "c"))
+          s (apply str (repeat 64 "d"))
+          signature (str "0x" r s "1b")
+          address "0x1234567890abcdef1234567890abcdef12345678"
+          action {:hyperliquidChain "Mainnet"
+                  :signatureChainId "0xa4b1"
+                  :agentAddress "0x9999999999999999999999999999999999999999"
+                  :agentName ""
+                  :nonce 1700000000999}
+          selected-provider #js {:request (fn [payload]
+                                            (swap! calls conj
+                                                   [:selected
+                                                    (aget payload "method")])
+                                            (js/Promise.resolve signature))}
+          global-provider #js {:request (fn [payload]
+                                          (swap! calls conj
+                                                 [:global
+                                                  (aget payload "method")])
+                                          (js/Promise.reject
+                                           (js/Error. "wrong provider")))}]
+      (wallet/reset-provider-registry!)
+      (set! (.-ethereum js/globalThis) global-provider)
+      (wallet/set-provider-override! selected-provider)
+      (-> (signing/sign-approve-agent-action! address action)
+          (.then (fn [signed]
+                   (let [result (js->clj signed :keywordize-keys true)]
+                     (is (= [[:selected "eth_signTypedData_v4"]]
+                            @calls))
+                     (is (= signature (:sig result)))
+                     (is (= (str "0x" r) (:r result)))
+                     (is (= (str "0x" s) (:s result)))
+                     (is (= 27 (:v result)))
+                     (wallet/reset-provider-registry!)
+                     (set! (.-ethereum js/globalThis) original-provider)
+                     (done))))
+          (.catch (fn [err]
+                    (wallet/reset-provider-registry!)
+                    (set! (.-ethereum js/globalThis) original-provider)
+                    (is false (str "Unexpected error: " err))
                     (done)))))))

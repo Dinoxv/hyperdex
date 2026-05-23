@@ -100,9 +100,11 @@
      :connecting? (boolean (:connecting? wallet-state))
      :trigger-label (or short-address "Connected")
      :menu-address-label (or short-address "Unavailable")
+     :providers (:providers wallet-state)
      :copy-feedback (:copy-feedback wallet-state)
      :copy-action [[:actions/copy-wallet-address]]
      :disconnect-action [[:actions/disconnect-wallet]]
+     :agent-error (some-> wallet-state :agent :error str not-empty)
      :enable-trading (enable-trading-vm (:agent wallet-state))
      :connect-action [[:actions/connect-wallet]]}))
 

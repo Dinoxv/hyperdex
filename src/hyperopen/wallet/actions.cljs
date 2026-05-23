@@ -1,8 +1,9 @@
 (ns hyperopen.wallet.actions)
 
 (defn connect-wallet-action
-  [_]
-  [[:effects/connect-wallet]])
+  [_ & [provider-id]]
+  [(cond-> [:effects/connect-wallet]
+     (seq provider-id) (conj provider-id))])
 
 (defn disconnect-wallet-action
   [_]

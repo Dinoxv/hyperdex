@@ -62,6 +62,31 @@
     (is (contains? connect-text "Connect Wallet"))
     (is (nil? trigger))))
 
+(deftest disconnected-header-renders-provider-menu-for-multiple-wallets-test
+  (let [view (header-view/header-view
+              {:wallet {:connected? false
+                        :connecting? false
+                        :providers [{:id "legacy:metamask"
+                                     :name "MetaMask"
+                                     :rdns "io.metamask"}
+                                    {:id "legacy:coinbase"
+                                     :name "Coinbase Wallet"
+                                     :rdns "com.coinbase.wallet"}]}})
+        details-node (find-node-by-role view "wallet-connect-provider-details")
+        menu-node (find-node-by-role view "wallet-provider-menu")
+        coinbase-node (find-node #(and (= "wallet-connect-provider"
+                                          (get-in % [1 :data-role]))
+                                      (= "legacy:coinbase"
+                                         (get-in % [1 :data-provider-id])))
+                                  view)]
+    (is (some? details-node))
+    (is (some? menu-node))
+    (is (some? coinbase-node))
+    (is (= [[:actions/connect-wallet "legacy:coinbase"]]
+           (get-in coinbase-node [1 :on :click])))
+    (is (contains? (set (collect-strings coinbase-node))
+                   "Coinbase Wallet"))))
+
 (deftest header-does-not-render-parity-attr-maps-as-visible-text-test
   (let [view (header-view/header-view {:wallet {:connected? false}})
         all-text (collect-strings view)]
@@ -378,6 +403,17 @@
            (get-in enable-button [1 :on :click])))
     (is (= [[:actions/disconnect-wallet]]
            (get-in disconnect-button [1 :on :click])))))
+
+(deftest wallet-menu-renders-agent-error-message-test
+  (let [message "Must deposit before performing actions."
+        view (header-view/header-view {:wallet {:connected? true
+                                                :address connected-address
+                                                :agent {:status :error
+                                                        :error message}}})
+        error-row (find-node-by-role view "wallet-agent-error")
+        text (set (collect-strings error-row))]
+    (is (some? error-row))
+    (is (contains? text message))))
 
 (deftest wallet-menu-hides-enable-button-when-trading-ready-test
   (let [view (header-view/header-view {:wallet {:connected? true

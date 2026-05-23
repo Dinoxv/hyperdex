@@ -35,10 +35,25 @@
   (parse-chain-id-int
    (agent-session/default-signature-chain-id-for-environment false)))
 
+(defn- supported-wallet-signature-chain-id
+  [wallet-chain-id]
+  (let [candidate (normalize-signature-chain-id wallet-chain-id)
+        candidate-int (parse-chain-id-int candidate)
+        mainnet-chain-id (agent-session/default-signature-chain-id-for-environment true)
+        testnet-chain-id (agent-session/default-signature-chain-id-for-environment false)]
+    (cond
+      (= candidate-int (parse-chain-id-int mainnet-chain-id))
+      mainnet-chain-id
+
+      (= candidate-int (parse-chain-id-int testnet-chain-id))
+      testnet-chain-id
+
+      :else nil)))
+
 (defn resolve-user-signing-context
   [store]
   (let [wallet-chain-id (get-in @store [:wallet :chain-id])
-        signature-chain-id (or (normalize-signature-chain-id wallet-chain-id)
+        signature-chain-id (or (supported-wallet-signature-chain-id wallet-chain-id)
                                (agent-session/default-signature-chain-id-for-environment true))
         chain-id-int (parse-chain-id-int signature-chain-id)]
     {:signature-chain-id signature-chain-id

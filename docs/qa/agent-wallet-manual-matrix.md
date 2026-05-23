@@ -12,6 +12,8 @@ This matrix complements automated tests by covering wallet-provider behavior, ex
 - Wallet providers:
 - MetaMask software account
 - MetaMask + hardware wallet account
+- Coinbase Wallet extension account
+- Multi-provider desktop profile with MetaMask and Coinbase Wallet installed
 - Networks:
 - Arbitrum mainnet (`0xa4b1`) for production-like checks
 - App persistence modes:

@@ -48,9 +48,23 @@
               :data-role "wallet-enable-trading"}
      label]))
 
+(defn- wallet-agent-error-row
+  [message]
+  (when (seq message)
+    [:div {:class ["px-3"
+                   "pb-2"
+                   "text-xs"
+                   "font-medium"
+                   "leading-snug"
+                   "text-error"]
+           :aria-live "polite"
+           :data-role "wallet-agent-error"}
+     message]))
+
 (defn- wallet-menu
-  [{:keys [copy-action copy-feedback disconnect-action enable-trading menu-address-label]}]
-  (let [enable-trading-cta (enable-trading-button enable-trading)]
+  [{:keys [agent-error copy-action copy-feedback disconnect-action enable-trading menu-address-label]}]
+  (let [agent-error-row (wallet-agent-error-row agent-error)
+        enable-trading-cta (enable-trading-button enable-trading)]
     [:div {:class ["ui-dropdown-panel"
                    "absolute"
                    "right-0"
@@ -90,6 +104,8 @@
      (when (and (map? copy-feedback)
                 (seq (:message copy-feedback)))
        (wallet-copy-feedback-row copy-feedback))
+     (when agent-error-row
+       agent-error-row)
      (when enable-trading-cta
        enable-trading-cta)
      (when enable-trading-cta
@@ -164,10 +180,88 @@
      [[:span {:class ["sm:hidden"]} "Connect"]
       [:span {:class ["hidden" "sm:inline"]} "Connect Wallet"]])))
 
+(defn- provider-connect-action
+  [provider]
+  (let [provider-id (:id provider)]
+    (if (seq provider-id)
+      [[:actions/connect-wallet provider-id]]
+      [[:actions/connect-wallet]])))
+
+(defn- provider-connect-option
+  [provider connecting?]
+  [:button {:class ["flex"
+                    "w-full"
+                    "items-center"
+                    "justify-between"
+                    "gap-3"
+                    "px-3"
+                    "py-2"
+                    "text-left"
+                    "text-xs"
+                    "text-trading-text"
+                    "hover:bg-trading-border/30"
+                    "transition-colors"]
+            :disabled connecting?
+            :on {:click (provider-connect-action provider)}
+            :data-role "wallet-connect-provider"
+            :data-provider-id (:id provider)}
+   [:span {:class ["truncate"]} (:name provider)]
+   (when-let [rdns (:rdns provider)]
+     [:span {:class ["hidden"
+                     "max-w-[8rem]"
+                     "truncate"
+                     "text-xs"
+                     "text-trading-muted"
+                     "sm:inline"]}
+      rdns])])
+
+(defn- provider-connect-menu
+  [{:keys [connecting? providers]}]
+  (if connecting?
+    (connect-wallet-button {:connect-action [[:actions/connect-wallet]]
+                            :connecting? true})
+    [:details {:class ["relative" "group"]
+               :data-role "wallet-connect-provider-details"}
+     [:summary {:class ["bg-teal-700"
+                        "hover:bg-teal-800"
+                        "text-white"
+                        "inline-flex"
+                        "h-9"
+                        "cursor-pointer"
+                        "list-none"
+                        "items-center"
+                        "justify-center"
+                        "px-3"
+                        "rounded-lg"
+                        "text-xs"
+                        "sm:text-sm"
+                        "font-medium"
+                        "transition-colors"
+                        "[&::-webkit-details-marker]:hidden"]
+                :data-role "wallet-connect-button"}
+      [:span {:class ["sm:hidden"]} "Connect"]
+      [:span {:class ["hidden" "sm:inline"]} "Connect Wallet"]]
+     [:div {:class ["absolute"
+                    "right-0"
+                    "z-50"
+                    "mt-2"
+                    "w-64"
+                    "overflow-hidden"
+                    "rounded-lg"
+                    "border"
+                    "border-trading-border"
+                    "bg-[#071a1f]"
+                    "shadow-xl"]
+            :data-role "wallet-provider-menu"}
+      (for [provider providers]
+        (provider-connect-option provider connecting?))]]))
+
 (defn render
-  [{:keys [connected?] :as wallet}]
+  [{:keys [connected? providers] :as wallet}]
   (if connected?
     [:details {:class ["relative" "group"] :data-role "wallet-menu-details"}
      (wallet-trigger wallet)
      (wallet-menu wallet)]
-    (connect-wallet-button wallet)))
+    (if (> (count providers) 1)
+      (provider-connect-menu wallet)
+      (connect-wallet-button wallet))))

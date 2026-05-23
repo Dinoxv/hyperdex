@@ -68,6 +68,9 @@
 (deftest debug-exchange-simulator-snapshot-records-approve-agent-consumption-test
   (async done
     (let [original-sign signing/sign-approve-agent-action!
+          cleanup! (fn []
+                     (trading/clear-debug-exchange-simulator!)
+                     (set! signing/sign-approve-agent-action! original-sign))
           action {:type "approveAgent"
                   :agentAddress "0x9999999999999999999999999999999999999999"
                   :nonce 1700000006666
@@ -95,14 +98,12 @@
                                      :responseStatus "ok"
                                      :remainingResponses 0}]
                                    (:calls snapshot)))
+                            (cleanup!)
                             (done)))))))
           (.catch (fn [err]
+                    (cleanup!)
                     (is false (str "Unexpected error: " err))
-                    (done)))
-          (.finally
-           (fn []
-             (trading/clear-debug-exchange-simulator!)
-             (set! signing/sign-approve-agent-action! original-sign)))))))
+                    (done)))))))
 
 (deftest parse-json-private-helper-parses-text-json-and-validates-contract-test
   (async done
@@ -163,7 +164,15 @@
     (is (= {:signature-chain-id "0xa4b1"
             :hyperliquid-chain "Mainnet"}
            (@#'hyperopen.api.trading/resolve-user-signing-context
-            (atom {:wallet {}}))))))
+            (atom {:wallet {}}))))
+    (is (= {:signature-chain-id "0xa4b1"
+            :hyperliquid-chain "Mainnet"}
+           (@#'hyperopen.api.trading/resolve-user-signing-context
+            (atom {:wallet {:chain-id "0x1"}}))))
+    (is (= {:signature-chain-id "0x66eee"
+            :hyperliquid-chain "Testnet"}
+           (@#'hyperopen.api.trading/resolve-user-signing-context
+            (atom {:wallet {:chain-id "0x66eee"}}))))))
 
 (deftest post-signed-action-private-helper-includes-optional-fields-test
   (async done
@@ -306,7 +315,11 @@
           restore-fetch! (support/install-fetch-stub!
                           (fn [_url _opts]
                             (reset! fetch-called? true)
-                            (js/Promise.resolve #js {:ok true})))
+                                          (js/Promise.resolve #js {:ok true})))
+          cleanup! (fn []
+                     (trading/clear-debug-exchange-simulator!)
+                     (set! signing/sign-approve-agent-action! original-sign)
+                     (restore-fetch!))
           action {:type "approveAgent"
                   :agentAddress "0x9999999999999999999999999999999999999999"
                   :nonce 1700000005555
@@ -329,12 +342,9 @@
                                 (is (= {:status "ok"
                                         :response {:source "simulator"}}
                                        (js->clj body :keywordize-keys true)))
+                                (cleanup!)
                                 (done))))))
           (.catch (fn [err]
+                    (cleanup!)
                     (is false (str "Unexpected error: " err))
-                    (done)))
-          (.finally
-           (fn []
-             (trading/clear-debug-exchange-simulator!)
-             (set! signing/sign-approve-agent-action! original-sign)
-             (restore-fetch!)))))))
+                    (done)))))))

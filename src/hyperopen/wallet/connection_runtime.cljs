@@ -2,9 +2,11 @@
   (:require [clojure.string :as str]))
 
 (defn connect-wallet!
-  [{:keys [store log-fn request-connection!]}]
+  [{:keys [store log-fn request-connection! provider-id]}]
   (log-fn "Connecting wallet...")
-  (request-connection! store))
+  (if (seq provider-id)
+    (request-connection! store provider-id)
+    (request-connection! store)))
 
 (defn disconnect-wallet!
   [{:keys [store
