@@ -104,6 +104,18 @@
 (def save-portfolio-optimizer-scenario-from-current
   run/save-portfolio-optimizer-scenario-from-current)
 
+(def open-portfolio-optimizer-scenario-save-modal
+  run/open-portfolio-optimizer-scenario-save-modal)
+
+(def close-portfolio-optimizer-scenario-save-modal
+  run/close-portfolio-optimizer-scenario-save-modal)
+
+(def set-portfolio-optimizer-scenario-save-name
+  run/set-portfolio-optimizer-scenario-save-name)
+
+(def confirm-portfolio-optimizer-scenario-save
+  run/confirm-portfolio-optimizer-scenario-save)
+
 (def open-portfolio-optimizer-execution-modal
   execution/open-portfolio-optimizer-execution-modal)
 

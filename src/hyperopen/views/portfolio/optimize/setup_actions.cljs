@@ -65,7 +65,7 @@
                        "disabled:cursor-not-allowed" "disabled:text-trading-muted"]
                :data-role "portfolio-optimizer-save-scenario"
                :disabled (or (not solved-run?) saving-scenario?)
-               :on {:click [[:actions/save-portfolio-optimizer-scenario-from-current]]}}
+               :on {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]}}
       (if saving-scenario? "Saving" "Save draft")]
      [:div {:class ["flex" "max-w-full" "flex-col" "items-start" "gap-1.5" "font-mono"
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}

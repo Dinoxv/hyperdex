@@ -90,6 +90,12 @@
    :completed-at-ms nil
    :error nil})
 
+(defn default-scenario-save-modal-state
+  []
+  {:open? false
+   :name ""
+   :error nil})
+
 (defn default-scenario-index-load-state
   []
   {:status :idle
@@ -162,6 +168,7 @@
    :history-load-state (default-history-load-state)
    :optimization-progress (default-optimization-progress-state)
    :scenario-save-state (default-scenario-save-state)
+   :scenario-save-modal (default-scenario-save-modal-state)
    :scenario-index-load-state (default-scenario-index-load-state)
    :scenario-load-state (default-scenario-load-state)
    :scenario-archive-state (default-scenario-archive-state)

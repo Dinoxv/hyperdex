@@ -277,6 +277,18 @@
 (def save-portfolio-optimizer-scenario-from-current-action
   portfolio-optimizer-actions/save-portfolio-optimizer-scenario-from-current)
 
+(def open-portfolio-optimizer-scenario-save-modal-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-scenario-save-modal)
+
+(def close-portfolio-optimizer-scenario-save-modal-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-scenario-save-modal)
+
+(def set-portfolio-optimizer-scenario-save-name-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-scenario-save-name)
+
+(def confirm-portfolio-optimizer-scenario-save-action
+  portfolio-optimizer-actions/confirm-portfolio-optimizer-scenario-save)
+
 (def load-portfolio-optimizer-route-action
   portfolio-optimizer-actions/load-portfolio-optimizer-route)
 

@@ -252,6 +252,26 @@
           :actions/save-portfolio-optimizer-scenario-from-current
           []
           {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
+          :actions/open-portfolio-optimizer-scenario-save-modal
+          []
+          {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
+          :actions/close-portfolio-optimizer-scenario-save-modal
+          []
+          {:phase :test})))
+  (is (= ["May Rotation"]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-scenario-save-name
+          ["May Rotation"]
+          {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
+          :actions/confirm-portfolio-optimizer-scenario-save
+          []
+          {:phase :test})))
   (is (= ["/portfolio/optimize/scn_01"]
          (contracts/assert-action-args!
           :actions/load-portfolio-optimizer-route

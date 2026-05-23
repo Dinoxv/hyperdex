@@ -81,7 +81,7 @@
     (is (= false (get-in run-button [1 :disabled])))
     (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions run-button)))
-    (is (= [[:actions/save-portfolio-optimizer-scenario-from-current]]
+    (is (= [[:actions/open-portfolio-optimizer-scenario-save-modal]]
            (click-actions save-button)))))
 
 (deftest setup-black-litterman-insight-cards-render-empty-view-state-test

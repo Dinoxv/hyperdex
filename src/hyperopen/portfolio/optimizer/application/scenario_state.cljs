@@ -38,6 +38,12 @@
    :completed-at-ms completed-at-ms
    :error {:message (error-message err)}})
 
+(defn closed-scenario-save-modal-state
+  []
+  {:open? false
+   :name ""
+   :error nil})
+
 (defn begin-scenario-index-load-state
   [started-at-ms]
   {:status :loading
@@ -162,16 +168,20 @@
       (assoc-in contracts/scenario-save-state-path
                 (saved-scenario-save-state (:id scenario-record)
                                            started-at-ms
-                                           completed-at-ms))))
+                                           completed-at-ms))
+      (assoc-in contracts/scenario-save-modal-path
+                (closed-scenario-save-modal-state))))
 
 (defn apply-scenario-save-error
   [state scenario-id started-at-ms completed-at-ms err]
-  (assoc-in state
-            contracts/scenario-save-state-path
-            (failed-scenario-save-state scenario-id
-                                        started-at-ms
-                                        completed-at-ms
-                                        err)))
+  (let [message (error-message err)]
+    (-> state
+        (assoc-in contracts/scenario-save-state-path
+                  (failed-scenario-save-state scenario-id
+                                              started-at-ms
+                                              completed-at-ms
+                                              err))
+        (assoc-in contracts/scenario-save-modal-error-path message))))
 
 (defn apply-scenario-index-load-success
   [state scenario-index started-at-ms completed-at-ms]

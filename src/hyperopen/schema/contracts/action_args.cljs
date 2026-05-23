@@ -261,6 +261,10 @@
    :actions/set-portfolio-optimizer-universe-from-current ::common/no-args
    :actions/load-portfolio-optimizer-history-from-draft ::common/no-args
    :actions/save-portfolio-optimizer-scenario-from-current ::common/no-args
+   :actions/open-portfolio-optimizer-scenario-save-modal ::common/no-args
+   :actions/close-portfolio-optimizer-scenario-save-modal ::common/no-args
+   :actions/set-portfolio-optimizer-scenario-save-name ::common/single-input-args
+   :actions/confirm-portfolio-optimizer-scenario-save ::common/no-args
    :actions/load-portfolio-optimizer-route ::common/path-args
    :actions/archive-portfolio-optimizer-scenario ::portfolio-optimizer-scenario-id-args
    :actions/duplicate-portfolio-optimizer-scenario ::portfolio-optimizer-scenario-id-args

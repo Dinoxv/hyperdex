@@ -1,10 +1,12 @@
 (ns hyperopen.portfolio.optimizer.actions.run
-  (:require [hyperopen.portfolio.optimizer.actions.common :as action-common]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as bl-common]
             [hyperopen.portfolio.optimizer.black-litterman-actions.editor-model :as bl-editor-model]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.optimizer.query-state :as optimizer-query-state]
             [hyperopen.portfolio.routes :as portfolio-routes]))
 
@@ -66,16 +68,76 @@
   (or (= :running (get-in state contracts/run-state-status-path))
       (= :running (get-in state contracts/optimization-progress-status-path))))
 
+(defn- current-solved-run?
+  [state]
+  (run-identity/current-solved-run?
+   {:draft (get-in state contracts/draft-path)
+    :readiness (setup-readiness/build-readiness state)
+    :run-state (get-in state contracts/run-state-path)
+    :running? (optimizer-running? state)
+    :last-successful-run (get-in state contracts/last-successful-run-path)}))
+
+(defn- non-blank-text
+  [value]
+  (let [text (some-> value str str/trim)]
+    (when (seq text)
+      text)))
+
+(defn- scenario-save-default-name
+  [state]
+  (or (non-blank-text (get-in state contracts/active-scenario-name-path))
+      (non-blank-text (get-in state contracts/draft-name-path))
+      "Untitled Optimization"))
+
+(defn- open-scenario-save-modal-effect
+  [state]
+  [:effects/save
+   contracts/scenario-save-modal-path
+   {:open? true
+    :name (scenario-save-default-name state)
+    :error nil}])
+
+(defn open-portfolio-optimizer-scenario-save-modal
+  [state]
+  [(open-scenario-save-modal-effect state)])
+
+(defn close-portfolio-optimizer-scenario-save-modal
+  [_state]
+  [[:effects/save
+    contracts/scenario-save-modal-path
+    (optimizer-defaults/default-scenario-save-modal-state)]])
+
+(defn set-portfolio-optimizer-scenario-save-name
+  [_state value]
+  [[:effects/save
+    (conj contracts/scenario-save-modal-path :name)
+    value]])
+
 (defn save-portfolio-optimizer-scenario-from-current
   [state]
-  (if (run-identity/current-solved-run?
-       {:draft (get-in state contracts/draft-path)
-        :readiness (setup-readiness/build-readiness state)
-        :run-state (get-in state contracts/run-state-path)
-        :running? (optimizer-running? state)
-        :last-successful-run (get-in state contracts/last-successful-run-path)})
-    [[:effects/save-portfolio-optimizer-scenario]]
+  (if (current-solved-run? state)
+    [(open-scenario-save-modal-effect state)]
     []))
+
+(defn confirm-portfolio-optimizer-scenario-save
+  [state]
+  (let [scenario-name (non-blank-text
+                       (get-in state
+                               (conj contracts/scenario-save-modal-path :name)))]
+    (cond
+      (nil? scenario-name)
+      [[:effects/save
+        contracts/scenario-save-modal-error-path
+        "Enter a scenario name before saving."]]
+
+      (not (current-solved-run? state))
+      [[:effects/save
+        contracts/scenario-save-modal-error-path
+        "Rerun this scenario before saving."]]
+
+      :else
+      [[:effects/save contracts/scenario-save-modal-error-path nil]
+       [:effects/save-portfolio-optimizer-scenario {:name scenario-name}]])))
 
 (defn- asset-selector-market-fetch-effects
   [state]

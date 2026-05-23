@@ -63,6 +63,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/load-portfolio-optimizer-history}}
 
+   :actions/confirm-portfolio-optimizer-scenario-save
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/save-portfolio-optimizer-scenario}}
+
    :actions/select-portfolio-returns-benchmark
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

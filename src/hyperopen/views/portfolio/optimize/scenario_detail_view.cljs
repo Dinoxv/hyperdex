@@ -105,7 +105,7 @@
                  :data-role "portfolio-optimizer-scenario-save"
                  :disabled save-disabled?
                  :on (when-not save-disabled?
-                       {:click [[:actions/save-portfolio-optimizer-scenario-from-current]]})}
+                       {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]})}
         (if saving? "Saving" "Save scenario")]
        [:button {:type "button"
                  :class ["rounded-lg"

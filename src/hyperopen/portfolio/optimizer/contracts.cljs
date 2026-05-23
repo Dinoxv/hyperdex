@@ -66,6 +66,8 @@
 (def scenario-index-load-state-path paths/scenario-index-load-state-path)
 (def scenario-archive-state-path paths/scenario-archive-state-path)
 (def scenario-duplicate-state-path paths/scenario-duplicate-state-path)
+(def scenario-save-modal-path paths/scenario-save-modal-path)
+(def scenario-save-modal-error-path paths/scenario-save-modal-error-path)
 (def last-successful-run-path paths/last-successful-run-path)
 (def last-successful-run-result-path paths/last-successful-run-result-path)
 (def execution-modal-path paths/execution-modal-path)

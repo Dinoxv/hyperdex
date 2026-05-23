@@ -150,7 +150,8 @@
    :load-scenario! *load-scenario!*
    :load-tracking! *load-tracking!*
    :save-scenario! *save-scenario!*
-   :save-scenario-index! *save-scenario-index!*})
+   :save-scenario-index! *save-scenario-index!*
+   :dispatch! *dispatch!*})
 
 (defn- execution-env
   []

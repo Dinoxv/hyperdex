@@ -6,7 +6,7 @@
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [click-actions collect-nodes collect-strings node-by-role]]))
+             :refer [click-actions collect-nodes collect-strings input-actions node-attr node-by-role]]))
 
 (defn- ready-scenario-state
   [scenario-id return-model]
@@ -361,7 +361,39 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
-    (is (= false (get-in save-button [1 :disabled])))))
+    (is (= false (get-in save-button [1 :disabled])))
+    (is (= [[:actions/open-portfolio-optimizer-scenario-save-modal]]
+           (click-actions save-button)))))
+
+(deftest portfolio-optimizer-scenario-save-modal-collects-name-before-save-test
+  (let [scenario-id "draft"
+        state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state state)
+        view-node (portfolio-view/portfolio-view
+                   (-> state
+                       (assoc-in [:portfolio :optimizer :run-state :request-signature]
+                                 (:request-signature solved-run))
+                       (assoc-in [:portfolio :optimizer :last-successful-run]
+                                 solved-run)
+                       (assoc-in [:portfolio :optimizer :scenario-save-modal]
+                                 {:open? true
+                                  :name "May Rotation"
+                                  :error nil})))
+        modal (node-by-role view-node "portfolio-optimizer-scenario-save-modal")
+        input (node-by-role view-node "portfolio-optimizer-scenario-save-name")
+        confirm (node-by-role view-node "portfolio-optimizer-scenario-save-confirm")
+        cancel (node-by-role view-node "portfolio-optimizer-scenario-save-cancel")
+        strings (set (collect-strings modal))]
+    (is (some? modal))
+    (is (contains? strings "Save scenario as"))
+    (is (= "May Rotation" (node-attr input :value)))
+    (is (= [[:actions/set-portfolio-optimizer-scenario-save-name
+             [:event.target/value]]]
+           (input-actions input)))
+    (is (= [[:actions/confirm-portfolio-optimizer-scenario-save]]
+           (click-actions confirm)))
+    (is (= [[:actions/close-portfolio-optimizer-scenario-save-modal]]
+           (click-actions cancel)))))
 
 (deftest portfolio-optimizer-scenario-detail-retains-recommendation-while-recomputing-test
   (let [scenario-id "scn_recompute"

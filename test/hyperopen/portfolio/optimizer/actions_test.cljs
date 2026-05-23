@@ -17,6 +17,9 @@
 (def ^:private dirty-path
   [:portfolio :optimizer :draft :metadata :dirty?])
 
+(def ^:private scenario-save-modal-path
+  [:portfolio :optimizer :scenario-save-modal])
+
 (defn- deep-merge
   [& maps]
   (apply merge-with
@@ -259,7 +262,11 @@
 
 (deftest save-portfolio-optimizer-scenario-from-current-requires-solved-run-test
   (let [state (ready-optimizer-state {:kind :historical-mean})]
-    (is (= [[:effects/save-portfolio-optimizer-scenario]]
+    (is (= [[:effects/save
+              scenario-save-modal-path
+              {:open? true
+               :name "Untitled Optimization"
+               :error nil}]]
            (actions/save-portfolio-optimizer-scenario-from-current
             (assoc-in state
                       [:portfolio :optimizer :last-successful-run]
@@ -307,8 +314,39 @@
                              solved-run)
                    (assoc-in [:webdata2 :clearinghouseState :marginSummary :accountValue]
                              "2000"))]
-    (is (= [[:effects/save-portfolio-optimizer-scenario]]
+    (is (= [[:effects/save
+              scenario-save-modal-path
+              {:open? true
+               :name "Untitled Optimization"
+               :error nil}]]
            (actions/save-portfolio-optimizer-scenario-from-current state*)))))
+
+(deftest confirm-portfolio-optimizer-scenario-save-requires-name-test
+  (is (= [[:effects/save
+           (conj scenario-save-modal-path :error)
+           "Enter a scenario name before saving."]]
+         (actions/confirm-portfolio-optimizer-scenario-save
+          (assoc-in (ready-optimizer-state {:kind :historical-mean})
+                    scenario-save-modal-path
+                    {:open? true
+                     :name "  "
+                     :error nil})))))
+
+(deftest confirm-portfolio-optimizer-scenario-save-passes-trimmed-name-test
+  (let [state (ready-optimizer-state {:kind :historical-mean})
+        state* (-> state
+                   (assoc-in [:portfolio :optimizer :last-successful-run]
+                             (solved-run-for-state state))
+                   (assoc-in scenario-save-modal-path
+                             {:open? true
+                              :name "  May Rotation  "
+                              :error nil}))]
+    (is (= [[:effects/save
+             (conj scenario-save-modal-path :error)
+             nil]
+            [:effects/save-portfolio-optimizer-scenario
+             {:name "May Rotation"}]]
+           (actions/confirm-portfolio-optimizer-scenario-save state*)))))
 
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]

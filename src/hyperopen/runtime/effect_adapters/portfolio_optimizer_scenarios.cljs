@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios
-  (:require [hyperopen.account.context :as account-context]
+  (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.application.scenario-operations :as scenario-operations]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -16,16 +17,35 @@
         (.catch (fn [_err] nil)))
     (js/Promise.resolve nil)))
 
+(def ^:private reserved-unsaved-scenario-ids
+  #{"draft"})
+
+(defn- saved-scenario-id
+  [scenario-id]
+  (let [scenario-id* (some-> scenario-id str str/trim)]
+    (when (and (seq scenario-id*)
+               (not (contains? reserved-unsaved-scenario-ids scenario-id*))
+               (not (str/starts-with? scenario-id* "draft-")))
+      scenario-id*)))
+
+(defn- scenario-name
+  [opts]
+  (let [scenario-name* (some-> (:name opts) str str/trim)]
+    (when (seq scenario-name*)
+      scenario-name*)))
+
 (defn- current-scenario-id
   [env state opts now-ms]
   (let [route-kind (:kind (portfolio-routes/parse-portfolio-route
                            (get-in state [:router :path])))
         new-route? (= :optimize-new route-kind)]
-    (or (:scenario-id opts)
+    (or (saved-scenario-id (:scenario-id opts))
         (when-not new-route?
-          (get-in state contracts/active-scenario-loaded-id-path))
+          (saved-scenario-id
+           (get-in state contracts/active-scenario-loaded-id-path)))
         (when-not new-route?
-          (get-in state contracts/draft-id-path))
+          (saved-scenario-id
+           (get-in state contracts/draft-id-path)))
         ((env-fn env :next-scenario-id) now-ms))))
 
 (defn- apply-result!
@@ -53,6 +73,18 @@
 (defn- complete-operation-result
   [operation state completed-at-ms]
   (scenario-operations/complete operation state completed-at-ms))
+
+(defn- dispatch-saved-scenario-route!
+  [env store scenario-record]
+  (when-let [scenario-id (saved-scenario-id (:id scenario-record))]
+    (let [path (portfolio-routes/portfolio-optimize-scenario-path scenario-id)
+          current-path (get-in @store [:router :path])
+          dispatch! (env-fn env :dispatch!)]
+      (when (and path
+                 current-path
+                 dispatch!
+                 (not= current-path path))
+        (dispatch! store nil [[:actions/navigate path {:replace? true}]])))))
 
 (defn- continue-after-scenario-record
   [operation state command scenario-record completed-at-ms]
@@ -151,13 +183,20 @@
              (:address command)
              (:scenario-index command))
             (.then (fn [_]
-                     (interpret-result!
-                      env
-                      store
-                      operation*
-                      (complete-operation-result operation*
-                                                 @store
-                                                 (now-ms-fn)))))
+                     (-> (interpret-result!
+                          env
+                          store
+                          operation*
+                          (complete-operation-result operation*
+                                                     @store
+                                                     (now-ms-fn)))
+                         (.then (fn [value]
+                                  (when (= :save (:operation/type operation*))
+                                    (dispatch-saved-scenario-route!
+                                     env
+                                     store
+                                     (:scenario-record operation*)))
+                                  value)))))
             (.catch (fn [err]
                       (fail-operation! env store operation* err)))))
 
@@ -266,13 +305,15 @@
         state @store
         address (account-context/effective-account-address state)
         started-at-ms ((env-fn env :now-ms))
-        scenario-id (current-scenario-id env state opts* started-at-ms)]
+        scenario-id (current-scenario-id env state opts* started-at-ms)
+        scenario-name* (scenario-name opts*)]
     (interpret-result!
      env
      store
      {:operation/type :save
       :address address
       :scenario-id scenario-id
+      :scenario-name scenario-name*
       :started-at-ms started-at-ms}
      (scenario-workflow/begin-save
       {:state state

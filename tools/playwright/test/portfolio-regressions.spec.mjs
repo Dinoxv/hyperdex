@@ -354,6 +354,22 @@ async function seedPortfolioVolumeHistory(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedPortfolioWalletAddress(page, address) {
+  await page.evaluate((walletAddress) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    c.reset_BANG_(
+      globalThis.hyperopen.system.store,
+      c.assoc_in(
+        c.deref(globalThis.hyperopen.system.store),
+        c.PersistentVector.fromArray([kw("wallet"), kw("address")], true),
+        walletAddress
+      )
+    );
+  }, address);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedOptimizerAssetSelectorMarkets(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
@@ -790,6 +806,52 @@ async function putOptimizerRecord(page, key, payload) {
   }, { key, payload });
 }
 
+async function readOptimizerRecord(page, key) {
+  return await page.evaluate(async (recordKey) => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("hyperopen-persistence", 6);
+      request.onsuccess = (event) => resolve(event.target.result);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("IndexedDB open blocked"));
+    });
+
+    const record = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(["portfolio-optimizer"], "readonly");
+      const store = transaction.objectStore("portfolio-optimizer");
+      const request = store.get(recordKey);
+      request.onsuccess = (event) => resolve(event.target.result || null);
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    db.close();
+    return record;
+  }, key);
+}
+
+async function readOptimizerKeys(page) {
+  return await page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("hyperopen-persistence", 6);
+      request.onsuccess = (event) => resolve(event.target.result);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("IndexedDB open blocked"));
+    });
+
+    const keys = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(["portfolio-optimizer"], "readonly");
+      const store = transaction.objectStore("portfolio-optimizer");
+      const request = store.getAllKeys();
+      request.onsuccess = (event) => resolve(event.target.result || []);
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    db.close();
+    return keys;
+  });
+}
+
 async function seedPersistedOptimizerTrackingScenario(page) {
   await putOptimizerRecord(
     page,
@@ -801,6 +863,95 @@ async function seedPersistedOptimizerTrackingScenario(page) {
     `tracking::${OPTIMIZER_RELOAD_SCENARIO_ID}`,
     OPTIMIZER_RELOAD_TRACKING_EDN
   );
+}
+
+async function seedOptimizerDraftSaveState(page, placeholderId = "draft-current") {
+  await page.evaluate(({ address, placeholderId }) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const store = globalThis.hyperopen.system.store;
+    const state = c.deref(store);
+    const draft = c.get_in(state, path("portfolio", "optimizer", "draft")) || map([]);
+    const metadata = c.get(draft, kw("metadata")) || map([]);
+    const lastSuccessfulRun = c.get_in(
+      state,
+      path("portfolio", "optimizer", "last-successful-run")
+    );
+    const requestSignature =
+      c.get(lastSuccessfulRun, kw("request-signature")) ||
+      map([kw("scenario-id"), placeholderId]);
+    const draftScenario = c.assoc(
+      draft,
+      kw("id"), placeholderId,
+      kw("name"), "Draft Scenario",
+      kw("status"), kw("draft"),
+      kw("metadata"),
+      c.assoc(metadata, kw("dirty?"), false)
+    );
+    const activeScenario = map([
+      kw("loaded-id"), placeholderId,
+      kw("status"), kw("computed"),
+      kw("read-only?"), false
+    ]);
+    const runState = map([
+      kw("status"), kw("succeeded"),
+      kw("run-id"), "optimizer-draft-save-playwright",
+      kw("scenario-id"), placeholderId,
+      kw("request-signature"), requestSignature,
+      kw("started-at-ms"), 1777046000000,
+      kw("completed-at-ms"), 1777046000000,
+      kw("error"), null
+    ]);
+    const emptyScenarioIndex = map([
+      kw("ordered-ids"), vector([]),
+      kw("by-id"), map([])
+    ]);
+    let nextState = state;
+    nextState = c.assoc_in(nextState, path("wallet", "address"), address);
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "optimizer", "draft"),
+      draftScenario
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "optimizer", "active-scenario"),
+      activeScenario
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "optimizer", "run-state"),
+      runState
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "optimizer", "scenario-index"),
+      emptyScenarioIndex
+    );
+    c.reset_BANG_(store, nextState);
+  }, {
+    address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    placeholderId
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function readOptimizerSavedScenarioId(page) {
+  return await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const saveState = c.get_in(
+      c.deref(globalThis.hyperopen.system.store),
+      path("portfolio", "optimizer", "scenario-save-state")
+    );
+    return c.get(saveState, kw("scenario-id"));
+  });
 }
 
 async function enableOptimizerSpectateMode(page) {
@@ -1991,6 +2142,82 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   } else {
     expect(weights.some((weight) => Math.abs(weight) > 0.01)).toBe(true);
   }
+});
+
+test("portfolio optimizer saves draft scenarios under durable ids and reloads them from the index @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio/optimize");
+  await seedPersistedOptimizerTrackingScenario(page);
+  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+
+  const retainedDraftId = "draft-current";
+  await dispatch(page, [
+    ":actions/navigate",
+    `/portfolio/optimize/${retainedDraftId}`,
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedOptimizerDraftSaveState(page, retainedDraftId);
+
+  const draftDetail = page.locator("[data-role='portfolio-optimizer-scenario-detail-surface']");
+  const draftSave = page.locator("[data-role='portfolio-optimizer-scenario-save']");
+  await expect(draftDetail).toHaveAttribute("data-scenario-id", retainedDraftId);
+  await expect(draftSave).toBeEnabled();
+
+  await draftSave.click();
+  const saveModal = page.locator("[data-role='portfolio-optimizer-scenario-save-modal']");
+  const saveName = page.locator("[data-role='portfolio-optimizer-scenario-save-name']");
+  const saveConfirm = page.locator("[data-role='portfolio-optimizer-scenario-save-confirm']");
+  await expect(saveModal).toBeVisible();
+  await expect(saveName).toHaveValue("Draft Scenario");
+  await saveName.fill("May Rotation");
+  await saveConfirm.click();
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  const savedScenarioId = await readOptimizerSavedScenarioId(page);
+  expect(savedScenarioId).toMatch(/^scn_[0-9]+$/);
+  expect(savedScenarioId).not.toBe("draft");
+  await expect(page).toHaveURL(new RegExp(`/portfolio/optimize/${savedScenarioId}`));
+  await expect(saveModal).toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-loading-state']"))
+    .toHaveCount(0);
+
+  const optimizerKeys = await readOptimizerKeys(page);
+  expect(optimizerKeys).toContain(`scenario::${savedScenarioId}`);
+  expect(optimizerKeys).not.toContain("scenario::draft");
+  expect(optimizerKeys).not.toContain(`scenario::${retainedDraftId}`);
+
+  const indexRecord = await readOptimizerRecord(
+    page,
+    "scenario-index::0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  );
+  expect(indexRecord?.encoding).toBe("edn-v1");
+  expect(indexRecord?.payload).toContain(savedScenarioId);
+  expect(indexRecord?.payload).toContain("May Rotation");
+  expect(indexRecord?.payload).not.toContain('"draft"');
+  expect(indexRecord?.payload).not.toContain(`"${retainedDraftId}"`);
+
+  await page.reload();
+  await waitForDebugBridge(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
+
+  const savedRow = page.locator(`[data-role='portfolio-optimizer-scenario-row-${savedScenarioId}']`);
+  await expect(savedRow).toContainText("May Rotation");
+
+  await savedRow.click();
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-detail-surface']"))
+    .toHaveAttribute("data-scenario-id", savedScenarioId);
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-header']"))
+    .toContainText("May Rotation");
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-loading-state']"))
+    .toHaveCount(0);
 });
 
 test("portfolio optimizer persisted scenario hydrates results and tracking after reload @regression", async ({ page }) => {

@@ -104,6 +104,194 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest save-portfolio-optimizer-scenario-effect-creates-new-id-on-draft-route-test
+  (async done
+    (let [calls (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          solved-run (fixtures/sample-last-successful-run
+                      {:result {:expected-return 0.16
+                                :volatility 0.28}
+                       :computed-at-ms 2550})
+          store (atom {:router {:path "/portfolio/optimize/draft"}
+                       :wallet {:address address}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "draft"
+                                                      :status :computed}
+                                    :draft {:id "draft"
+                                            :name "Draft Scenario"
+                                            :objective {:kind :minimum-variance}
+                                            :return-model {:kind :historical-mean}
+                                            :risk-model {:kind :diagonal-shrink}
+                                            :metadata {:dirty? false}}
+                                    :scenario-index {:ordered-ids []
+                                                     :by-id {}}
+                                    :last-successful-run solved-run}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms* (fn [] 3600)
+                    portfolio-optimizer-adapters/*next-scenario-id*
+                    (fn [now-ms]
+                      (swap! calls conj [:next-id now-ms])
+                      "scn_3600")
+                    portfolio-optimizer-adapters/*load-scenario-index!*
+                    (fn [addr]
+                      (swap! calls conj [:load-index addr])
+                      (js/Promise.resolve nil))
+                    portfolio-optimizer-adapters/*save-scenario!*
+                    (fn [scenario-id record]
+                      (swap! calls conj [:save-scenario scenario-id record])
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*save-scenario-index!*
+                    (fn [addr index]
+                      (swap! calls conj [:save-index addr index])
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [store* ctx effects]
+                      (swap! calls conj [:dispatch store* ctx effects]))]
+        (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect
+             nil
+             store
+             {:name "May Rotation"})
+            (.then (fn [record]
+                     (is (= "scn_3600" (:id record)))
+                     (is (= "May Rotation" (:name record)))
+                     (is (= "May Rotation" (get-in record [:config :name])))
+                     (is (some #(= [:next-id 3600] %) @calls))
+                     (is (= "scn_3600"
+                            (second (first (filter #(= :save-scenario (first %))
+                                                   @calls)))))
+                     (is (not-any? #(and (= :save-scenario (first %))
+                                         (= "draft" (second %)))
+                                   @calls))
+                     (is (= ["scn_3600"]
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :ordered-ids])))
+                     (is (= "May Rotation"
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :by-id "scn_3600" :name])))
+                     (is (nil?
+                          (get-in @store
+                                  [:portfolio :optimizer :scenario-index :by-id "draft"])))
+                     (is (= [[:actions/navigate "/portfolio/optimize/scn_3600" {:replace? true}]]
+                            (some (fn [[kind _store ctx effects]]
+                                    (when (and (= :dispatch kind)
+                                               (nil? ctx))
+                                      effects))
+                                  @calls)))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(deftest save-portfolio-optimizer-scenario-effect-creates-new-id-for-retained-draft-id-test
+  (async done
+    (let [calls (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          solved-run (fixtures/sample-last-successful-run
+                      {:result {:expected-return 0.2
+                                :volatility 0.34}
+                       :computed-at-ms 2600})
+          store (atom {:router {:path "/portfolio/optimize/draft-current"}
+                       :wallet {:address address}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "draft-current"
+                                                      :status :computed}
+                                    :draft {:id "draft-current"
+                                            :name "Retained Draft"
+                                            :objective {:kind :minimum-variance}
+                                            :return-model {:kind :historical-mean}
+                                            :risk-model {:kind :diagonal-shrink}
+                                            :metadata {:dirty? false}}
+                                    :scenario-index {:ordered-ids []
+                                                     :by-id {}}
+                                    :last-successful-run solved-run}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms* (fn [] 3700)
+                    portfolio-optimizer-adapters/*next-scenario-id*
+                    (fn [now-ms]
+                      (swap! calls conj [:next-id now-ms])
+                      "scn_3700")
+                    portfolio-optimizer-adapters/*load-scenario-index!*
+                    (fn [addr]
+                      (swap! calls conj [:load-index addr])
+                      (js/Promise.resolve nil))
+                    portfolio-optimizer-adapters/*save-scenario!*
+                    (fn [scenario-id record]
+                      (swap! calls conj [:save-scenario scenario-id record])
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*save-scenario-index!*
+                    (fn [addr index]
+                      (swap! calls conj [:save-index addr index])
+                      (js/Promise.resolve true))]
+        (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect nil store)
+            (.then (fn [record]
+                     (is (= "scn_3700" (:id record)))
+                     (is (some #(= [:next-id 3700] %) @calls))
+                     (is (= "scn_3700"
+                            (second (first (filter #(= :save-scenario (first %))
+                                                   @calls)))))
+                     (is (not-any? #(and (= :save-scenario (first %))
+                                         (= "draft-current" (second %)))
+                                   @calls))
+                     (is (= ["scn_3700"]
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :ordered-ids])))
+                     (is (nil?
+                          (get-in @store
+                                  [:portfolio :optimizer :scenario-index :by-id "draft-current"])))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(deftest save-portfolio-optimizer-scenario-effect-preserves-loaded-saved-id-test
+  (async done
+    (let [calls (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          solved-run (fixtures/sample-last-successful-run
+                      {:result {:expected-return 0.22
+                                :volatility 0.31}
+                       :computed-at-ms 2650})
+          store (atom {:router {:path "/portfolio/optimize/scn_saved"}
+                       :wallet {:address address}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_saved"
+                                                      :status :saved}
+                                    :draft {:id "scn_saved"
+                                            :name "Saved Scenario"
+                                            :objective {:kind :minimum-variance}
+                                            :return-model {:kind :historical-mean}
+                                            :risk-model {:kind :diagonal-shrink}
+                                            :metadata {:dirty? false}}
+                                    :scenario-index {:ordered-ids ["scn_saved"]
+                                                     :by-id {"scn_saved" {:id "scn_saved"
+                                                                          :name "Saved Scenario"
+                                                                          :status :saved}}}
+                                    :last-successful-run solved-run}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms* (fn [] 3800)
+                    portfolio-optimizer-adapters/*next-scenario-id*
+                    (fn [now-ms]
+                      (swap! calls conj [:next-id now-ms])
+                      "scn_unexpected")
+                    portfolio-optimizer-adapters/*load-scenario-index!*
+                    (fn [addr]
+                      (swap! calls conj [:load-index addr])
+                      (js/Promise.resolve (get-in @store
+                                                  [:portfolio :optimizer :scenario-index])))
+                    portfolio-optimizer-adapters/*save-scenario!*
+                    (fn [scenario-id record]
+                      (swap! calls conj [:save-scenario scenario-id record])
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*save-scenario-index!*
+                    (fn [addr index]
+                      (swap! calls conj [:save-index addr index])
+                      (js/Promise.resolve true))]
+        (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect nil store)
+            (.then (fn [record]
+                     (is (= "scn_saved" (:id record)))
+                     (is (not-any? #(= :next-id (first %)) @calls))
+                     (is (= "scn_saved"
+                            (second (first (filter #(= :save-scenario (first %))
+                                                   @calls)))))
+                     (is (= ["scn_saved"]
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :ordered-ids])))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest load-portfolio-optimizer-scenario-index-effect-loads-address-scoped-index-test
   (async done
     (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

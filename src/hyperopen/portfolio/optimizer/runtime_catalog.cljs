@@ -96,6 +96,14 @@
     actions/load-portfolio-optimizer-history-from-draft
     :save-portfolio-optimizer-scenario-from-current
     actions/save-portfolio-optimizer-scenario-from-current
+    :open-portfolio-optimizer-scenario-save-modal
+    actions/open-portfolio-optimizer-scenario-save-modal
+    :close-portfolio-optimizer-scenario-save-modal
+    actions/close-portfolio-optimizer-scenario-save-modal
+    :set-portfolio-optimizer-scenario-save-name
+    actions/set-portfolio-optimizer-scenario-save-name
+    :confirm-portfolio-optimizer-scenario-save
+    actions/confirm-portfolio-optimizer-scenario-save
     :load-portfolio-optimizer-route
     actions/load-portfolio-optimizer-route
     :archive-portfolio-optimizer-scenario

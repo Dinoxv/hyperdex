@@ -46,6 +46,8 @@
 (def scenario-index-load-state-path (conj optimizer-path :scenario-index-load-state))
 (def scenario-archive-state-path (conj optimizer-path :scenario-archive-state))
 (def scenario-duplicate-state-path (conj optimizer-path :scenario-duplicate-state))
+(def scenario-save-modal-path (conj optimizer-path :scenario-save-modal))
+(def scenario-save-modal-error-path (conj scenario-save-modal-path :error))
 (def last-successful-run-path (conj optimizer-path :last-successful-run))
 (def last-successful-run-result-path (conj last-successful-run-path :result))
 (def execution-modal-path (conj optimizer-path :execution-modal))
@@ -126,6 +128,8 @@
    :optimizer/scenario-index-load-state scenario-index-load-state-path
    :optimizer/scenario-archive-state scenario-archive-state-path
    :optimizer/scenario-duplicate-state scenario-duplicate-state-path
+   :optimizer/scenario-save-modal scenario-save-modal-path
+   :optimizer/scenario-save-modal-error scenario-save-modal-error-path
    :optimizer/last-successful-run last-successful-run-path
    :optimizer/last-successful-run-result last-successful-run-result-path
    :optimizer/execution-modal execution-modal-path

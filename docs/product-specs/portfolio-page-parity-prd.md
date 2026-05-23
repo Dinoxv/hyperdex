@@ -1,7 +1,7 @@
 ---
 owner: product
 status: supporting
-last_reviewed: 2026-02-19
+last_reviewed: 2026-05-22
 review_cycle_days: 90
 source_of_truth: true
 ---

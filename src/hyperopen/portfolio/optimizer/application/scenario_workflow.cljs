@@ -177,9 +177,10 @@
      :commands []}))
 
 (defn continue-save-after-index
-  [{:keys [state address scenario-id started-at-ms loaded-index]}]
-  (let [draft (or (get-in state contracts/draft-path)
-                  (optimizer-defaults/default-draft))
+  [{:keys [state address scenario-id scenario-name started-at-ms loaded-index]}]
+  (let [draft (cond-> (or (get-in state contracts/draft-path)
+                          (optimizer-defaults/default-draft))
+                scenario-name (assoc :name scenario-name))
         last-successful-run (get-in state contracts/last-successful-run-path)
         existing-index (or (get-in state contracts/scenario-index-path)
                            (default-scenario-index))

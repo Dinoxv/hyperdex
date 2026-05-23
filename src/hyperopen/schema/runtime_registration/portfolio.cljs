@@ -124,6 +124,14 @@
    [:actions/set-portfolio-optimizer-universe-from-current :set-portfolio-optimizer-universe-from-current]
    [:actions/load-portfolio-optimizer-history-from-draft :load-portfolio-optimizer-history-from-draft]
    [:actions/save-portfolio-optimizer-scenario-from-current :save-portfolio-optimizer-scenario-from-current]
+   [:actions/open-portfolio-optimizer-scenario-save-modal
+    :open-portfolio-optimizer-scenario-save-modal]
+   [:actions/close-portfolio-optimizer-scenario-save-modal
+    :close-portfolio-optimizer-scenario-save-modal]
+   [:actions/set-portfolio-optimizer-scenario-save-name
+    :set-portfolio-optimizer-scenario-save-name]
+   [:actions/confirm-portfolio-optimizer-scenario-save
+    :confirm-portfolio-optimizer-scenario-save]
    [:actions/load-portfolio-optimizer-route :load-portfolio-optimizer-route]
    [:actions/archive-portfolio-optimizer-scenario :archive-portfolio-optimizer-scenario]
    [:actions/duplicate-portfolio-optimizer-scenario :duplicate-portfolio-optimizer-scenario]

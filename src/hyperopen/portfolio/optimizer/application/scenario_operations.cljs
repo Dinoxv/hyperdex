@@ -70,6 +70,7 @@
        {:state state
         :address (:address operation)
         :scenario-id (:scenario-id operation)
+        :scenario-name (:scenario-name operation)
         :started-at-ms (:started-at-ms operation)
         :loaded-index loaded-index}))}
 
