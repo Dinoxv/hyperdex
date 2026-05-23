@@ -45,6 +45,8 @@ async function seedRetainedDraftScenario(page) {
       kw("target-weights-by-instrument"), map(["perp:BTC", 1]),
       kw("current-weights-by-instrument"), map(["perp:BTC", 0.25]),
       kw("labels-by-instrument"), map(["perp:BTC", "BTC"]),
+      kw("current-expected-return"), 0.03,
+      kw("current-volatility"), 0.1,
       kw("expected-return"), 0.12,
       kw("volatility"), 0.2,
       kw("return-model"), kw("historical-mean"),
@@ -59,9 +61,13 @@ async function seedRetainedDraftScenario(page) {
         ])
       ]),
       kw("frontier-overlays"), map([]),
+      kw("current-performance"), map([
+        kw("in-sample-sharpe"), 0.3,
+        kw("shrunk-sharpe"), 0.15
+      ]),
       kw("performance"), map([
         kw("in-sample-sharpe"), 0.58,
-        kw("shrunk-sharpe"), 0.6
+        kw("shrunk-sharpe"), 0.29
       ]),
       kw("diagnostics"), map([
         kw("gross-exposure"), 1,
@@ -317,6 +323,12 @@ test("portfolio optimizer setup and retained draft detail routes render through 
     .toBeVisible();
   await expect(page.locator("[data-role='portfolio-optimizer-scenario-kpi-strip']"))
     .toContainText("Expected Return");
+  const sharpeKpi = page.locator("[data-role='portfolio-optimizer-scenario-kpi-sharpe']");
+  await expect(sharpeKpi).toContainText("Sharpe · current → target");
+  await expect(sharpeKpi).toContainText("0.3");
+  await expect(sharpeKpi).toContainText("0.58");
+  await expect(sharpeKpi).toContainText("+0.28 · raw Sharpe change");
+  await expect(sharpeKpi).not.toContainText("0.29");
 });
 
 test("portfolio optimizer draft allocation add asset selector updates draft and starts recompute @smoke @regression", async ({ page }) => {

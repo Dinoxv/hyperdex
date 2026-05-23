@@ -157,10 +157,31 @@
     [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "tabular-nums" delta-class]}
      delta]]))
 
+(defn- positive-number?
+  [value]
+  (and (opt-format/finite-number? value)
+       (pos? value)))
+
+(defn- sharpe-from
+  [performance expected-return volatility]
+  (or (when (opt-format/finite-number? (:in-sample-sharpe performance))
+        (:in-sample-sharpe performance))
+      (when (and (opt-format/finite-number? expected-return)
+                 (positive-number? volatility))
+        (/ expected-return volatility))))
+
+(defn- format-decimal-delta
+  [value]
+  (if (opt-format/finite-number? value)
+    (str (when (pos? value) "+")
+         (opt-format/format-decimal value))
+    "N/A"))
+
 (defn- kpi-strip
   [result*]
   (let [preview (:rebalance-preview result*)
         performance (:performance result*)
+        current-performance (:current-performance result*)
         diagnostics (:diagnostics result*)
         current-return (:current-expected-return result*)
         current-vol (:current-volatility result*)
@@ -170,6 +191,15 @@
                        (- (or target-return 0) current-return))
         vol-delta (when (opt-format/finite-number? current-vol)
                     (- (or target-vol 0) current-vol))
+        current-sharpe (sharpe-from current-performance
+                                    current-return
+                                    current-vol)
+        target-sharpe (sharpe-from performance
+                                   target-return
+                                   target-vol)
+        sharpe-delta (when (and (opt-format/finite-number? current-sharpe)
+                                (opt-format/finite-number? target-sharpe))
+                       (- (or target-sharpe 0) current-sharpe))
         gross (:gross-exposure diagnostics)
         net (:net-exposure diagnostics)]
     [:section {:class ["optimizer-scenario-kpi-strip"
@@ -199,13 +229,21 @@
                  (str (opt-format/format-pct-delta return-delta) " · annualized")
                  "annualized")
                (kpi-delta-class return-delta
+                                 {:positive "text-trading-green"
+                                  :negative "text-warning"}))
+     (kpi-card "portfolio-optimizer-scenario-kpi-sharpe"
+               "Sharpe · current → target"
+               (if (opt-format/finite-number? current-sharpe)
+                 [:span [:span {:class ["text-trading-muted"]} (opt-format/format-decimal current-sharpe)]
+                  " → "
+                  (opt-format/format-decimal target-sharpe)]
+                 (opt-format/format-decimal target-sharpe))
+               (if (opt-format/finite-number? current-sharpe)
+                 (str (format-decimal-delta sharpe-delta) " · raw Sharpe change")
+                 "raw Sharpe")
+               (kpi-delta-class sharpe-delta
                                 {:positive "text-trading-green"
                                  :negative "text-warning"}))
-     (kpi-card "portfolio-optimizer-scenario-kpi-sharpe"
-               "Sharpe"
-               (opt-format/format-decimal (or (:shrunk-sharpe performance)
-                                               (:in-sample-sharpe performance)))
-               "optimized run")
      (kpi-card "portfolio-optimizer-scenario-kpi-turnover"
                "Turnover Required"
                (opt-format/format-pct (:turnover diagnostics))
