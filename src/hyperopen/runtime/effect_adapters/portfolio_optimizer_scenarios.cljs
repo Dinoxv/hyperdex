@@ -34,6 +34,11 @@
     (when (seq scenario-name*)
       scenario-name*)))
 
+(defn- active-scenario-address
+  [state]
+  (account-context/normalize-address
+   (get-in state (conj contracts/active-scenario-path :address))))
+
 (defn- current-scenario-id
   [env state opts now-ms]
   (let [route-kind (:kind (portfolio-routes/parse-portfolio-route
@@ -311,7 +316,8 @@
   [env store opts]
   (let [opts* (or opts {})
         state @store
-        address (account-context/effective-account-address state)
+        address (or (account-context/effective-account-address state)
+                    (active-scenario-address state))
         started-at-ms ((env-fn env :now-ms))
         scenario-id (current-scenario-id env state opts* started-at-ms)
         scenario-name* (scenario-name opts*)]

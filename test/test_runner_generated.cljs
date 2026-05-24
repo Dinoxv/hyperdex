@@ -290,6 +290,7 @@
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-resave-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test]
@@ -946,6 +947,7 @@
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-resave-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test

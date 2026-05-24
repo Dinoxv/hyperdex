@@ -156,14 +156,22 @@
    :completed-at-ms completed-at-ms
    :error {:message (error-message err)}})
 
+(defn- active-scenario-state
+  [scenario-id status scenario-record]
+  (cond-> {:loaded-id scenario-id
+           :status status
+           :read-only? false}
+    (:address scenario-record)
+    (assoc :address (:address scenario-record))))
+
 (defn apply-scenario-save-success
   [state scenario-index scenario-record started-at-ms completed-at-ms]
   (-> state
       (assoc-in contracts/draft-path (:config scenario-record))
       (assoc-in contracts/active-scenario-path
-                {:loaded-id (:id scenario-record)
-                 :status :saved
-                 :read-only? false})
+                (active-scenario-state (:id scenario-record)
+                                       :saved
+                                       scenario-record))
       (assoc-in contracts/scenario-index-path scenario-index)
       (assoc-in contracts/scenario-save-state-path
                 (saved-scenario-save-state (:id scenario-record)
@@ -215,9 +223,9 @@
          (assoc-in contracts/draft-path (:config scenario-record))
          (assoc-in contracts/last-successful-run-path (:saved-run scenario-record))
          (assoc-in contracts/active-scenario-path
-                   {:loaded-id scenario-id
-                    :status (:status scenario-record)
-                    :read-only? false})
+                   (active-scenario-state scenario-id
+                                          (:status scenario-record)
+                                          scenario-record))
          (assoc-in contracts/scenario-index-path scenario-index)
          (assoc-in contracts/scenario-load-state-path
                    (loaded-scenario-load-state scenario-id
@@ -297,9 +305,9 @@
         (assoc-in contracts/scenario-index-path scenario-index)
         (assoc-in contracts/draft-path (:config scenario-record))
         (assoc-in contracts/active-scenario-path
-                  {:loaded-id scenario-id
-                   :status (:status scenario-record)
-                   :read-only? false})
+                  (active-scenario-state scenario-id
+                                         (:status scenario-record)
+                                         scenario-record))
         (assoc-in contracts/tracking-path
                   (cleared-tracking-state scenario-id)))))
 
