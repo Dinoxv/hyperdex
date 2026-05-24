@@ -329,6 +329,39 @@ test("portfolio optimizer setup and retained draft detail routes render through 
   await expect(sharpeKpi).toContainText("0.58");
   await expect(sharpeKpi).toContainText("+0.28 · raw Sharpe change");
   await expect(sharpeKpi).not.toContainText("0.29");
+
+  const navigationEntriesBeforeRebalanceClick = await page.evaluate(() =>
+    performance.getEntriesByType("navigation").length
+  );
+
+  await page.locator("[data-role='portfolio-optimizer-scenario-tab-rebalance']").click();
+
+  const rebalanceRoute = await page.evaluate(() => ({
+    pathname: window.location.pathname,
+    selectedTab: new URL(window.location.href).searchParams.get("otab")
+  }));
+  expect(rebalanceRoute).toEqual({
+    pathname: "/portfolio/optimize/draft",
+    selectedTab: "rebalance"
+  });
+  await expect(page.locator("[data-role='portfolio-optimizer-rebalance-review-surface']"))
+    .toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-rebalance-empty']"))
+    .toHaveCount(0);
+  await expect.poll(async () => {
+    const result = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "last-successful-run",
+      "result"
+    ]);
+    return result?.status;
+  }).toBe("solved");
+
+  const navigationEntriesAfterRebalanceClick = await page.evaluate(() =>
+    performance.getEntriesByType("navigation").length
+  );
+  expect(navigationEntriesAfterRebalanceClick).toBe(navigationEntriesBeforeRebalanceClick);
 });
 
 test("portfolio optimizer draft allocation add asset selector updates draft and starts recompute @smoke @regression", async ({ page }) => {

@@ -2,12 +2,19 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
 
 (defn open-portfolio-optimizer-execution-modal
   [state]
-  (let [result (get-in state contracts/last-successful-run-result-path)
+  (let [readiness (setup-readiness/build-readiness state)
+        last-successful-run
+        (rebalance-preview/last-successful-run-with-rebalance-preview
+         (:request readiness)
+         (get-in state contracts/last-successful-run-path))
+        result (:result last-successful-run)
         preview (:rebalance-preview result)]
     (if (and (= :solved (:status result))
              (map? preview))

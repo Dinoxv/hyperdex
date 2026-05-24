@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.scenario
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -84,6 +85,9 @@
         state* (scenario-scoped-state state scenario-id)
         selected-tab (active-tab state)
         readiness (setup-readiness/build-readiness state*)
+        last-successful-run (rebalance-preview/last-successful-run-with-rebalance-preview
+                             (:request readiness)
+                             (get-in state* contracts/last-successful-run-path))
         current-result?* (workspace/current-result? state* readiness)
         stale? (workspace/scenario-stale? state* readiness)
         optimization-progress (get-in state* contracts/optimization-progress-path)
@@ -101,8 +105,8 @@
      :stale? (boolean stale?)
      :scenario-name (scenario-name state* scenario-id)
      :draft (workspace/optimizer-draft state*)
-     :result (workspace/result state*)
-     :last-successful-run (get-in state* contracts/last-successful-run-path)
+     :result (:result last-successful-run)
+     :last-successful-run last-successful-run
      :active-scenario (get-in state* contracts/active-scenario-path)
      :run-state run-state
      :optimization-progress optimization-progress

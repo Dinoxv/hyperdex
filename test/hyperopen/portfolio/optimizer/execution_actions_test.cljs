@@ -57,6 +57,89 @@
             :error nil}]]
          (actions/close-portfolio-optimizer-execution-modal {}))))
 
+(deftest execution-modal-action-derives-preview-when-solved-run-lacks-preview-test
+  (let [state {:asset-selector
+               {:market-by-key
+                {"perp:BTC" {:key "perp:BTC"
+                             :market-type :perp
+                             :coin "BTC"
+                             :markPx "100"}
+                 "perp:ETH" {:key "perp:ETH"
+                             :market-type :perp
+                             :coin "ETH"
+                             :markPx "50"}}}
+               :webdata2
+               {:clearinghouseState
+                {:marginSummary {:accountValue "10000"
+                                 :totalMarginUsed "500"}
+                 :assetPositions [{:position {:coin "BTC"
+                                              :szi "25"
+                                              :positionValue "2500"
+                                              :markPx "100"
+                                              :leverage {:value 5
+                                                         :type "cross"}}}]}}
+               :portfolio {:optimizer
+                           {:active-scenario {:loaded-id nil
+                                              :status :computed}
+                            :draft {:id "draft-1"
+                                    :universe [{:instrument-id "perp:BTC"
+                                                :market-type :perp
+                                                :coin "BTC"}
+                                               {:instrument-id "perp:ETH"
+                                                :market-type :perp
+                                                :coin "ETH"}]
+                                    :objective {:kind :minimum-variance}
+                                    :return-model {:kind :historical-mean}
+                                    :risk-model {:kind :diagonal-shrink}
+                                    :constraints {:long-only? true
+                                                  :max-asset-weight 0.75
+                                                  :rebalance-tolerance 0.001}
+                                    :execution-assumptions
+                                    {:default-order-type :market
+                                     :fallback-slippage-bps 20
+                                     :prices-by-id {"perp:BTC" 100
+                                                    "perp:ETH" 50}
+                                     :fee-bps-by-id {"perp:BTC" 4
+                                                    "perp:ETH" 5}}}
+                            :history-data {:candle-history-by-coin
+                                           {"BTC" [{:time-ms 1000 :close "100"}
+                                                   {:time-ms 2000 :close "101"}
+                                                   {:time-ms 3000 :close "102"}]
+                                            "ETH" [{:time-ms 1000 :close "50"}
+                                                   {:time-ms 2000 :close "51"}
+                                                   {:time-ms 3000 :close "52"}]}
+                                           :funding-history-by-coin
+                                           {"BTC" [{:time-ms 1000
+                                                    :funding-rate-raw 0}]
+                                            "ETH" [{:time-ms 1000
+                                                    :funding-rate-raw 0}]}}
+                            :runtime {:as-of-ms 3000
+                                      :stale-after-ms 60000}
+                            :last-successful-run
+                            (fixtures/sample-minimal-last-successful-run
+                             {:result {:status :solved
+                                       :scenario-id "draft-1"
+                                       :instrument-ids ["perp:BTC" "perp:ETH"]
+                                       :current-weights [0.25 0.0]
+                                       :target-weights [0.5 0.5]
+                                       :target-weights-by-instrument {"perp:BTC" 0.5
+                                                                      "perp:ETH" 0.5}
+                                       :current-weights-by-instrument {"perp:BTC" 0.25
+                                                                       "perp:ETH" 0.0}
+                                       :diagnostics {:turnover 0.75}}})}}}
+        effects (actions/open-portfolio-optimizer-execution-modal state)
+        plan (get-in effects [0 2 :plan])]
+    (is (= :effects/save (get-in effects [0 0])))
+    (is (= [:portfolio :optimizer :execution-modal]
+           (get-in effects [0 1])))
+    (is (= true (get-in effects [0 2 :open?])))
+    (is (= :ready (:status plan)))
+    (is (= 2 (get-in plan [:summary :ready-count])))
+    (is (= #{"perp:BTC" "perp:ETH"}
+           (set (map :instrument-id (:rows plan)))))
+    (is (= #{:perp-order}
+           (set (map #(get-in % [:intent :kind]) (:rows plan)))))))
+
 (deftest open-execution-modal-requires-solved-run-test
   (is (= []
          (actions/open-portfolio-optimizer-execution-modal

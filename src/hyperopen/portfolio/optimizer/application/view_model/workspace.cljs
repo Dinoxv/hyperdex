@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.workspace
   (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -64,7 +65,9 @@
                      progress-running?)
         run-triggerable? (and (seq (:universe draft))
                               (not running?))
-        last-successful-run (get-in state contracts/last-successful-run-path)
+        last-successful-run (rebalance-preview/last-successful-run-with-rebalance-preview
+                             (:request readiness)
+                             (get-in state contracts/last-successful-run-path))
         current-result?* (run-identity/current-solved-run?
                           {:draft draft
                            :readiness readiness

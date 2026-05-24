@@ -143,6 +143,13 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-rebalance")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-tracking")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-inputs")))
+    (is (= :button
+           (first (node-by-role view-node
+                                "portfolio-optimizer-scenario-tab-rebalance")))
+        "Switching tabs must not perform browser navigation that loses unsaved run state.")
+    (is (nil? (get-in (node-by-role view-node
+                                     "portfolio-optimizer-scenario-tab-rebalance")
+                      [1 :href])))
     (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-tab")))
     (is (= [[:actions/set-portfolio-optimizer-results-tab :tracking]]
            (click-actions

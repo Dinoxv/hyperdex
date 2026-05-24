@@ -16,12 +16,6 @@
    {:key :tracking :label "Tracking" :data-role "portfolio-optimizer-scenario-tab-tracking"}
    {:key :inputs :label "Inputs" :data-role "portfolio-optimizer-scenario-tab-inputs"}])
 
-(defn- tab-path
-  [scenario-id tab-key]
-  (str (portfolio-routes/portfolio-optimize-scenario-path scenario-id)
-       "?otab="
-       (name tab-key)))
-
 (defn- copy-scenario-link!
   [scenario-id]
   (fn [_event]
@@ -340,19 +334,19 @@
        fields))))
 
 (defn- scenario-tabs
-  [scenario-id selected-tab]
+  [_scenario-id selected-tab]
   (into
    [:nav {:class ["optimizer-scenario-tabs"
                   "flex" "h-8" "items-stretch" "border-b" "border-base-300" "bg-base-100/95" "pl-4"]
           :data-role "portfolio-optimizer-scenario-tabs"}]
    (map (fn [{:keys [key label data-role]}]
-          [:a {:class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium"]
-                        (= key selected-tab) (conj "border-primary" "text-trading-text")
-                        (not= key selected-tab) (conj "border-transparent" "text-trading-muted"))
-               :href (tab-path scenario-id key)
-               :data-role data-role
-               :aria-current (when (= key selected-tab) "page")
-               :on {:click [[:actions/set-portfolio-optimizer-results-tab key]]}}
+          [:button {:type "button"
+                    :class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium"]
+                             (= key selected-tab) (conj "border-primary" "text-trading-text")
+                             (not= key selected-tab) (conj "border-transparent" "text-trading-muted"))
+                    :data-role data-role
+                    :aria-current (when (= key selected-tab) "page")
+                    :on {:click [[:actions/set-portfolio-optimizer-results-tab key]]}}
            label])
         tabs)))
 
