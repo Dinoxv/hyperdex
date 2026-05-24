@@ -591,6 +591,7 @@
             [hyperopen.wallet.agent-runtime-test]
             [hyperopen.wallet.agent-safety-test]
             [hyperopen.wallet.agent-session-test]
+            [hyperopen.wallet.connection-restore-test]
             [hyperopen.wallet.connection-runtime-test]
             [hyperopen.wallet.copy-feedback-runtime-test]
             [hyperopen.wallet.core-test]
@@ -1248,6 +1249,7 @@
              'hyperopen.wallet.agent-runtime-test
              'hyperopen.wallet.agent-safety-test
              'hyperopen.wallet.agent-session-test
+             'hyperopen.wallet.connection-restore-test
              'hyperopen.wallet.connection-runtime-test
              'hyperopen.wallet.copy-feedback-runtime-test
              'hyperopen.wallet.core-test

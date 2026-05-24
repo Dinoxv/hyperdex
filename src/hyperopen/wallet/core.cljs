@@ -7,6 +7,7 @@
 ;; ---------- Provider helpers -------------------------------------------------
 
 (declare listeners-installed?
+         apply-accounts-connection!
          provider-listener-state
          provider-listener-store)
 
@@ -224,6 +225,54 @@
     (catch :default _
       nil)))
 
+(defn- prioritize-selected-provider
+  [records]
+  (let [selected-id (provider-registry/selected-provider-id-value)]
+    (if (seq selected-id)
+      (let [selected-record (some #(when (= selected-id (:id %)) %) records)]
+        (if selected-record
+          (into [selected-record]
+                (remove #(= selected-id (:id %)) records))
+          records))
+      records)))
+
+(defn- provider-records-for-connection-check
+  [store]
+  (provider-registry/install-discovery! store)
+  (let [records (-> (provider-registry/provider-records)
+                    (prioritize-selected-provider))]
+    (provider-registry/sync-provider-list! store)
+    (if (seq records)
+      records
+      (when (has-provider?)
+        [{:id (provider-registry/selected-provider-id-value)
+          :provider (provider)}]))))
+
+(defn- mark-selected-provider!
+  [store provider-id]
+  (when (seq provider-id)
+    (provider-registry/select-provider! provider-id)
+    (provider-registry/sync-provider-list! store)))
+
+(defn- restore-connection-from-provider-records!
+  [store records]
+  (letfn [(attempt [remaining first-error]
+            (if-let [{:keys [id provider]} (first remaining)]
+              (-> (.request provider (clj->js {:method "eth_accounts"}))
+                  (.then (fn [accounts]
+                           (if (seq accounts)
+                             (do
+                               (mark-selected-provider! store id)
+                               (apply-accounts-connection! store accounts)
+                               (refresh-chain-id! store provider))
+                             (attempt (rest remaining) first-error))))
+                  (.catch (fn [err]
+                            (attempt (rest remaining) (or first-error err)))))
+              (if first-error
+                (set-error! store first-error)
+                (set-disconnected! store))))]
+    (attempt records nil)))
+
 (defn- apply-accounts-connection!
   ([store accounts]
    (apply-accounts-connection! store accounts nil))
@@ -237,14 +286,10 @@
 (defn ->js [m] (clj->js m))
 
 (defn check-connection! [store]
-  (let [provider* (selected-provider-for-request store nil)]
-    (if-not provider*
-    (set-disconnected! store)
-      (-> (.request provider* (->js {:method "eth_accounts"}))
-          (.then (fn [accounts]
-                   (apply-accounts-connection! store accounts)
-                   (refresh-chain-id! store provider*)))
-          (.catch #(set-error! store %))))))
+  (let [records (provider-records-for-connection-check store)]
+    (if (seq records)
+      (restore-connection-from-provider-records! store records)
+      (set-disconnected! store))))
 
 ;; Only call this from a user gesture (button click)
 (defn request-connection!
