@@ -59,6 +59,14 @@
                           (let [request #js {}]
                             (request-success! request (get-in @databases [db-name :stores store-name key]))
                             request))
+                   :getAll (fn []
+                             (let [request #js {}
+                                   values (->> (get-in @databases [db-name :stores store-name] {})
+                                               vals
+                                               vec
+                                               clj->js)]
+                               (request-success! request values)
+                               request))
                    :put (fn [value key]
                           (let [request #js {}]
                             (swap! databases assoc-in [db-name :stores store-name key] value)

@@ -53,6 +53,22 @@
         (is (= [[store [[:actions/load-staking-route "/staking"]]]]
                @dispatch-calls))))))
 
+(deftest handle-wallet-connected-refreshes-portfolio-optimizer-route-when-active-test
+  (let [dispatch-calls (atom [])]
+    (with-redefs [wallet-connection-runtime/handle-wallet-connected!
+                  (fn [_]
+                    :handled)
+                  nxr/dispatch (fn [store _ctx effects]
+                                 (swap! dispatch-calls conj [store effects]))]
+      (let [store (atom {:router {:path "/portfolio/optimize"}})
+            result (wallet-adapters/handle-wallet-connected
+                    store
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+        (is (= :handled result))
+        (is (= [[store [[:actions/load-portfolio-optimizer-route
+                         "/portfolio/optimize"]]]]
+               @dispatch-calls))))))
+
 (deftest enable-agent-trading-loads-crypto-module-before-delegating-test
   (async done
     (let [captured-creds (atom nil)

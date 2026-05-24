@@ -50,6 +50,55 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest save-portfolio-optimizer-scenario-effect-fails-when-record-write-is-not-persisted-test
+  (async done
+    (let [calls (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          solved-run (fixtures/sample-last-successful-run
+                      {:result {:expected-return 0.18
+                                :volatility 0.42}
+                       :computed-at-ms 2000})
+          store (atom {:wallet {:address address}
+                       :portfolio {:optimizer
+                                   {:draft {:name "Core Hedge"
+                                            :objective {:kind :max-sharpe}
+                                            :return-model {:kind :historical-mean}
+                                            :risk-model {:kind :diagonal-shrink}
+                                            :metadata {:dirty? true}}
+                                    :scenario-index {:ordered-ids []
+                                                     :by-id {}}
+                                    :last-successful-run solved-run}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms* (fn [] 3000)
+                    portfolio-optimizer-adapters/*next-scenario-id* (fn [_now-ms] "scn_3000")
+                    portfolio-optimizer-adapters/*load-scenario-index!*
+                    (fn [addr]
+                      (swap! calls conj [:load-index addr])
+                      (js/Promise.resolve nil))
+                    portfolio-optimizer-adapters/*save-scenario!*
+                    (fn [scenario-id record]
+                      (swap! calls conj [:save-scenario scenario-id record])
+                      (js/Promise.resolve false))
+                    portfolio-optimizer-adapters/*save-scenario-index!*
+                    (fn [addr index]
+                      (swap! calls conj [:save-index addr index])
+                      (js/Promise.resolve true))]
+        (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect nil store)
+            (.then (fn [result]
+                     (is (nil? result))
+                     (is (= :failed
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-save-state :status])))
+                     (is (= "Failed to persist optimizer scenario."
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-save-state :error :message])))
+                     (is (some #(= :save-scenario (first %)) @calls))
+                     (is (not-any? #(= :save-index (first %)) @calls))
+                     (is (= []
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :ordered-ids])))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest save-portfolio-optimizer-scenario-effect-creates-new-id-on-new-route-test
   (async done
     (let [calls (atom [])

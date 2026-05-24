@@ -82,6 +82,85 @@
                        (done)))
               (.catch fail!)))))))
 
+(deftest load-scenario-index-recovers-from-saved-scenario-records-when-index-is-missing-test
+  (async done
+    (browser-mocks/with-test-indexed-db
+      (fn []
+        (let [other-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              scenario-a {:schema-version 1
+                          :id "scn_a"
+                          :name "Recovered A"
+                          :address wallet-address
+                          :status :saved
+                          :config {:objective {:kind :max-sharpe}
+                                   :return-model {:kind :historical-mean}
+                                   :risk-model {:kind :diagonal-shrink}}
+                          :saved-run {:result {:expected-return 0.11
+                                               :volatility 0.22}}
+                          :updated-at-ms 3000}
+              scenario-b {:schema-version 1
+                          :id "scn_b"
+                          :name "Recovered B"
+                          :address wallet-address
+                          :status :executed
+                          :config {:objective {:kind :minimum-variance}
+                                   :return-model {:kind :black-litterman}
+                                   :risk-model {:kind :stabilized-covariance}}
+                          :saved-run {:result {:expected-return 0.09
+                                               :volatility 0.18}}
+                          :updated-at-ms 5000}
+              other-scenario (assoc scenario-a
+                                    :id "scn_other"
+                                    :address other-address
+                                    :updated-at-ms 7000)
+              fail! (async-support/unexpected-error done)]
+          (-> (js/Promise.all
+               #js [(persistence/save-scenario! "scn_a" scenario-a)
+                    (persistence/save-scenario! "scn_b" scenario-b)
+                    (persistence/save-scenario! "scn_other" other-scenario)])
+              (.then (fn [_]
+                       (persistence/load-scenario-index! wallet-address)))
+              (.then (fn [loaded-index]
+                       (is (= ["scn_b" "scn_a"] (:ordered-ids loaded-index)))
+                       (is (= "Recovered B"
+                              (get-in loaded-index [:by-id "scn_b" :name])))
+                       (is (= :executed
+                              (get-in loaded-index [:by-id "scn_b" :status])))
+                       (is (nil? (get-in loaded-index [:by-id "scn_other"])))
+                       (done)))
+              (.catch fail!)))))))
+
+(deftest load-scenario-index-recovers-from-saved-scenario-records-when-index-is-incomplete-test
+  (async done
+    (browser-mocks/with-test-indexed-db
+      (fn []
+        (let [scenario {:schema-version 1
+                        :id "scn_incomplete"
+                        :name "Recovered From Incomplete"
+                        :address wallet-address
+                        :status :saved
+                        :config {:objective {:kind :max-sharpe}
+                                 :return-model {:kind :historical-mean}
+                                 :risk-model {:kind :diagonal-shrink}}
+                        :saved-run {:result {:expected-return 0.13
+                                             :volatility 0.21}}
+                        :updated-at-ms 6000}
+              incomplete-index {:ordered-ids ["scn_incomplete"]
+                                :by-id {}}
+              fail! (async-support/unexpected-error done)]
+          (-> (js/Promise.all
+               #js [(persistence/save-scenario-index! wallet-address incomplete-index)
+                    (persistence/save-scenario! "scn_incomplete" scenario)])
+              (.then (fn [_]
+                       (persistence/load-scenario-index! wallet-address)))
+              (.then (fn [loaded-index]
+                       (is (= ["scn_incomplete"] (:ordered-ids loaded-index)))
+                       (is (= "Recovered From Incomplete"
+                              (get-in loaded-index
+                                      [:by-id "scn_incomplete" :name])))
+                       (done)))
+              (.catch fail!)))))))
+
 (deftest indexed-db-app-store-list-includes-portfolio-optimizer-store-test
   (async done
     (browser-mocks/with-test-indexed-db

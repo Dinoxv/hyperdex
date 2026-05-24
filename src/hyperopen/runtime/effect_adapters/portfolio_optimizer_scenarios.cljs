@@ -59,6 +59,12 @@
   [store operation]
   (scenario-operations/result-value operation @store))
 
+(defn- require-persisted!
+  [label persisted?]
+  (when-not persisted?
+    (throw (js/Error. (str "Failed to persist " label "."))))
+  persisted?)
+
 (defn- fail-operation-result
   [operation state error completed-at-ms]
   (scenario-operations/fail operation state error completed-at-ms))
@@ -167,7 +173,8 @@
       (-> ((env-fn env :save-scenario!)
            (:scenario-id command)
            (:scenario-record command))
-          (.then (fn [_]
+          (.then (fn [persisted?]
+                   (require-persisted! "optimizer scenario" persisted?)
                    (interpret-result!
                     env
                     store
@@ -182,7 +189,8 @@
         (-> ((env-fn env :save-scenario-index!)
              (:address command)
              (:scenario-index command))
-            (.then (fn [_]
+            (.then (fn [persisted?]
+                     (require-persisted! "optimizer scenario index" persisted?)
                      (-> (interpret-result!
                           env
                           store

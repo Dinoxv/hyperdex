@@ -90,6 +90,32 @@
                          (.catch (async-support/unexpected-error done)))))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest indexed-db-default-open-migrates-legacy-v6-databases-to-portfolio-optimizer-store-test
+  (async done
+    (browser-mocks/with-test-indexed-db
+      (fn []
+        (let [legacy-opts {:db-name indexed-db/app-db-name
+                           :db-version 6
+                           :store-names [indexed-db/funding-history-store]}
+              fail! (async-support/unexpected-error done)]
+          (-> (indexed-db/put-json! indexed-db/funding-history-store
+                                    "legacy-record"
+                                    {:ok true}
+                                    legacy-opts)
+              (.then (fn [persisted?]
+                       (is (true? persisted?))
+                       (indexed-db/put-json! indexed-db/portfolio-optimizer-store
+                                             "scenario::migration"
+                                             {:id "scenario::migration"})))
+              (.then (fn [persisted?]
+                       (is (true? persisted?))
+                       (indexed-db/get-json! indexed-db/portfolio-optimizer-store
+                                             "scenario::migration")))
+              (.then (fn [record]
+                       (is (= {:id "scenario::migration"} record))
+                       (done)))
+              (.catch fail!)))))))
+
 (deftest indexed-db-helpers-gracefully-handle-unavailable-browser-api-test
   (async done
     (let [original-indexed-db (.-indexedDB js/globalThis)
@@ -172,6 +198,43 @@
                                       (done)))
                              (.catch fail!))))
                 (.catch fail!))))))))
+
+(deftest open-db-closes-stale-cached-connection-before-opening-new-version-test
+  (async done
+    (let [closed-versions (atom [])
+          opened-versions (atom [])
+          db-v6 #js {:close (fn []
+                              (swap! closed-versions conj 6))}
+          db-v7 #js {:close (fn []
+                              (swap! closed-versions conj 7))}
+          fail! (async-support/unexpected-error done)]
+      (with-indexed-db-api
+        #js {:open (fn [_db-name db-version]
+                     (swap! opened-versions conj db-version)
+                     (let [request #js {}
+                           db (if (= 6 db-version) db-v6 db-v7)]
+                       (js/setTimeout
+                        (fn []
+                          (set! (.-result request) db)
+                          (when-let [handler (.-onsuccess request)]
+                            (handler #js {:target #js {:result db}})))
+                        0)
+                       request))}
+        (fn []
+          (-> (indexed-db/open-db! {:db-name "upgrade-cache-db"
+                                    :db-version 6
+                                    :store-names []})
+              (.then (fn [opened-db]
+                       (is (identical? db-v6 opened-db))
+                       (indexed-db/open-db! {:db-name "upgrade-cache-db"
+                                             :db-version 7
+                                             :store-names []})))
+              (.then (fn [opened-db]
+                       (is (identical? db-v7 opened-db))
+                       (is (= [6 7] @opened-versions))
+                       (is (= [6] @closed-versions))
+                       (done)))
+              (.catch fail!)))))))
 
 (deftest open-db-evicts-failed-cache-and-allows-retry-test
   (async done

@@ -535,7 +535,7 @@ async function putOptimizerVaultIndexCacheRecord(page, summaries) {
       "last-modified": cacheRecord["last-modified"]
     };
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("hyperopen-persistence", 6);
+      const request = indexedDB.open("hyperopen-persistence", 7);
       request.onupgradeneeded = (event) => {
         const database = event.target.result;
         for (const storeName of storeNames) {
@@ -781,7 +781,7 @@ async function seedOptimizerMisalignedVaultHistory(page) {
 async function putOptimizerRecord(page, key, payload) {
   await page.evaluate(async ({ key, payload }) => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("hyperopen-persistence", 6);
+      const request = indexedDB.open("hyperopen-persistence", 7);
       request.onupgradeneeded = (event) => {
         const database = event.target.result;
         if (!database.objectStoreNames.contains("portfolio-optimizer")) {
@@ -806,10 +806,56 @@ async function putOptimizerRecord(page, key, payload) {
   }, { key, payload });
 }
 
+async function seedLegacyV6PersistenceDb(page) {
+  const legacyStoreNames = [
+    "asset-selector-markets-cache",
+    "funding-history-cache",
+    "chart-visible-range-cache",
+    "vault-index-cache",
+    "leaderboard-preferences",
+    "leaderboard-cache",
+    "agent-locked-session"
+  ];
+
+  await page.route("**/__legacy-v6-indexeddb-seed", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><meta charset=\"utf-8\"><title>IDB seed</title>"
+    });
+  });
+  await page.goto("/__legacy-v6-indexeddb-seed");
+  await page.evaluate(async (storeNames) => {
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase("hyperopen-persistence");
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("Legacy IndexedDB reset blocked"));
+    });
+
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("hyperopen-persistence", 6);
+      request.onupgradeneeded = (event) => {
+        const database = event.target.result;
+        for (const storeName of storeNames) {
+          if (!database.objectStoreNames.contains(storeName)) {
+            database.createObjectStore(storeName);
+          }
+        }
+      };
+      request.onsuccess = (event) => resolve(event.target.result);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("Legacy IndexedDB open blocked"));
+    });
+    db.close();
+  }, legacyStoreNames);
+  await page.unroute("**/__legacy-v6-indexeddb-seed");
+}
+
 async function readOptimizerRecord(page, key) {
   return await page.evaluate(async (recordKey) => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("hyperopen-persistence", 6);
+      const request = indexedDB.open("hyperopen-persistence", 7);
       request.onsuccess = (event) => resolve(event.target.result);
       request.onerror = () => reject(request.error);
       request.onblocked = () => reject(new Error("IndexedDB open blocked"));
@@ -832,7 +878,7 @@ async function readOptimizerRecord(page, key) {
 async function readOptimizerKeys(page) {
   return await page.evaluate(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("hyperopen-persistence", 6);
+      const request = indexedDB.open("hyperopen-persistence", 7);
       request.onsuccess = (event) => resolve(event.target.result);
       request.onerror = () => reject(request.error);
       request.onblocked = () => reject(new Error("IndexedDB open blocked"));
@@ -1149,6 +1195,59 @@ test("portfolio optimizer scenario board renders the local scenario surface @reg
 
   await page.locator("a[href='/portfolio/optimize/new']").click();
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
+});
+
+test("portfolio optimizer scenario board recovers saved scenarios when the address index is missing @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio/optimize");
+  await putOptimizerRecord(
+    page,
+    `scenario::${OPTIMIZER_RELOAD_SCENARIO_ID}`,
+    OPTIMIZER_RELOAD_SCENARIO_EDN
+  );
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
+
+  const savedRow = page.locator(
+    `[data-role='portfolio-optimizer-scenario-row-${OPTIMIZER_RELOAD_SCENARIO_ID}']`
+  );
+  await expect(savedRow).toContainText("QA Tracking Reload");
+  await expect(page.locator("[data-role='portfolio-optimizer-empty-scenarios']"))
+    .toHaveCount(0);
+});
+
+test("portfolio optimizer scenario board recovers saved scenarios when the address index is incomplete @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio/optimize");
+  await putOptimizerRecord(
+    page,
+    `scenario::${OPTIMIZER_RELOAD_SCENARIO_ID}`,
+    OPTIMIZER_RELOAD_SCENARIO_EDN
+  );
+  await putOptimizerRecord(
+    page,
+    "scenario-index::0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    `{:ordered-ids ["${OPTIMIZER_RELOAD_SCENARIO_ID}"] :by-id {}}`
+  );
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
+
+  const savedRow = page.locator(
+    `[data-role='portfolio-optimizer-scenario-row-${OPTIMIZER_RELOAD_SCENARIO_ID}']`
+  );
+  await expect(savedRow).toContainText("QA Tracking Reload");
+  await expect(page.locator("[data-role='portfolio-optimizer-empty-scenarios']"))
+    .toHaveCount(0);
 });
 
 test("portfolio optimizer setup orders objective before return risk model @regression", async ({ page }) => {
@@ -2145,6 +2244,7 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
 });
 
 test("portfolio optimizer saves draft scenarios under durable ids and reloads them from the index @regression", async ({ page }) => {
+  await seedLegacyV6PersistenceDb(page);
   await visitRoute(page, "/portfolio/optimize");
   await seedPersistedOptimizerTrackingScenario(page);
   await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);

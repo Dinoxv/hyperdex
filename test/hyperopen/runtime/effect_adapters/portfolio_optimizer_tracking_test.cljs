@@ -99,11 +99,11 @@
                     portfolio-optimizer-adapters/*save-scenario!*
                     (fn [scenario-id record]
                       (swap! saved-scenarios conj [scenario-id record])
-                      (js/Promise.resolve nil))
+                      (js/Promise.resolve true))
                     portfolio-optimizer-adapters/*save-scenario-index!*
                     (fn [address index]
                       (swap! saved-indexes conj [address index])
-                      (js/Promise.resolve nil))]
+                      (js/Promise.resolve true))]
         (-> (portfolio-optimizer-adapters/enable-portfolio-optimizer-manual-tracking-effect
              nil
              store)

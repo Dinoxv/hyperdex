@@ -2,6 +2,8 @@
   (:require [cljs.reader :as reader]
             [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+            [hyperopen.portfolio.optimizer.application.scenario-state :as scenario-state]
             [hyperopen.platform.indexed-db :as indexed-db]))
 
 (def ^:private non-blank-text coercion/non-blank-text)
@@ -66,13 +68,51 @@
   (-> (get-record! key)
       (.then decode-record)))
 
+(defn- get-all-encoded-records!
+  []
+  (-> (indexed-db/get-all-json! indexed-db/portfolio-optimizer-store)
+      (.then (fn [records]
+               (mapv decode-record records)))))
+
 (defn- put-encoded-record!
   [key value]
   (put-record! key (encode-record value)))
 
+(defn- scenario-record-for-address?
+  [address record]
+  (and (map? record)
+       (= address (address-token (:address record)))
+       (seq (non-blank-text (:id record)))))
+
+(defn- recovered-scenario-index
+  [address records]
+  (let [address* (address-token address)
+        scenario-records (->> records
+                              (filter #(scenario-record-for-address? address* %))
+                              (sort-by #(or (:updated-at-ms %) 0)))]
+    (when (seq scenario-records)
+      (reduce (fn [scenario-index scenario-record]
+                (scenario-records/refresh-scenario-index-summary
+                 scenario-index
+                 (scenario-records/scenario-summary scenario-record)))
+              (scenario-state/default-scenario-index)
+              scenario-records))))
+
+(defn- usable-scenario-index?
+  [scenario-index]
+  (let [{:keys [ordered-ids by-id]} scenario-index]
+    (and (seq ordered-ids)
+         (every? #(map? (get by-id %)) ordered-ids))))
+
 (defn load-scenario-index!
   [address]
-  (get-encoded-record! (scenario-index-key address)))
+  (-> (get-encoded-record! (scenario-index-key address))
+      (.then (fn [scenario-index]
+               (if (usable-scenario-index? scenario-index)
+                 scenario-index
+                 (-> (get-all-encoded-records!)
+                     (.then #(or (recovered-scenario-index address %)
+                                 scenario-index))))))))
 
 (defn save-scenario-index!
   [address scenario-index]

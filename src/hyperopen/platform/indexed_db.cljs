@@ -4,7 +4,7 @@
   "hyperopen-persistence")
 
 (def app-db-version
-  6)
+  7)
 
 (def asset-selector-markets-store
   "asset-selector-markets-cache")
@@ -61,6 +61,32 @@
     (when-not (.contains (.-objectStoreNames db) store-name)
       (.createObjectStore db store-name))))
 
+(defn- close-db!
+  [db]
+  (when (and db (fn? (.-close db)))
+    (.close db)))
+
+(defn- close-stale-open-dbs!
+  [db-name db-version]
+  (let [stale-entries (->> @open-db-cache
+                           (filter (fn [[[cached-db-name cached-db-version _store-names]
+                                         _db-promise]]
+                                     (and (= db-name cached-db-name)
+                                          (not= db-version cached-db-version)))))]
+    (doseq [[cache-key _db-promise] stale-entries]
+      (swap! open-db-cache dissoc cache-key))
+    (if (seq stale-entries)
+      (js/Promise.all
+       (clj->js
+        (map (fn [[_cache-key db-promise]]
+               (-> db-promise
+                   (.then (fn [db]
+                            (close-db! db)
+                            nil))
+                   (.catch (fn [_] nil))))
+             stale-entries)))
+      (js/Promise.resolve nil))))
+
 (defn open-db!
   ([]
    (open-db! {}))
@@ -72,40 +98,47 @@
          cache-key [db-name db-version store-names*]]
      (if-let [cached (get @open-db-cache cache-key)]
        cached
-       (let [open-promise
-             (if-not (indexed-db-supported?)
-               (js/Promise.resolve nil)
-               (js/Promise.
-                (fn [resolve reject]
-                  (try
-                    (let [request (.open ^js (.-indexedDB js/globalThis)
-                                         db-name
-                                         db-version)]
-                      (set! (.-onupgradeneeded request)
-                            (fn [event]
-                              (create-object-stores! (.-result (.-target event))
-                                                     store-names*)))
-                      (set! (.-onsuccess request)
-                            (fn [event]
-                              (resolve (.-result (.-target event)))))
-                      (set! (.-onerror request)
-                            (fn [_]
-                              (reject (request-error request
-                                                     (str "IndexedDB open failed for " db-name)))))
-                      (set! (.-onblocked request)
-                            (fn [_]
-                              (reject (js/Error.
-                                       (str "IndexedDB open blocked for " db-name)))))
-                      nil)
-                    (catch :default e
-                      (reject e))))))]
+       (letfn [(open-request! []
+                 (if-not (indexed-db-supported?)
+                   (js/Promise.resolve nil)
+                   (js/Promise.
+                    (fn [resolve reject]
+                      (try
+                        (let [request (.open ^js (.-indexedDB js/globalThis)
+                                             db-name
+                                             db-version)]
+                          (set! (.-onupgradeneeded request)
+                                (fn [event]
+                                  (create-object-stores! (.-result (.-target event))
+                                                         store-names*)))
+                          (set! (.-onsuccess request)
+                                (fn [event]
+                                  (let [db (.-result (.-target event))]
+                                    (set! (.-onversionchange db)
+                                          (fn [_]
+                                            (swap! open-db-cache dissoc cache-key)
+                                            (close-db! db)))
+                                    (resolve db))))
+                          (set! (.-onerror request)
+                                (fn [_]
+                                  (reject (request-error request
+                                                         (str "IndexedDB open failed for " db-name)))))
+                          (set! (.-onblocked request)
+                                (fn [_]
+                                  (reject (js/Error.
+                                           (str "IndexedDB open blocked for " db-name)))))
+                          nil)
+                        (catch :default e
+                          (reject e)))))))]
+         (let [open-promise (-> (close-stale-open-dbs! db-name db-version)
+                                (.then open-request!))]
          (swap! open-db-cache assoc
                 cache-key
                 (.catch open-promise
                         (fn [error]
                           (swap! open-db-cache dissoc cache-key)
                           (js/Promise.reject error))))
-         (get @open-db-cache cache-key))))))
+         (get @open-db-cache cache-key)))))))
 
 (defn- transact-request!
   [db store-name mode request-fn on-success]
@@ -154,6 +187,25 @@
                    (fn [result]
                      (when (some? result)
                        (js->clj result :keywordize-keys true))))))))))
+
+(defn get-all-json!
+  ([store-name]
+   (get-all-json! store-name {}))
+  ([store-name opts]
+   (-> (open-db! opts)
+       (.then (fn [db]
+                (if-not db
+                  []
+                  (transact-request!
+                   db
+                   store-name
+                   "readonly"
+                   (fn [store]
+                     (.getAll ^js store))
+                   (fn [result]
+                     (if (some? result)
+                       (js->clj result :keywordize-keys true)
+                       [])))))))))
 
 (defn put-json!
   ([store-name key value]
