@@ -10,6 +10,8 @@ When a user opens a saved optimizer scenario whose draft inputs differ from the 
 
 After this change, the scenario detail page should retain and clearly label the last successful optimizer output whenever it exists. Stale allocation weights, frontier output, and rebalance context must stay visible as previous output, while save and execution-oriented flows remain guarded until a fresh run succeeds. If recomputation starts, the page should keep the previous output visible and show the existing progress state.
 
+Follow-up feedback on 2026-05-24 clarified that stale scenarios should not expose `Recompute` as a user-facing decision. The retained stale output should request a background recompute automatically and show only status-oriented stale/recomputing messaging while the previous output remains visible.
+
 ## Context References
 
 Public refs:
@@ -48,6 +50,10 @@ Local scratch refs:
 - [x] (2026-05-24 18:10Z) Ran `npm test` and `npm run test:websocket`; both passed.
 - [x] (2026-05-24 18:12Z) Ran governed design review for `portfolio-optimizer-results-route`; it passed all required browser-QA passes at 375, 768, 1280, and 1440 widths.
 - [x] (2026-05-24 18:12Z) Ran `npm run browser:cleanup`; no browser-inspection sessions remained running.
+- [x] (2026-05-24 19:09Z) Added follow-up RED coverage for automatic stale recompute and removal of `Recompute` controls; focused tests failed on missing action/path and old visible buttons.
+- [x] (2026-05-24 19:15Z) Implemented a guarded auto-recompute action with a request-signature latch, wired it to the scenario stale banner render hook, and removed stale-banner `Recompute` buttons.
+- [x] (2026-05-24 19:17Z) Added runtime registration, action-arg validation, effect-order policy, and regenerated formal effect-order vectors for the new background action.
+- [x] (2026-05-24 19:19Z) Focused action, render, wiring, schema, and formal conformance tests passed after the follow-up implementation.
 
 ## Surprises & Discoveries
 
@@ -80,9 +86,17 @@ Local scratch refs:
   Rationale: The observed source-level root cause is presentation gating. `run-portfolio-optimizer-from-draft` already dispatches `:effects/run-portfolio-optimizer-pipeline`, and the pipeline already projects running progress. A wider runtime change would increase risk without evidence.
   Date/Author: 2026-05-24 / Codex
 
+- Decision: Replace stale `Recompute` controls with a guarded automatic background recompute.
+  Rationale: Follow-up product feedback favored not asking users to decide whether to recompute stale output. A render hook dispatches a no-arg action, and the action records the current request signature before emitting `:effects/run-portfolio-optimizer-pipeline`, so repeated renders or failed runs do not loop.
+  Date/Author: 2026-05-24 / Codex
+
+- Decision: Keep the top header `Rerun` action as the manual run affordance, but remove stale-specific `Recompute` labeling.
+  Rationale: Users can still force a run from the scenario header, while stale state no longer presents recomputation as the primary task. The stale status banners explain automatic refresh instead.
+  Date/Author: 2026-05-24 / Codex
+
 ## Outcomes & Retrospective
 
-Implemented the requested stale-output behavior. A stale solved optimizer scenario now keeps the previous allocation table, efficient frontier, diagnostics, and stale output banner visible instead of replacing the recommendation tab with a rerun-only warning. The top stale banner now says the page is showing previous output until the next recompute finishes, and stale run actions use `Recompute` instead of `Rerun` or `Run again`.
+Implemented the requested stale-output behavior. A stale solved optimizer scenario now keeps the previous allocation table, efficient frontier, diagnostics, and stale output banner visible instead of replacing the recommendation tab with a rerun-only warning. Follow-up feedback removed stale-specific `Recompute` controls: stale banners now say the app is refreshing automatically, and a guarded background action requests the existing optimizer pipeline once per stale request signature.
 
 Save remains guarded by `current-result?`, so stale previous output cannot be saved as a fresh scenario. The existing recompute path still shows the previous output plus the progress banner while a run is in flight.
 
@@ -158,7 +172,7 @@ Work from `/Users/barry/.codex/worktrees/8dcf/hyperopen`.
 
        npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app
 
-   Actual result: PASS, run id `design-review-2026-05-24T18-11-46-990Z-bcc641f6`. The run inspected 375, 768, 1280, and 1440 widths and reported PASS for visual evidence, native-control, styling-consistency, interaction, layout-regression, and jank/perf.
+   Actual follow-up result: PASS, run id `design-review-2026-05-24T19-16-37-365Z-834fc224`. The run inspected 375, 768, 1280, and 1440 widths and reported PASS for visual evidence, native-control, styling-consistency, interaction, layout-regression, and jank/perf.
 
 8. Clean up browser-inspection sessions:
 
@@ -168,23 +182,25 @@ Work from `/Users/barry/.codex/worktrees/8dcf/hyperopen`.
 
 ## Validation and Acceptance
 
-Acceptance is met when opening a stale saved optimizer scenario with a retained solved run shows the allocation table, efficient frontier, diagnostics, and stale labels instead of a recommendation-only blocker. The page must make the stale state visible, but it must not allow saving the scenario as current until a fresh run succeeds.
+Acceptance is met when opening a stale saved optimizer scenario with a retained solved run shows the allocation table, efficient frontier, diagnostics, and stale labels instead of a recommendation-only blocker. The page must make the stale state visible, automatically request recomputation in the background, avoid user-facing `Recompute` controls, and not allow saving the scenario as current until a fresh run succeeds.
 
 Automated acceptance:
 - The updated `portfolio-optimizer-scenario-detail-marks-clean-mismatched-result-stale-test` failed before the production edit and passed after the edit.
 - The focused scenario detail render test namespace passes.
-- The selected Playwright optimizer smoke passes.
-- `npm test` and `npm run test:websocket` pass.
+- Focused action, defaults, results-panel, frontier-contract, scenario-detail, runtime wiring, action-arg, and formal conformance tests pass.
+- The selected Playwright optimizer smoke passes and asserts no `Recompute` controls in the stale retained-output state.
+- `npm test` passes with 4029 tests, 22201 assertions, 0 failures, and 0 errors.
+- `npm run test:websocket` passes with 524 tests, 3043 assertions, 0 failures, and 0 errors.
 - `npm run check` is blocked only by unrelated namespace-size failures in `test/hyperopen/wallet/agent_runtime_edge_test.cljs`, `test/hyperopen/wallet/core_test.cljs`, and `test/hyperopen/views/header_view_test.cljs`.
 
 Browser-QA accounting must include PASS, FAIL, or BLOCKED for:
-- Visual pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Native-control pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Styling-consistency pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Interaction pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Layout-regression pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Jank/perf pass: PASS in `design-review-2026-05-24T18-11-46-990Z-bcc641f6`.
-- Residual blind spot: the design review notes that hover, active, disabled, and loading states still require targeted route actions when not present by default. The Playwright route smoke covers the stale visible-output state and recompute button text directly.
+- Visual pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Native-control pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Styling-consistency pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Interaction pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Layout-regression pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Jank/perf pass: PASS in `design-review-2026-05-24T19-16-37-365Z-834fc224`.
+- Residual blind spot: the design review notes that hover, active, disabled, and loading states still require targeted route actions when not present by default. The Playwright route smoke covers stale visible output and absence of stale `Recompute` controls directly.
 
 ## Idempotence and Recovery
 
@@ -204,19 +220,24 @@ Initial source evidence:
 
 Validation transcript excerpts:
 
+    Testing hyperopen.views.portfolio.optimize.frontier-chart-contract-test
     Testing hyperopen.views.portfolio.optimize.scenario-detail-view-test
-    Ran 13 tests containing 171 assertions.
+    Ran 15 tests containing 309 assertions.
     0 failures, 0 errors.
 
+    Testing hyperopen.portfolio.optimizer.actions-test
+    Testing hyperopen.portfolio.optimizer.defaults-test
+    Testing hyperopen.views.portfolio.optimize.frontier-chart-contract-test
     Testing hyperopen.views.portfolio.optimize.results-panel-test
-    Ran 5 tests containing 72 assertions.
+    Testing hyperopen.views.portfolio.optimize.scenario-detail-view-test
+    Ran 42 tests containing 467 assertions.
     0 failures, 0 errors.
 
     npx playwright test -c playwright.config.mjs tools/playwright/test/optimizer-view-model-routes.smoke.spec.mjs --grep "setup and retained draft detail"
-    1 passed (41.3s)
+    1 passed (25.3s)
 
     npm test
-    Ran 4028 tests containing 22190 assertions.
+    Ran 4029 tests containing 22201 assertions.
     0 failures, 0 errors.
 
     npm run test:websocket
@@ -225,7 +246,7 @@ Validation transcript excerpts:
 
     npm run qa:design-ui -- --targets portfolio-optimizer-results-route --manage-local-app
     reviewOutcome: PASS
-    runId: design-review-2026-05-24T18-11-46-990Z-bcc641f6
+    runId: design-review-2026-05-24T19-16-37-365Z-834fc224
 
     npm run browser:cleanup
     {"ok": true, "stopped": [], "results": []}

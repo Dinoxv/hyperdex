@@ -141,5 +141,7 @@
 	   [:actions/refresh-portfolio-optimizer-tracking :refresh-portfolio-optimizer-tracking]
 	   [:actions/enable-portfolio-optimizer-manual-tracking
 	    :enable-portfolio-optimizer-manual-tracking]
+	   [:actions/auto-recompute-stale-portfolio-optimizer-scenario
+	    :auto-recompute-stale-portfolio-optimizer-scenario]
 	   [:actions/run-portfolio-optimizer-from-draft :run-portfolio-optimizer-from-draft]
    [:actions/run-portfolio-optimizer :run-portfolio-optimizer]])

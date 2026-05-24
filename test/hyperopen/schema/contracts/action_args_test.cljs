@@ -314,6 +314,11 @@
           {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
+          :actions/auto-recompute-stale-portfolio-optimizer-scenario
+          []
+          {:phase :test})))
+  (is (= []
+         (contracts/assert-action-args!
           :actions/run-portfolio-optimizer-from-draft
           []
           {:phase :test})))

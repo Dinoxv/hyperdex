@@ -20,9 +20,7 @@
         strings (set (collect-strings view-node))]
     (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-stale-result-banner")))
-    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
-           (click-actions
-            (node-by-role view-node "portfolio-optimizer-rerun-stale-result"))))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-rerun-stale-result")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-grid")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-left-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-results-center-panel")))

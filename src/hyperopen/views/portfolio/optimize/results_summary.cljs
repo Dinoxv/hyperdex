@@ -39,13 +39,7 @@
        [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-warning"]}
         "Stale Output"]
        [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
-        "These allocation weights come from the last successful run. Draft inputs changed, so recompute before saving or executing."]]
-      [:button {:type "button"
-                :class ["rounded-lg" "border" "border-warning/60" "bg-warning/10" "px-3" "py-2"
-                        "text-sm" "font-semibold" "text-warning" "hover:bg-warning/20"]
-                :data-role "portfolio-optimizer-rerun-stale-result"
-                :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
-       "Recompute"]]]))
+        "These allocation weights come from the last successful run. The app is refreshing them automatically; save and execute unlock when the refreshed run completes."]]]]))
 
 (defn- history-lookback-label
   [result]

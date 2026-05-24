@@ -348,12 +348,12 @@ test("portfolio optimizer setup and retained draft detail routes render through 
   await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
     .toBeVisible();
-  await expect(page.locator("[data-role='portfolio-optimizer-stale-result-banner']"))
-    .toContainText("Stale Output");
-  await expect(page.locator("[data-role='portfolio-optimizer-scenario-stale-banner']"))
-    .toContainText("Showing previous output");
-  await expect(page.locator("[data-role='portfolio-optimizer-scenario-rerun']"))
-    .toContainText("Recompute");
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-rerun-stale']"))
+    .toHaveCount(0);
+  await expect(page.locator("[data-role='portfolio-optimizer-rerun-stale-result']"))
+    .toHaveCount(0);
+  await expect(page.locator("body"))
+    .not.toContainText("Recompute");
   await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))
     .toHaveCount(0);
 

@@ -313,5 +313,8 @@
 (def enable-portfolio-optimizer-manual-tracking-action
   portfolio-optimizer-actions/enable-portfolio-optimizer-manual-tracking)
 
+(def auto-recompute-stale-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/auto-recompute-stale-portfolio-optimizer-scenario)
+
 (def run-portfolio-optimizer-from-draft-action
   portfolio-optimizer-actions/run-portfolio-optimizer-from-draft)

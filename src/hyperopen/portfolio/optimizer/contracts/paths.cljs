@@ -82,6 +82,8 @@
 (def ui-frontier-overlay-mode-path
   (conj optimizer-ui-path :frontier-overlay-mode))
 (def ui-constrain-frontier-path (conj optimizer-ui-path :constrain-frontier?))
+(def ui-stale-auto-recompute-path
+  (conj optimizer-ui-path :stale-auto-recompute))
 
 (def path-catalog
   {:optimizer/root optimizer-path
@@ -155,7 +157,8 @@
    :optimizer-ui/objective-menu-view-drafts ui-objective-menu-view-drafts-path
    :optimizer-ui/black-litterman-editor ui-black-litterman-editor-path
    :optimizer-ui/frontier-overlay-mode ui-frontier-overlay-mode-path
-   :optimizer-ui/constrain-frontier ui-constrain-frontier-path})
+   :optimizer-ui/constrain-frontier ui-constrain-frontier-path
+   :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path})
 
 (defn optimizer-state-path
   [& segments]

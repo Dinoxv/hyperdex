@@ -223,9 +223,10 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-tracking-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")))
-    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
-           (click-actions
-            (node-by-role view-node "portfolio-optimizer-scenario-rerun-stale"))))
+    (is (fn? (node-attr
+              (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")
+              :replicant/on-render)))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-rerun-stale")))
     (is (= true
            (get-in (node-by-role view-node "portfolio-optimizer-scenario-save")
                    [1 :disabled])))
@@ -235,6 +236,7 @@
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions
             (node-by-role view-node "portfolio-optimizer-scenario-rerun"))))
+    (is (not (contains? strings "Recompute")))
     (is (contains? strings "Capital Rotation"))
     (is (contains? strings "14.00%"))
     (is (contains? strings "32.00%"))
@@ -242,9 +244,9 @@
     (is (contains? strings "20.00%"))
     (is (contains? strings "data as of "))
     (is (contains? strings "gross ≤ 1.5 · cap 40.00%"))
-    (is (contains? strings "Draft inputs differ from the last successful run. Showing previous output until the next recompute finishes."))
+    (is (contains? strings "Draft inputs differ from the last successful run. Refreshing automatically while previous output stays visible."))
     (is (contains? strings "Stale Output"))
-    (is (contains? strings "Recompute"))))
+    (is (contains? strings "These allocation weights come from the last successful run. The app is refreshing them automatically; save and execute unlock when the refreshed run completes."))))
 
 (deftest portfolio-optimizer-scenario-sharpe-kpi-renders-current-to-target-raw-sharpe-test
   (let [view-node (portfolio-view/portfolio-view
@@ -346,10 +348,11 @@
         "A stale retained result should remain visible as previous frontier output.")
     (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-table"))
         "A stale retained result should keep previous allocation weights visible.")
-    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
-           (click-actions
-            (node-by-role view-node
-                          "portfolio-optimizer-rerun-stale-result"))))))
+    (is (nil? (node-by-role view-node
+                             "portfolio-optimizer-rerun-stale-result")))
+    (is (fn? (node-attr
+              (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")
+              :replicant/on-render)))))
 
 (deftest portfolio-optimizer-scenario-detail-keeps-completed-result-after-snapshot-drift-test
   (let [scenario-id "draft"

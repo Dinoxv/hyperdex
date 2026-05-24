@@ -3,6 +3,7 @@
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.actions :as actions]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
 (def ^:private bl-editor-path
@@ -249,6 +250,36 @@
            (get values (conj bl-errors-path :return-text))))
     (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
                    effects)))))
+
+(deftest auto-recompute-stale-portfolio-optimizer-scenario-requests-background-run-once-test
+  (let [state (ready-optimizer-state {:kind :historical-mean})
+        stale-state (-> state
+                        (assoc-in contracts/last-successful-run-path
+                                  (solved-run-for-state state))
+                        (assoc-in dirty-path true))
+        request-signature (-> (setup-readiness/build-readiness stale-state)
+                              :request
+                              action-common/build-request-signature)
+        expected-auto-state {:request-signature request-signature
+                             :scenario-id "draft-current"}]
+    (is (= [[:effects/save
+             contracts/ui-stale-auto-recompute-path
+             expected-auto-state]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/auto-recompute-stale-portfolio-optimizer-scenario
+            stale-state)))
+    (is (= []
+           (actions/auto-recompute-stale-portfolio-optimizer-scenario
+            (assoc-in stale-state
+                      contracts/ui-stale-auto-recompute-path
+                      expected-auto-state)))
+        "The render hook may fire repeatedly, so a stale signature is requested at most once.")
+    (is (= []
+           (actions/auto-recompute-stale-portfolio-optimizer-scenario
+            (assoc-in stale-state
+                      contracts/optimization-progress-status-path
+                      :running)))
+        "A visible recompute status means the background run is already in flight.")))
 
 (deftest load-portfolio-optimizer-history-from-draft-requires-universe-test
   (is (= [[:effects/load-portfolio-optimizer-history]]

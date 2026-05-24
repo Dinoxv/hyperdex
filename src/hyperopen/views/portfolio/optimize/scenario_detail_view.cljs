@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.scenario-detail-view
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.system :as app-system]
             [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.inputs-tab :as inputs-tab-view]
@@ -8,7 +9,8 @@
             [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
-            [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]))
+            [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]
+            [nexus.registry :as nxr]))
 
 (def ^:private tabs
   [{:key :recommendation :label "Recommendation" :data-role "portfolio-optimizer-scenario-tab-recommendation"}
@@ -31,7 +33,6 @@
            active-scenario
            run-state
            running?
-           stale?
            scenario-save-state
            current-result?]}]
   (let [status (:status active-scenario)
@@ -127,8 +128,14 @@
                  :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
         (cond
           running? "Running"
-          stale? "Recompute"
           :else "Rerun")]]]]))
+
+(defn- auto-recompute-stale-scenario!
+  [_node]
+  (when app-system/store
+    (nxr/dispatch app-system/store
+                  nil
+                  [[:actions/auto-recompute-stale-portfolio-optimizer-scenario]])))
 
 (defn- kpi-delta-class
   [delta {:keys [positive negative]}]
@@ -261,23 +268,11 @@
                        "p-3"
                        "text-sm"
                        "text-warning"]
-               :data-role "portfolio-optimizer-scenario-stale-banner"}
+               :data-role "portfolio-optimizer-scenario-stale-banner"
+               :replicant/on-render auto-recompute-stale-scenario!}
      [:span {:class ["font-semibold"]} "Stale"]
      [:span {:class ["ml-2"]}
-      "Draft inputs differ from the last successful run. Showing previous output until the next recompute finishes."]
-     [:button {:type "button"
-               :class ["optimizer-primary-action"
-                       "ml-3"
-                       "rounded-md"
-                       "border"
-                       "border-warning/50"
-                       "px-2"
-                       "py-1"
-                       "text-xs"
-                       "font-semibold"]
-               :data-role "portfolio-optimizer-scenario-rerun-stale"
-               :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
-      "Recompute"]]))
+      "Draft inputs differ from the last successful run. Refreshing automatically while previous output stays visible."]]))
 
 (defn- provenance-strip
   [{:keys [state draft result readiness scenario-id]}]

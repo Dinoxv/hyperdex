@@ -111,5 +111,7 @@
           :results-tab :recommendation
           :diagnostics-tab :conditioning
           :frontier-overlay-mode :standalone
-          :constrain-frontier? false}
+          :constrain-frontier? false
+          :stale-auto-recompute {:request-signature nil
+                                 :scenario-id nil}}
          (defaults/default-optimizer-ui-state))))

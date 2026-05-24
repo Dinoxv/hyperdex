@@ -101,6 +101,9 @@
 (def run-portfolio-optimizer-from-ready-draft
   run/run-portfolio-optimizer-from-ready-draft)
 
+(def auto-recompute-stale-portfolio-optimizer-scenario
+  run/auto-recompute-stale-portfolio-optimizer-scenario)
+
 (def save-portfolio-optimizer-scenario-from-current
   run/save-portfolio-optimizer-scenario-from-current)
 

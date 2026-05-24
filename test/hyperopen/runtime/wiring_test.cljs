@@ -159,6 +159,9 @@
                     (get-in deps [:portfolio-optimizer :refresh-portfolio-optimizer-tracking])))
     (is (identical? (:enable-portfolio-optimizer-manual-tracking optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :enable-portfolio-optimizer-manual-tracking])))
+    (is (identical? (:auto-recompute-stale-portfolio-optimizer-scenario optimizer-action-deps)
+                    (get-in deps [:portfolio-optimizer
+                                  :auto-recompute-stale-portfolio-optimizer-scenario])))
     (is (identical? (:run-portfolio-optimizer-from-draft optimizer-action-deps)
                     (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-from-draft])))))
 

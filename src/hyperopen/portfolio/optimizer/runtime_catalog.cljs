@@ -120,6 +120,8 @@
     actions/refresh-portfolio-optimizer-tracking
     :enable-portfolio-optimizer-manual-tracking
     actions/enable-portfolio-optimizer-manual-tracking
+    :auto-recompute-stale-portfolio-optimizer-scenario
+    actions/auto-recompute-stale-portfolio-optimizer-scenario
     :run-portfolio-optimizer-from-draft
     actions/run-portfolio-optimizer-from-draft}})
 

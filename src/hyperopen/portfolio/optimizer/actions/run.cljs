@@ -77,6 +77,44 @@
     :running? (optimizer-running? state)
     :last-successful-run (get-in state contracts/last-successful-run-path)}))
 
+(defn- stale-solved-run?
+  [state readiness]
+  (let [last-successful-run (get-in state contracts/last-successful-run-path)]
+    (and (run-identity/solved-run? last-successful-run)
+         (run-identity/stale-run?
+          {:draft (get-in state contracts/draft-path)
+           :readiness readiness
+           :last-successful-run last-successful-run
+           :run-state (get-in state contracts/run-state-path)
+           :running? (optimizer-running? state)}))))
+
+(defn- runnable-black-litterman-draft?
+  [state]
+  (or (not (bl-common/black-litterman-return-model? state))
+      (seq (bl-common/black-litterman-views state))))
+
+(defn auto-recompute-stale-portfolio-optimizer-scenario
+  [state]
+  (let [readiness (setup-readiness/build-readiness state)
+        request (:request readiness)
+        request-signature (when request
+                            (action-common/build-request-signature request))
+        last-requested-signature (get-in state
+                                         (conj contracts/ui-stale-auto-recompute-path
+                                               :request-signature))]
+    (if (and request-signature
+             (not (optimizer-running? state))
+             (seq (get-in state contracts/draft-universe-path))
+             (runnable-black-litterman-draft? state)
+             (stale-solved-run? state readiness)
+             (not= request-signature last-requested-signature))
+      [[:effects/save
+        contracts/ui-stale-auto-recompute-path
+        {:request-signature request-signature
+         :scenario-id (:scenario-id request)}]
+       (run-pipeline-effect)]
+      [])))
+
 (defn- non-blank-text
   [value]
   (let [text (some-> value str str/trim)]
