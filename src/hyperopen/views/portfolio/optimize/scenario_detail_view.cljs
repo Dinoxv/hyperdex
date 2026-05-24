@@ -31,6 +31,7 @@
            active-scenario
            run-state
            running?
+           stale?
            scenario-save-state
            current-result?]}]
   (let [status (:status active-scenario)
@@ -124,7 +125,10 @@
                  :data-role "portfolio-optimizer-scenario-rerun"
                  :disabled running?
                  :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
-        (if running? "Running" "Rerun")]]]]))
+        (cond
+          running? "Running"
+          stale? "Recompute"
+          :else "Rerun")]]]]))
 
 (defn- kpi-delta-class
   [delta {:keys [positive negative]}]
@@ -260,7 +264,7 @@
                :data-role "portfolio-optimizer-scenario-stale-banner"}
      [:span {:class ["font-semibold"]} "Stale"]
      [:span {:class ["ml-2"]}
-      "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."]
+      "Draft inputs differ from the last successful run. Showing previous output until the next recompute finishes."]
      [:button {:type "button"
                :class ["optimizer-primary-action"
                        "ml-3"
@@ -273,7 +277,7 @@
                        "font-semibold"]
                :data-role "portfolio-optimizer-scenario-rerun-stale"
                :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
-      "Rerun"]]))
+      "Recompute"]]))
 
 (defn- provenance-strip
   [{:keys [state draft result readiness scenario-id]}]
@@ -362,33 +366,6 @@
     title]
    [:p {:class ["mt-2" "text-sm" "text-trading-muted"]} body]])
 
-(defn- stale-recommendation-blocked
-  []
-  [:section {:class ["rounded-xl"
-                     "border"
-                     "border-warning/50"
-                     "bg-warning/10"
-                     "p-4"
-                     "text-sm"
-                     "text-warning"]
-             :data-role "portfolio-optimizer-recommendation-stale-blocked"}
-   [:p {:class ["font-semibold"]} "Recommendation is stale"]
-   [:p {:class ["mt-2" "max-w-2xl" "text-trading-muted"]}
-    "Draft inputs differ from the last successful run. Rerun before using allocation weights or the efficient frontier."]
-   [:button {:type "button"
-             :class ["mt-3"
-                     "rounded-md"
-                     "border"
-                     "border-warning/50"
-                     "px-3"
-                     "py-1.5"
-                     "text-xs"
-                     "font-semibold"
-                     "text-warning"]
-             :data-role "portfolio-optimizer-recommendation-run-again"
-             :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
-    "Run again"]])
-
 (defn- solved-result?
   [model]
   (= :solved (:status (:result model))))
@@ -412,7 +389,6 @@
   [{:keys [last-successful-run
            draft
            stale?
-           current-result?
            running?
            optimization-progress
            frontier-overlay-mode
@@ -423,8 +399,7 @@
    [:section {:class ["space-y-0"]
               :data-role "portfolio-optimizer-recommendation-tab"}]
    (cond
-     (and (solved-result? model)
-          (or current-result? running?))
+     (solved-result? model)
      (cond-> []
        running? (conj (recompute-banner optimization-progress))
        true (conj (results-panel/results-panel
@@ -436,9 +411,6 @@
                     :frontier-overlay-mode frontier-overlay-mode
                     :constrain-frontier? constrain-frontier?
                     :include-rebalance? false})))
-
-     (solved-result? model)
-     [(stale-recommendation-blocked)]
 
      :else
      [(empty-tab "portfolio-optimizer-recommendation-empty"

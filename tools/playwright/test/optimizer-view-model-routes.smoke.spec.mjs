@@ -330,6 +330,33 @@ test("portfolio optimizer setup and retained draft detail routes render through 
   await expect(sharpeKpi).toContainText("+0.28 · raw Sharpe change");
   await expect(sharpeKpi).not.toContainText("0.29");
 
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const store = globalThis.hyperopen.system.store;
+    c.swap_BANG_(
+      store,
+      (state) => c.assoc_in(
+        state,
+        path("portfolio", "optimizer", "draft", "metadata", "dirty?"),
+        true
+      )
+    );
+  });
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+    .toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-stale-result-banner']"))
+    .toContainText("Stale Output");
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-stale-banner']"))
+    .toContainText("Showing previous output");
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-rerun']"))
+    .toContainText("Recompute");
+  await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))
+    .toHaveCount(0);
+
   const navigationEntriesBeforeRebalanceClick = await page.evaluate(() =>
     performance.getEntriesByType("navigation").length
   );

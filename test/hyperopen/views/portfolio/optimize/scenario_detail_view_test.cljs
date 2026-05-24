@@ -215,8 +215,11 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-sharpe")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-turnover")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-kpi-rebalance")))
-    (is (nil? (node-by-role view-node "portfolio-optimizer-results-surface")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-stale-result-banner")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-table")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-tracking-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")))
@@ -239,7 +242,9 @@
     (is (contains? strings "20.00%"))
     (is (contains? strings "data as of "))
     (is (contains? strings "gross ≤ 1.5 · cap 40.00%"))
-    (is (contains? strings "Draft inputs differ from the last successful run. Rerun before using recommendation or rebalance output."))))
+    (is (contains? strings "Draft inputs differ from the last successful run. Showing previous output until the next recompute finishes."))
+    (is (contains? strings "Stale Output"))
+    (is (contains? strings "Recompute"))))
 
 (deftest portfolio-optimizer-scenario-sharpe-kpi-renders-current-to-target-raw-sharpe-test
   (let [view-node (portfolio-view/portfolio-view
@@ -332,17 +337,19 @@
         "Mismatched solved runs must not be saveable as the active scenario.")
     (is (nil?
            (click-actions save-button)))
-    (is (some? (node-by-role view-node
-                              "portfolio-optimizer-recommendation-stale-blocked"))
-        "The recommendation tab should block stale actionable output.")
-    (is (nil? (node-by-role view-node "portfolio-optimizer-frontier-panel"))
-        "A stale retained result must not render an actionable frontier.")
-    (is (nil? (node-by-role view-node "portfolio-optimizer-target-exposure-table"))
-        "A stale retained result must not render actionable allocation weights.")
+    (is (nil? (node-by-role view-node
+                             "portfolio-optimizer-recommendation-stale-blocked"))
+        "The recommendation tab should not replace retained output with a rerun-only blocker.")
+    (is (some? (node-by-role view-node "portfolio-optimizer-stale-result-banner"))
+        "Retained previous output should be clearly labeled as stale.")
+    (is (some? (node-by-role view-node "portfolio-optimizer-frontier-panel"))
+        "A stale retained result should remain visible as previous frontier output.")
+    (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-table"))
+        "A stale retained result should keep previous allocation weights visible.")
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-recommendation-run-again"))))))
+                          "portfolio-optimizer-rerun-stale-result"))))))
 
 (deftest portfolio-optimizer-scenario-detail-keeps-completed-result-after-snapshot-drift-test
   (let [scenario-id "draft"
