@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm.benchmarks.computation
-  (:require [hyperopen.portfolio.actions :as portfolio-actions]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.metrics :as portfolio-metrics]
             [hyperopen.vaults.detail.performance :as vault-performance]
             [hyperopen.views.portfolio.vm.benchmarks.selector :as selector]
@@ -16,7 +17,10 @@
 
 (defn- trader-benchmark-summary-by-key
   [state trader-address]
-  (get-in state [:portfolio :trader-benchmarks-by-address trader-address :summary-by-key]))
+  (if (= (account-context/normalize-address trader-address)
+         (account-context/effective-account-address state))
+    (get-in state [:portfolio :summary-by-key])
+    (get-in state [:portfolio :trader-benchmarks-by-address trader-address :summary-by-key])))
 
 (defn- trader-benchmark-summary
   [state trader-address summary-scope summary-time-range]

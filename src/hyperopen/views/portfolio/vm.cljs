@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm
-  (:require [hyperopen.domain.trading :as trading]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.domain.trading :as trading]
             [hyperopen.portfolio.application.metrics-bridge :as vm-metrics-bridge]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
@@ -144,6 +145,9 @@
 (defonce chart-model-cache
   (atom nil))
 
+(def ^:private benchmark-computation-context-cache-version
+  1)
+
 (defn- summary-entry-source-version
   [summary-entry]
   (hash [(vm-benchmarks/sampled-series-source-version-counter
@@ -223,12 +227,15 @@
         benchmark-details-by-address (get-in state [:vaults :benchmark-details-by-address])
         details-by-address (get-in state [:vaults :details-by-address])
         trader-benchmarks-by-address (get-in state [:portfolio :trader-benchmarks-by-address])
+        current-address (account-context/effective-account-address state)
         cache @benchmark-computation-context-cache]
     (if (and (map? cache)
+             (= benchmark-computation-context-cache-version (:cache-version cache))
              (= summary-source-version (:summary-source-version cache))
              (= summary-scope (:summary-scope cache))
              (= summary-time-range (:summary-time-range cache))
              (= selected-benchmark-coins (:selected-benchmark-coins cache))
+             (= current-address (:current-address cache))
              (identical? candles (:candles cache))
              (identical? merged-index-rows (:merged-index-rows cache))
              (identical? benchmark-details-by-address (:benchmark-details-by-address cache))
@@ -240,10 +247,12 @@
                                                                  summary-scope
                                                                  summary-time-range
                                                                  returns-benchmark-selector)]
-        (reset! benchmark-computation-context-cache {:summary-source-version summary-source-version
+        (reset! benchmark-computation-context-cache {:cache-version benchmark-computation-context-cache-version
+                                                     :summary-source-version summary-source-version
                                                      :summary-scope summary-scope
                                                      :summary-time-range summary-time-range
                                                      :selected-benchmark-coins selected-benchmark-coins
+                                                     :current-address current-address
                                                      :candles candles
                                                      :merged-index-rows merged-index-rows
                                                      :benchmark-details-by-address benchmark-details-by-address

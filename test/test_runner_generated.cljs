@@ -494,6 +494,7 @@
             [hyperopen.views.portfolio.vm.chart-math-additional-test]
             [hyperopen.views.portfolio.vm.chart-math-test]
             [hyperopen.views.portfolio.vm.chart-tooltip-test]
+            [hyperopen.views.portfolio.vm.current-trader-benchmark-test]
             [hyperopen.views.portfolio.vm.equity-helpers-test]
             [hyperopen.views.portfolio.vm.history-helpers-test]
             [hyperopen.views.portfolio.vm.history-test]
@@ -1153,6 +1154,7 @@
              'hyperopen.views.portfolio.vm.chart-math-additional-test
              'hyperopen.views.portfolio.vm.chart-math-test
              'hyperopen.views.portfolio.vm.chart-tooltip-test
+             'hyperopen.views.portfolio.vm.current-trader-benchmark-test
              'hyperopen.views.portfolio.vm.equity-helpers-test
              'hyperopen.views.portfolio.vm.history-helpers-test
              'hyperopen.views.portfolio.vm.history-test

@@ -170,6 +170,11 @@
   (is (= []
          (actions/ensure-portfolio-trader-benchmark-effects
           {:portfolio-ui {:returns-benchmark-coins []}})))
+  (is (= []
+         (actions/ensure-portfolio-trader-benchmark-effects
+          {:account-context {:spectate-mode {:active? true
+                                             :address trader-address}}
+           :portfolio-ui {:returns-benchmark-coins [trader-benchmark]}})))
   (is (= [[:effects/api-fetch-trader-portfolio-benchmark trader-address]
           [:effects/api-fetch-trader-portfolio-benchmark "0x2222222222222222222222222222222222222222"]]
          (actions/ensure-portfolio-trader-benchmark-effects
@@ -261,6 +266,18 @@
           {:portfolio-ui {:summary-time-range :all-time
                           :returns-benchmark-coins []}}
           (str "trader:" mixed-case-trader-address))))
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] [trader-benchmark]]
+            [[:portfolio-ui :returns-benchmark-coin] trader-benchmark]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
+          replace-shareable-route-query-effect]
+         (actions/select-portfolio-returns-benchmark
+          {:account-context {:spectate-mode {:active? true
+                                             :address trader-address}}
+           :portfolio-ui {:summary-time-range :all-time
+                          :returns-benchmark-coins []}}
+          trader-benchmark)))
   (is (= [[:effects/save-many
            [[[:portfolio-ui :returns-benchmark-coins] [trader-benchmark]]
             [[:portfolio-ui :returns-benchmark-coin] trader-benchmark]

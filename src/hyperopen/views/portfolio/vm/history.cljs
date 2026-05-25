@@ -278,6 +278,22 @@
            :value percent})
         cumulative-rows))
 
+(defn- cumulative-percent-factor
+  [percent]
+  (let [factor (+ 1 (/ percent 100))]
+    (when (parsing/finite-number? factor)
+      factor)))
+
+(defn- rebased-cumulative-percent
+  [percent anchor-factor]
+  (let [factor (cumulative-percent-factor percent)
+        rebased (when (and (parsing/finite-number? factor)
+                           (parsing/finite-number? anchor-factor)
+                           (pos? anchor-factor))
+                   (* 100 (- (/ factor anchor-factor) 1)))]
+    (when (parsing/finite-number? rebased)
+      rebased)))
+
 (defn aligned-summary-return-rows
   [benchmark-rows strategy-points]
   (let [benchmark-rows* (->> (or benchmark-rows [])
@@ -295,6 +311,7 @@
     (loop [time-idx 0
            benchmark-idx 0
            latest-value nil
+           anchor-factor nil
            output []]
       (if (>= time-idx strategy-count)
         output
@@ -308,12 +325,22 @@
                     (if (<= benchmark-time-ms time-ms)
                       (recur (inc idx) benchmark-value)
                       [idx latest]))))
-              output* (if (parsing/finite-number? latest-value*)
-                        (conj output [time-ms latest-value*])
+              latest-factor (when (parsing/finite-number? latest-value*)
+                              (cumulative-percent-factor latest-value*))
+              anchor-factor* (or anchor-factor
+                                 (when (and (parsing/finite-number? latest-factor)
+                                            (pos? latest-factor))
+                                   latest-factor))
+              rebased-value (when (some? anchor-factor*)
+                              (rebased-cumulative-percent latest-value*
+                                                          anchor-factor*))
+              output* (if (parsing/finite-number? rebased-value)
+                        (conj output [time-ms rebased-value])
                         output)]
           (recur (inc time-idx)
                  benchmark-idx*
                  latest-value*
+                 anchor-factor*
                  output*))))))
 
 (defn cumulative-return-row-pairs

@@ -132,6 +132,20 @@
   (is (= [{:time-ms 1 :value 0} {:time-ms 2 :value 12}]
          (vm-history/cumulative-return-time-points [[1 0] [2 12]]))))
 
+(deftest aligned-summary-return-rows-rebases-to-first-aligned-cumulative-factor-test
+  (let [aligned (vm-history/aligned-summary-return-rows [[1000 0]
+                                                         [2000 50]
+                                                         [3000 100]]
+                                                        [{:time-ms 2000}
+                                                         {:time-ms 2500}
+                                                         {:time-ms 3000}])]
+    (is (= [2000 2500 3000]
+           (mapv first aligned)))
+    (is (every? true?
+                (map approx=
+                     [0 0 33.33333333333333]
+                     (mapv second aligned))))))
+
 (deftest aligned-benchmark-return-rows-honors-explicit-anchor-time-before-late-strategy-start-test
   (let [t2 (.getTime (js/Date. "2026-04-14T00:00:00.000Z"))
         t0 (vm-history/summary-window-cutoff-ms :one-year t2)

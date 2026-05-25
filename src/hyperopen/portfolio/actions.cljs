@@ -270,12 +270,14 @@
 
 (defn- trader-benchmark-portfolio-fetch-effects
   [state addresses]
-  (->> addresses
-       (remove (fn [address]
-                 (or (get-in state [:portfolio :trader-benchmarks-by-address address])
-                     (true? (get-in state [:portfolio :loading :trader-benchmarks-by-address address])))))
-       (mapv (fn [address]
-               [:effects/api-fetch-trader-portfolio-benchmark address]))))
+  (let [current-address (account-context/effective-account-address state)]
+    (->> addresses
+         (remove (fn [address]
+                   (or (= address current-address)
+                       (get-in state [:portfolio :trader-benchmarks-by-address address])
+                       (true? (get-in state [:portfolio :loading :trader-benchmarks-by-address address])))))
+         (mapv (fn [address]
+                 [:effects/api-fetch-trader-portfolio-benchmark address])))))
 
 (defn ensure-portfolio-trader-benchmark-effects
   [state]
