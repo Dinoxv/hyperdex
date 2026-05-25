@@ -37,10 +37,32 @@
   [metrics]
   (number-or-zero (:spot-equity metrics)))
 
+(defn- sum-optional-numbers
+  [values]
+  (let [numbers (keep optional-number values)]
+    (when (seq numbers)
+      (reduce + numbers))))
+
+(defn- delegator-summary-total-hype
+  [summary]
+  (when (map? summary)
+    (sum-optional-numbers [(:delegated summary)
+                           (:undelegated summary)
+                           (:total-pending-withdrawal summary)])))
+
+(defn- delegations-total-hype
+  [delegations]
+  (when (sequential? delegations)
+    (sum-optional-numbers (map :amount delegations))))
+
 (defn staking-account-hype
   [state]
   (or (optional-number (get-in state [:staking :total-hype]))
       (optional-number (get-in state [:staking :total]))
+      (delegator-summary-total-hype
+       (get-in state [:staking :delegator-summary]))
+      (delegations-total-hype
+       (get-in state [:staking :delegations]))
       0))
 
 (defn staking-value-usd

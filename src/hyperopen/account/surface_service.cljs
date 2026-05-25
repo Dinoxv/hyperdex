@@ -129,11 +129,13 @@
            fetch-spot-clearinghouse-state!
            fetch-user-abstraction!
            fetch-portfolio!
-           fetch-user-fees!]}]
+           fetch-user-fees!
+           fetch-staking-delegator-summary!]}]
   (call-when-fn! fetch-spot-clearinghouse-state! store address {:priority :high})
   (call-when-fn! fetch-user-abstraction! store address {:priority :high})
   (call-when-fn! fetch-portfolio! store address {:priority :high})
-  (call-when-fn! fetch-user-fees! store address {:priority :high}))
+  (call-when-fn! fetch-user-fees! store address {:priority :high})
+  (call-when-fn! fetch-staking-delegator-summary! store address {:priority :high}))
 
 (defn- bootstrap-open-orders-and-fills!
   [{:keys [store

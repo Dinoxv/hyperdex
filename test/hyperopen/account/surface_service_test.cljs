@@ -319,6 +319,8 @@
                             (swap! visible-calls conj [:portfolio fetch-address opts]))
         :fetch-user-fees! (fn [_store fetch-address opts]
                             (swap! visible-calls conj [:user-fees fetch-address opts]))
+        :fetch-staking-delegator-summary! (fn [_store fetch-address opts]
+                                            (swap! visible-calls conj [:staking-delegator-summary fetch-address opts]))
         :fetch-and-merge-funding-history! (fn [_store fetch-address opts]
                                             (swap! hidden-calls conj [:fundings fetch-address opts]))
         :ensure-perp-dexs! (fn [_store opts]
@@ -329,7 +331,8 @@
       (is (= [[:spot address {:priority :high}]
               [:abstraction address {:priority :high}]
               [:portfolio address {:priority :high}]
-              [:user-fees address {:priority :high}]]
+              [:user-fees address {:priority :high}]
+              [:staking-delegator-summary address {:priority :high}]]
              @visible-calls))
       (is (= [] @hidden-calls))
       (is (= [] @ensure-calls))

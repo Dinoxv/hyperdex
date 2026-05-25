@@ -20,6 +20,15 @@
   (is (= 7 (vm-equity/spot-account-equity {:spot-equity "7"})))
   (is (= 9 (vm-equity/staking-account-hype {:staking {:total-hype "9"}})))
   (is (= 8 (vm-equity/staking-account-hype {:staking {:total "8"}})))
+  (is (= 1009.5
+         (vm-equity/staking-account-hype
+          {:staking {:delegator-summary {:delegated "1008.25"
+                                          :undelegated "1.0"
+                                          :total-pending-withdrawal "0.25"}}})))
+  (is (= 3.5
+         (vm-equity/staking-account-hype
+          {:staking {:delegations [{:amount "1.25"}
+                                   {:amount "2.25"}]}})))
   (is (= 0 (vm-equity/staking-value-usd nil 10)))
   (is (= 105 (vm-equity/compute-total-equity {:top-up-enabled? false
                                               :vault-equity 10

@@ -62,6 +62,7 @@
    :request-user-abstraction! (resolve-api-op api-instance :request-user-abstraction! api-default/request-user-abstraction!)
    :request-portfolio! (resolve-api-op api-instance :request-portfolio! api-default/request-portfolio!)
    :request-user-fees! (resolve-api-op api-instance :request-user-fees! api-default/request-user-fees!)
+   :request-staking-delegator-summary! (resolve-api-op api-instance :request-staking-delegator-summary! api-default/request-staking-delegator-summary!)
    :request-user-non-funding-ledger-updates! (resolve-api-op api-instance :request-user-non-funding-ledger-updates! api-default/request-user-non-funding-ledger-updates!)
    :ensure-perp-dexs-data! (resolve-api-op api-instance :ensure-perp-dexs-data! api-default/ensure-perp-dexs-data!)
    :request-asset-contexts! (resolve-api-op api-instance :request-asset-contexts! api-default/request-asset-contexts!)
@@ -285,6 +286,27 @@
                        api-projections/apply-user-fees-error
                        requested-address)))))))))
 
+(defn- fetch-staking-delegator-summary!
+  ([api-ops store address]
+   (fetch-staking-delegator-summary! api-ops store address {}))
+  ([{:keys [request-staking-delegator-summary!]} store address opts]
+   (if-not address
+     (js/Promise.resolve nil)
+     (let [requested-address (normalize-address address)]
+       (if-not requested-address
+         (js/Promise.resolve nil)
+         (do
+           (swap! store api-projections/begin-staking-delegator-summary-load)
+           (-> (request-staking-delegator-summary! address (or opts {}))
+               (.then (apply-success-and-return-when-current
+                       store
+                       requested-address
+                       api-projections/apply-staking-delegator-summary-success))
+               (.catch (apply-error-and-reject-when-current
+                        store
+                        requested-address
+                        api-projections/apply-staking-delegator-summary-error)))))))))
+
 (defn- ensure-perp-dexs!
   ([api-ops store]
    (ensure-perp-dexs! api-ops store {}))
@@ -368,6 +390,11 @@
                            (fetch-user-fees! api-ops store address))
                           ([store address opts]
                            (fetch-user-fees! api-ops store address opts)))
+      :fetch-staking-delegator-summary! (fn
+                                          ([store address]
+                                           (fetch-staking-delegator-summary! api-ops store address))
+                                          ([store address opts]
+                                           (fetch-staking-delegator-summary! api-ops store address opts)))
       :fetch-historical-orders! (fn
                                   ([store request-id]
                                    (account-history-effects/fetch-historical-orders!

@@ -175,6 +175,40 @@
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
+(deftest startup-base-deps-fetch-staking-delegator-summary-updates-visible-portfolio-state-test
+  (async done
+    (let [request-address "0x1111111111111111111111111111111111111111"
+          staking-calls (atom [])
+          store (atom {:wallet {:address request-address}
+                       :staking {}})
+          deps (collaborators/startup-base-deps
+                {:api {:get-request-stats (fn [] {:source :injected})
+                       :request-staking-delegator-summary!
+                       (fn [address opts]
+                         (swap! staking-calls conj [address opts])
+                         (js/Promise.resolve {:delegated 1008.25
+                                              :undelegated 1.0
+                                              :total-pending-withdrawal 0.25}))}})]
+      (-> ((:fetch-staking-delegator-summary! deps)
+           store
+           request-address
+           {:priority :high})
+          (.then (fn [summary]
+                   (is (= [[request-address {:priority :high}]]
+                          @staking-calls))
+                   (is (= {:delegated 1008.25
+                           :undelegated 1.0
+                           :total-pending-withdrawal 0.25}
+                          summary))
+                   (is (= summary
+                          (get-in @store [:staking :delegator-summary])))
+                   (is (false? (get-in @store [:staking :loading :delegator-summary])))
+                   (is (nil? (get-in @store [:staking :errors :delegator-summary])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest startup-base-deps-fetch-user-fills-ignores-stale-address-responses-test
   (async done
     (let [requested-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
