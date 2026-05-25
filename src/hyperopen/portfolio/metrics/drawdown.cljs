@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.metrics.drawdown
-  (:require [hyperopen.portfolio.metrics.history :as history]
+  (:require [hyperopen.portfolio.metrics.distribution :as distribution]
+            [hyperopen.portfolio.metrics.history :as history]
             [hyperopen.portfolio.metrics.returns :as returns]))
 
 (defn to-drawdown-series
@@ -99,8 +100,60 @@
         {:max-drawdown (/ (:max-drawdown worst) 100)
          :max-dd-date (:valley worst)
          :max-dd-period-start (:start worst)
-         :max-dd-period-end (:end worst)
-         :longest-dd-days (:days longest)}))))
+	         :max-dd-period-end (:end worst)
+	         :longest-dd-days (:days longest)}))))
+
+(defn avg-drawdown
+  [daily-rows]
+  (when-let [details (seq (drawdown-details daily-rows))]
+    (/ (reduce + 0 (map :max-drawdown details))
+       (* 100 (count details)))))
+
+(defn avg-drawdown-days
+  [daily-rows]
+  (when-let [details (seq (drawdown-details daily-rows))]
+    (/ (reduce + 0 (map :days details))
+       (count details))))
+
+(defn recovery-factor
+  ([returns*]
+   (recovery-factor returns* {}))
+  ([returns* {:keys [rf]
+              :or {rf 0}}]
+   (let [drawdown (max-drawdown returns*)]
+     (when (and (number? drawdown)
+                (neg? drawdown))
+       (/ (js/Math.abs (- (reduce + 0 returns*) rf))
+          (js/Math.abs drawdown))))))
+
+(defn ulcer-index
+  [returns*]
+  (let [drawdowns (to-drawdown-series returns*)
+        n (count returns*)]
+    (when (> n 1)
+      (js/Math.sqrt (/ (reduce + 0 (map #(* % %) drawdowns))
+                       (dec n))))))
+
+(defn serenity-index
+  ([returns*]
+   (serenity-index returns* {}))
+  ([returns* {:keys [rf]
+              :or {rf 0}}]
+   (let [std (returns/volatility returns* {:annualize false})
+         drawdowns (to-drawdown-series returns*)]
+     (when (and (number? std)
+                (pos? std))
+       (let [pitfall (some-> (distribution/expected-shortfall drawdowns)
+                             (-)
+                             (/ std))
+             ulcer (ulcer-index returns*)
+             denominator (when (and (number? ulcer)
+                                    (number? pitfall))
+                           (* ulcer pitfall))]
+         (when (and (number? denominator)
+                    (not (zero? denominator)))
+           (/ (- (reduce + 0 returns*) rf)
+              denominator)))))))
 
 (defn calmar
   ([returns*]

@@ -3,6 +3,17 @@
             [hyperopen.portfolio.metrics :as metrics]
             [hyperopen.portfolio.metrics.test-utils :refer [approx= fixture-daily-rows quantstats-returns quantstats-benchmark]]))
 
+(def ^:private period-fixture-rows
+  [{:day "2023-12-29" :time-ms (.getTime (js/Date. "2023-12-29T00:00:00.000Z")) :return 0.02}
+   {:day "2023-12-30" :time-ms (.getTime (js/Date. "2023-12-30T00:00:00.000Z")) :return -0.01}
+   {:day "2024-01-02" :time-ms (.getTime (js/Date. "2024-01-02T00:00:00.000Z")) :return 0.10}
+   {:day "2024-01-03" :time-ms (.getTime (js/Date. "2024-01-03T00:00:00.000Z")) :return -0.05}
+   {:day "2024-02-01" :time-ms (.getTime (js/Date. "2024-02-01T00:00:00.000Z")) :return -0.02}
+   {:day "2024-02-02" :time-ms (.getTime (js/Date. "2024-02-02T00:00:00.000Z")) :return -0.03}
+   {:day "2024-04-01" :time-ms (.getTime (js/Date. "2024-04-01T00:00:00.000Z")) :return 0.04}
+   {:day "2025-01-01" :time-ms (.getTime (js/Date. "2025-01-01T00:00:00.000Z")) :return -0.10}
+   {:day "2025-01-02" :time-ms (.getTime (js/Date. "2025-01-02T00:00:00.000Z")) :return 0.02}])
+
 (deftest cagr-years-override-matches-compounded-growth-over-explicit-span-test
   (let [returns [0.10 -0.05 -0.20]
         cumulative (metrics/comp returns)]
@@ -173,7 +184,80 @@
                1e-12))
   (is (approx= (metrics/information-ratio quantstats-returns quantstats-benchmark)
                0.3050013278569594
+               1e-12))
+  (is (approx= (metrics/beta quantstats-returns quantstats-benchmark)
+               1.3830749975931453
+               1e-12))
+  (is (approx= (metrics/alpha quantstats-returns
+                              quantstats-benchmark
+                              {:periods-per-year 252})
+               0.17009454125348972
+               1e-12))
+  (is (approx= (metrics/correlation quantstats-returns quantstats-benchmark)
+               0.9780052491364871
+               1e-12))
+  (is (approx= (metrics/treynor-ratio quantstats-returns
+                                       quantstats-benchmark
+                                       {:periods-per-year 252
+                                        :rf 0})
+               0.038236123704921354
                1e-12)))
+
+(deftest quantstats-full-report-period-rows-parity-test
+  (is (approx= (metrics/best-period-return period-fixture-rows :day)
+               0.10
+               1e-12))
+  (is (approx= (metrics/worst-period-return period-fixture-rows :day)
+               -0.10
+               1e-12))
+  (is (approx= (metrics/best-period-return period-fixture-rows :month)
+               0.04499999999999993
+               1e-12))
+  (is (approx= (metrics/worst-period-return period-fixture-rows :month)
+               -0.08199999999999996
+               1e-12))
+  (is (approx= (metrics/best-period-return period-fixture-rows :year)
+               0.03311207999999999
+               1e-12))
+  (is (approx= (metrics/worst-period-return period-fixture-rows :year)
+               -0.08199999999999996
+               1e-12))
+  (is (approx= (metrics/avg-win period-fixture-rows :month)
+               0.031599999999999996
+               1e-12))
+  (is (approx= (metrics/avg-loss period-fixture-rows :month)
+               -0.06569999999999998
+               1e-12))
+  (is (approx= (metrics/win-rate (mapv :return period-fixture-rows))
+               0.4444444444444444
+               1e-12))
+  (is (approx= (metrics/win-rate period-fixture-rows :month)
+               0.6
+               1e-12))
+  (is (approx= (metrics/win-rate period-fixture-rows :quarter)
+               0.5
+               1e-12))
+  (is (approx= (metrics/win-rate period-fixture-rows :year)
+               0.6666666666666666
+               1e-12)))
+
+(deftest quantstats-full-report-drawdown-extension-parity-test
+  (let [daily-rows (fixture-daily-rows quantstats-returns)]
+    (is (approx= (metrics/avg-drawdown daily-rows)
+                 -0.01325000000000001
+                 1e-12))
+    (is (approx= (metrics/avg-drawdown-days daily-rows)
+                 2.5
+                 1e-12))
+    (is (approx= (metrics/recovery-factor quantstats-returns)
+                 2.6499999999999972
+                 1e-12))
+    (is (approx= (metrics/ulcer-index quantstats-returns)
+                 0.008935349155458046
+                 1e-12))
+    (is (approx= (metrics/serenity-index quantstats-returns)
+                 4.171471755716605
+                 1e-9))))
 
 (deftest drawdown-details-parity-test
   (let [details (metrics/drawdown-details (fixture-daily-rows quantstats-returns))

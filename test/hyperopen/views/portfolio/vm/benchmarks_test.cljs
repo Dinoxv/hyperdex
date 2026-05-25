@@ -378,7 +378,11 @@
           view-model (vm/portfolio-vm state)
           cumulative-return-row (performance-metric-row view-model :cumulative-return)
           r2-row (performance-metric-row view-model :r2)
-          information-ratio-row (performance-metric-row view-model :information-ratio)]
+          information-ratio-row (performance-metric-row view-model :information-ratio)
+          beta-row (performance-metric-row view-model :beta)
+          alpha-row (performance-metric-row view-model :alpha)
+          correlation-row (performance-metric-row view-model :correlation)
+          treynor-row (performance-metric-row view-model :treynor-ratio)]
       (is (true? (get-in view-model [:performance-metrics :benchmark-selected?])))
       (is (= ["SPY" "QQQ"] (get-in view-model [:performance-metrics :benchmark-coins])))
       (is (= [{:coin "SPY"
@@ -393,7 +397,15 @@
       (is (number? (get-in cumulative-return-row [:benchmark-values "SPY"])))
       (is (number? (get-in cumulative-return-row [:benchmark-values "QQQ"])))
       (is (number? (:value r2-row)))
-      (is (number? (:value information-ratio-row))))))
+      (is (number? (:value information-ratio-row)))
+      (is (number? (:value beta-row)))
+      (is (number? (:value alpha-row)))
+      (is (number? (:value correlation-row)))
+      (is (number? (:value treynor-row)))
+      (is (nil? (get-in beta-row [:benchmark-values "SPY"])))
+      (is (nil? (get-in alpha-row [:benchmark-values "SPY"])))
+      (is (nil? (get-in correlation-row [:benchmark-values "SPY"])))
+      (is (nil? (get-in treynor-row [:benchmark-values "SPY"]))))))
 
 
 (deftest portfolio-vm-sync-metrics-derives-benchmark-daily-rows-from-cumulative-test

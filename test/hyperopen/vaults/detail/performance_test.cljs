@@ -160,10 +160,10 @@
           (is (= {"BTC" :daily-coverage-gate-failed} (:benchmark-reasons row))))))))
 
 (deftest performance-metrics-model-skips-request-build-when-worker-signature-is-unchanged-test
-  (let [request-signature {:summary-time-range :month
-                           :selected-benchmark-coins ["BTC"]
-                           :strategy-source-version 101
-                           :benchmark-source-versions [["BTC" 201]]}
+  (let [request-signature (metrics-bridge/metrics-request-signature :month
+                                                                    ["BTC"]
+                                                                    101
+                                                                    {"BTC" 201})
         request-state (atom {:signature request-signature})
         request-build-count (atom 0)
         request-dispatch-count (atom 0)

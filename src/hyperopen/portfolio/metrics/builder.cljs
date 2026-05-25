@@ -61,6 +61,7 @@
         (window/add-drawdown-and-window-metrics context)
         (core/add-daily-risk-adjusted-metrics context)
         (core/add-daily-distribution-metrics context)
+        (core/add-full-report-period-metrics context)
         (benchmark/add-benchmark-relative-metrics context))))
 
 (defn metric-rows

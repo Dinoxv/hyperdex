@@ -36,6 +36,7 @@
                                                               {"SPY" 201
                                                                "QQQ" 301})]
     (is (= :month (:summary-time-range signature-a)))
+    (is (= 2 (:metrics-schema-version signature-a)))
     (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
     (is (= [["SPY" 201] ["QQQ" 301]]
            (:benchmark-source-versions signature-a)))
@@ -132,6 +133,7 @@
                                                               {"SPY" 201
                                                                "QQQ" 301})]
     (is (= :month (:summary-time-range signature-a)))
+    (is (= 2 (:metrics-schema-version signature-a)))
     (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
     (is (= [["SPY" 201] ["QQQ" 301]]
            (:benchmark-source-versions signature-a)))

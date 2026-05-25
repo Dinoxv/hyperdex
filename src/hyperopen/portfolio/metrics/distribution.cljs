@@ -8,6 +8,9 @@
   (case period
     :day day
     :month (subs day 0 7)
+    :quarter (let [month (js/parseInt (subs day 5 7) 10)
+                   quarter (inc (quot (dec month) 3))]
+               (str (subs day 0 4) "-Q" quarter))
     :year (subs day 0 4)
     day))
 
@@ -18,11 +21,41 @@
                           (update acc (group-key day period) (fnil conj []) return))
                         (sorted-map)
                         rows)]
-    (mapv (fn [[_ values]]
-            (if compounded
-              (returns/comp values)
-              (reduce + 0 values)))
-          grouped)))
+	    (mapv (fn [[_ values]]
+	            (if compounded
+	              (returns/comp values)
+	              (reduce + 0 values)))
+	          grouped)))
+
+(defn- period-return-values
+  [daily-rows period compounded]
+  (aggregate-period-returns daily-rows period compounded))
+
+(defn best-period-return
+  ([daily-rows]
+   (best-period-return daily-rows :day))
+  ([daily-rows period]
+   (when-let [values (seq (period-return-values daily-rows period true))]
+     (apply max values))))
+
+(defn worst-period-return
+  ([daily-rows]
+   (worst-period-return daily-rows :day))
+  ([daily-rows period]
+   (when-let [values (seq (period-return-values daily-rows period true))]
+     (apply min values))))
+
+(defn avg-win
+  ([daily-rows]
+   (avg-win daily-rows :day))
+  ([daily-rows period]
+   (math/mean (filter pos? (period-return-values daily-rows period true)))))
+
+(defn avg-loss
+  ([daily-rows]
+   (avg-loss daily-rows :day))
+  ([daily-rows period]
+   (math/mean (filter neg? (period-return-values daily-rows period true)))))
 
 (defn expected-return
   ([daily-rows]
@@ -41,25 +74,27 @@
           1)))))
 
 (defn win-rate
-  [returns]
-  (let [non-zero (vec (filter (complement zero?) returns))]
-    (if (seq non-zero)
-      (/ (count (filter pos? returns))
-         (count non-zero))
-      0)))
+  ([returns]
+   (let [non-zero (vec (filter (complement zero?) returns))]
+     (if (seq non-zero)
+       (/ (count (filter pos? returns))
+          (count non-zero))
+       0)))
+  ([daily-rows period]
+   (win-rate (period-return-values daily-rows period true))))
 
-(defn- avg-win
+(defn- avg-positive-return
   [returns]
   (math/mean (filter pos? returns)))
 
-(defn- avg-loss
+(defn- avg-negative-return
   [returns]
   (math/mean (filter neg? returns)))
 
 (defn payoff-ratio
   [returns]
-  (let [loss (avg-loss returns)
-        win (avg-win returns)]
+  (let [loss (avg-negative-return returns)
+        win (avg-positive-return returns)]
     (when (and (number? loss)
                (number? win)
                (not (zero? loss)))
@@ -216,3 +251,64 @@
       (/ (or (math/mean diff) 0)
          std)
       0)))
+
+(defn- aligned-return-pair
+  [strategy-returns benchmark-returns]
+  (let [strategy* (vec strategy-returns)
+        benchmark* (vec benchmark-returns)]
+    (when (and (= (count strategy*) (count benchmark*))
+               (> (count strategy*) 1))
+      [strategy* benchmark*])))
+
+(defn- covariance-numerator
+  [xs ys]
+  (let [mx (math/mean xs)
+        my (math/mean ys)]
+    (when (and (number? mx)
+               (number? my))
+      (reduce + 0
+              (map (fn [x y]
+                     (* (- x mx) (- y my)))
+                   xs ys)))))
+
+(defn beta
+  [strategy-returns benchmark-returns]
+  (when-let [[strategy* benchmark*] (aligned-return-pair strategy-returns benchmark-returns)]
+    (let [benchmark-variance-numerator (covariance-numerator benchmark* benchmark*)
+          covariance (covariance-numerator strategy* benchmark*)]
+      (when (and (number? benchmark-variance-numerator)
+                 (number? covariance)
+                 (not (zero? benchmark-variance-numerator)))
+        (/ covariance benchmark-variance-numerator)))))
+
+(defn alpha
+  ([strategy-returns benchmark-returns]
+   (alpha strategy-returns benchmark-returns {}))
+  ([strategy-returns benchmark-returns {:keys [periods-per-year]
+                                        :or {periods-per-year returns/default-periods-per-year}}]
+   (when-let [[strategy* benchmark*] (aligned-return-pair strategy-returns benchmark-returns)]
+     (let [beta* (beta strategy* benchmark*)
+           strategy-mean (math/mean strategy*)
+           benchmark-mean (math/mean benchmark*)]
+       (when (and (number? beta*)
+                  (number? strategy-mean)
+                  (number? benchmark-mean)
+                  (number? periods-per-year))
+         (* (- strategy-mean (* beta* benchmark-mean))
+            periods-per-year))))))
+
+(defn correlation
+  [strategy-returns benchmark-returns]
+  (math/pearson-correlation strategy-returns benchmark-returns))
+
+(defn treynor-ratio
+  ([strategy-returns benchmark-returns]
+   (treynor-ratio strategy-returns benchmark-returns {}))
+  ([strategy-returns benchmark-returns {:keys [rf]
+                                        :or {rf 0}}]
+   (let [beta* (beta strategy-returns benchmark-returns)]
+     (cond
+       (nil? beta*) nil
+       (zero? beta*) 0
+       :else (/ (- (or (returns/comp strategy-returns) 0) rf)
+                beta*)))))

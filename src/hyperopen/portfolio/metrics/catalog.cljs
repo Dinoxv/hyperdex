@@ -17,9 +17,18 @@
    :max-dd-period-start "Date the maximum drawdown began at its prior peak."
    :max-dd-period-end "Date the maximum drawdown recovered, or the latest observed point."
    :longest-dd-days "Longest drawdown duration in calendar days."
+   :avg-drawdown "Average maximum drawdown across observed drawdown periods."
+   :avg-drawdown-days "Average duration of observed drawdown periods."
+   :recovery-factor "Absolute total return divided by absolute maximum drawdown."
+   :ulcer-index "Root mean square of drawdowns, measuring drawdown depth and duration."
+   :serenity-index "Return quality ratio combining total return, ulcer index, and drawdown tail risk."
    :volatility-ann "Annualized standard deviation of returns."
    :r2 "How closely returns moved with the benchmark, on a 0 to 1 scale."
    :information-ratio "Active return divided by tracking error versus the benchmark."
+   :beta "Sensitivity of portfolio returns to the selected benchmark."
+   :alpha "Annualized excess return after adjusting for benchmark sensitivity."
+   :correlation "Linear correlation between portfolio returns and the selected benchmark."
+   :treynor-ratio "Compounded excess return divided by benchmark beta."
    :calmar "Annualized return divided by maximum drawdown."
    :skew "Asymmetry of the return distribution."
    :kurtosis "Fat-tailedness of the return distribution relative to normal."
@@ -49,7 +58,19 @@
    :y3-ann "Annualized return over the last three years."
    :y5-ann "Annualized return over the last five years."
    :y10-ann "Annualized return over the last ten years."
-   :all-time-ann "Annualized return over the full available history."})
+   :all-time-ann "Annualized return over the full available history."
+   :best-day "Best single-day return in the selected window."
+   :worst-day "Worst single-day return in the selected window."
+   :best-month "Best compounded monthly return in the selected window."
+   :worst-month "Worst compounded monthly return in the selected window."
+   :best-year "Best compounded yearly return in the selected window."
+   :worst-year "Worst compounded yearly return in the selected window."
+   :avg-up-month "Average positive compounded monthly return."
+   :avg-down-month "Average negative compounded monthly return."
+   :win-days "Share of non-zero daily returns that are positive."
+   :win-month "Share of non-zero monthly returns that are positive."
+   :win-quarter "Share of non-zero quarterly returns that are positive."
+   :win-year "Share of non-zero yearly returns that are positive."})
 
 (def ^:private performance-metric-groups
   [{:id :overview
@@ -100,12 +121,27 @@
            {:key :max-dd-period-end
             :label "Max DD Period End"
             :kind :date}
-           {:key :longest-dd-days
-            :label "Longest DD Days"
-            :kind :integer}
-           {:key :volatility-ann
-            :label "Volatility (ann.)"
-            :kind :percent}
+	           {:key :longest-dd-days
+	            :label "Longest DD Days"
+	            :kind :integer}
+	           {:key :avg-drawdown
+	            :label "Avg. Drawdown"
+	            :kind :percent}
+	           {:key :avg-drawdown-days
+	            :label "Avg. Drawdown Days"
+	            :kind :integer}
+	           {:key :recovery-factor
+	            :label "Recovery Factor"
+	            :kind :ratio}
+	           {:key :ulcer-index
+	            :label "Ulcer Index"
+	            :kind :ratio}
+	           {:key :serenity-index
+	            :label "Serenity Index"
+	            :kind :ratio}
+	           {:key :volatility-ann
+	            :label "Volatility (ann.)"
+	            :kind :percent}
            {:key :r2
             :label "R^2"
             :kind :ratio}
@@ -203,9 +239,60 @@
            {:key :y10-ann
             :label "10Y (ann.)"
             :kind :percent}
-           {:key :all-time-ann
-            :label "All-time (ann.)"
-            :kind :percent}]}])
+	           {:key :all-time-ann
+	            :label "All-time (ann.)"
+	            :kind :percent}]}
+	   {:id :period-extremes
+	    :rows [{:key :best-day
+	            :label "Best Day"
+	            :kind :percent}
+	           {:key :worst-day
+	            :label "Worst Day"
+	            :kind :percent}
+	           {:key :best-month
+	            :label "Best Month"
+	            :kind :percent}
+	           {:key :worst-month
+	            :label "Worst Month"
+	            :kind :percent}
+	           {:key :best-year
+	            :label "Best Year"
+	            :kind :percent}
+	           {:key :worst-year
+	            :label "Worst Year"
+	            :kind :percent}]}
+	   {:id :win-rates
+	    :rows [{:key :avg-up-month
+	            :label "Avg. Up Month"
+	            :kind :percent}
+	           {:key :avg-down-month
+	            :label "Avg. Down Month"
+	            :kind :percent}
+	           {:key :win-days
+	            :label "Win Days"
+	            :kind :percent}
+	           {:key :win-month
+	            :label "Win Month"
+	            :kind :percent}
+	           {:key :win-quarter
+	            :label "Win Quarter"
+	            :kind :percent}
+	           {:key :win-year
+	            :label "Win Year"
+	            :kind :percent}]}
+	   {:id :benchmark-relative
+	    :rows [{:key :beta
+	            :label "Beta"
+	            :kind :ratio}
+	           {:key :alpha
+	            :label "Alpha"
+	            :kind :ratio}
+	           {:key :correlation
+	            :label "Correlation"
+	            :kind :percent}
+	           {:key :treynor-ratio
+	            :label "Treynor Ratio"
+	            :kind :percent}]}])
 
 (defn metric-rows
   [metric-values]

@@ -11,6 +11,9 @@
 (def ^:private benchmark-relative-metric-keys
   [:r2 :information-ratio])
 
+(def metrics-request-signature-schema-version
+  2)
+
 (defn- metric-token
   [value]
   (cond
@@ -100,7 +103,8 @@
 (defn metrics-request-signature
   [summary-time-range selected-benchmark-coins strategy-source-version benchmark-source-version-map]
   (let [selected-coins (vec (or selected-benchmark-coins []))]
-    {:summary-time-range (portfolio-actions/normalize-summary-time-range summary-time-range)
+    {:metrics-schema-version metrics-request-signature-schema-version
+     :summary-time-range (portfolio-actions/normalize-summary-time-range summary-time-range)
      :selected-benchmark-coins selected-coins
      :strategy-source-version strategy-source-version
      :benchmark-source-versions (mapv (fn [coin]

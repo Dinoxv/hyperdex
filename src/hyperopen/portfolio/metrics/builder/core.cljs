@@ -77,8 +77,9 @@
                             (:sortino-min? gates*)
                             (>= sortino-downside-count
                                 (:sortino-min-downside gates)))
-     :benchmark-enabled? (and daily-enabled?
-                             benchmark-min?)}))
+     :benchmark-enabled? (and benchmark-min?
+                             (not (:structural-gap? gates*)))
+     :benchmark-high-confidence? daily-enabled?}))
 
 (defn assoc-metric-result
   [acc key value enabled status reason]
@@ -223,3 +224,55 @@
                                      :daily-coverage-gate-failed)
       (assoc-estimated-metric-result :max-consecutive-wins (distribution/consecutive-wins strategy-returns) daily-enabled? :daily-coverage-gate-failed)
       (assoc-estimated-metric-result :max-consecutive-losses (distribution/consecutive-losses strategy-returns) daily-enabled? :daily-coverage-gate-failed)))
+
+(defn add-full-report-period-metrics
+  [acc {:keys [strategy-rows daily-enabled?]}]
+  (-> acc
+      (assoc-estimated-metric-result :best-day
+                                     (distribution/best-period-return strategy-rows :day)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :worst-day
+                                     (distribution/worst-period-return strategy-rows :day)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :best-month
+                                     (distribution/best-period-return strategy-rows :month)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :worst-month
+                                     (distribution/worst-period-return strategy-rows :month)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :best-year
+                                     (distribution/best-period-return strategy-rows :year)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :worst-year
+                                     (distribution/worst-period-return strategy-rows :year)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :avg-up-month
+                                     (distribution/avg-win strategy-rows :month)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :avg-down-month
+                                     (distribution/avg-loss strategy-rows :month)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :win-days
+                                     (distribution/win-rate (history/returns-values strategy-rows))
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :win-month
+                                     (distribution/win-rate strategy-rows :month)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :win-quarter
+                                     (distribution/win-rate strategy-rows :quarter)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)
+      (assoc-estimated-metric-result :win-year
+                                     (distribution/win-rate strategy-rows :year)
+                                     daily-enabled?
+                                     :daily-coverage-gate-failed)))

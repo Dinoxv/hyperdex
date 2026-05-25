@@ -122,7 +122,21 @@
                               :benchmark-coverage-gate-failed)))
 
 (defn add-benchmark-relative-metrics
-  [acc context]
+  [acc {:keys [rf periods-per-year] :as context}]
   (-> acc
       (assoc-benchmark-metric :r2 distribution/r-squared context)
-      (assoc-benchmark-metric :information-ratio distribution/information-ratio context)))
+      (assoc-benchmark-metric :information-ratio distribution/information-ratio context)
+      (assoc-benchmark-metric :beta distribution/beta context)
+      (assoc-benchmark-metric :alpha
+                              (fn [strategy-returns benchmark-returns]
+                                (distribution/alpha strategy-returns
+                                                    benchmark-returns
+                                                    {:periods-per-year periods-per-year}))
+                              context)
+      (assoc-benchmark-metric :correlation distribution/correlation context)
+      (assoc-benchmark-metric :treynor-ratio
+                              (fn [strategy-returns benchmark-returns]
+                                (distribution/treynor-ratio strategy-returns
+                                                            benchmark-returns
+                                                            {:rf rf}))
+                              context)))

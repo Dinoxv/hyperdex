@@ -180,7 +180,13 @@
     (is (number? (:information-ratio metrics*)))
     (is (= :low-confidence (get-in metrics* [:metric-status :information-ratio])))
     (is (= :benchmark-sparse-intervals
-           (get-in metrics* [:metric-reason :information-ratio])))))
+           (get-in metrics* [:metric-reason :information-ratio])))
+    (doseq [metric-key [:beta :alpha :correlation :treynor-ratio]]
+      (is (number? (get metrics* metric-key))
+          (str "missing sparse benchmark metric " metric-key))
+      (is (= :low-confidence (get-in metrics* [:metric-status metric-key])))
+      (is (= :benchmark-sparse-intervals
+             (get-in metrics* [:metric-reason metric-key]))))))
 
 (deftest compute-performance-metrics-suppresses-benchmark-relative-metrics-for-short-sparse-windows-test
   (let [strategy-returns (vec (take 13 (cycle [0.04 -0.02 0.03 0.01 -0.015 0.05 -0.01])))
@@ -203,7 +209,13 @@
     (is (nil? (:information-ratio metrics*)))
     (is (= :suppressed (get-in metrics* [:metric-status :information-ratio])))
     (is (= :benchmark-coverage-gate-failed
-           (get-in metrics* [:metric-reason :information-ratio])))))
+           (get-in metrics* [:metric-reason :information-ratio])))
+    (doseq [metric-key [:beta :alpha :correlation :treynor-ratio]]
+      (is (nil? (get metrics* metric-key))
+          (str "unexpected short sparse benchmark metric " metric-key))
+      (is (= :suppressed (get-in metrics* [:metric-status metric-key])))
+      (is (= :benchmark-coverage-gate-failed
+             (get-in metrics* [:metric-reason metric-key]))))))
 
 (deftest compute-performance-metrics-parity-test
   (let [metrics* (metrics/compute-performance-metrics
@@ -215,12 +227,12 @@
     (is (nil? (:volatility-ann metrics*)))
     (is (nil? (:sharpe metrics*)))
     (is (nil? (:sortino metrics*)))
-    (is (nil? (:r2 metrics*)))
-    (is (nil? (:information-ratio metrics*)))
+    (is (number? (:r2 metrics*)))
+    (is (number? (:information-ratio metrics*)))
     (is (= :suppressed (get-in metrics* [:metric-status :volatility-ann])))
     (is (= :core-gate-failed (get-in metrics* [:metric-reason :volatility-ann])))
-    (is (= :suppressed (get-in metrics* [:metric-status :r2])))
-    (is (= :benchmark-coverage-gate-failed (get-in metrics* [:metric-reason :r2])))
+    (is (= :low-confidence (get-in metrics* [:metric-status :r2])))
+    (is (= :daily-coverage-gate-failed (get-in metrics* [:metric-reason :r2])))
     (is (approx= (:mtd metrics*) 0.05288342670115531 1e-12))
     (is (approx= (:ytd metrics*) 0.05288342670115531 1e-12))))
 
@@ -254,14 +266,38 @@
                           (mapcat :rows groups))
         r2-row (get rows-by-key :r2)
         information-ratio-row (get rows-by-key :information-ratio)
-        daily-var-row (get rows-by-key :daily-var)]
+        daily-var-row (get rows-by-key :daily-var)
+        full-report-keys [:best-day
+                          :worst-day
+                          :best-month
+                          :worst-month
+                          :best-year
+                          :worst-year
+                          :avg-drawdown
+                          :avg-drawdown-days
+                          :recovery-factor
+                          :ulcer-index
+                          :serenity-index
+                          :avg-up-month
+                          :avg-down-month
+                          :win-days
+                          :win-month
+                          :win-quarter
+                          :win-year
+                          :beta
+                          :alpha
+                          :correlation
+                          :treynor-ratio]]
     (is (= [:overview
             :risk-adjusted
             :drawdown-and-risk
             :expectation-and-var
             :streaks-and-pain
             :trade-shape
-            :period-returns]
+            :period-returns
+            :period-extremes
+            :win-rates
+            :benchmark-relative]
            (mapv :id groups)))
     (is (= [:time-in-market :cumulative-return :cagr]
            (mapv :key (:rows (first groups)))))
@@ -270,6 +306,11 @@
             :max-dd-period-start
             :max-dd-period-end
             :longest-dd-days
+            :avg-drawdown
+            :avg-drawdown-days
+            :recovery-factor
+            :ulcer-index
+            :serenity-index
             :volatility-ann
             :r2
             :information-ratio
@@ -286,4 +327,9 @@
     (is (nil? (:reason information-ratio-row)))
     (is (number? (:value daily-var-row)))
     (is (= :ok (:status daily-var-row)))
-    (is (nil? (:reason daily-var-row)))))
+    (is (nil? (:reason daily-var-row)))
+    (doseq [metric-key full-report-keys]
+      (is (contains? metrics* metric-key)
+          (str "missing computed metric " metric-key))
+      (is (contains? rows-by-key metric-key)
+          (str "missing catalog row " metric-key)))))

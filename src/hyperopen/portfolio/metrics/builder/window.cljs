@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.metrics.builder.window
   (:require [hyperopen.portfolio.metrics.builder.core :as core]
+            [hyperopen.portfolio.metrics.drawdown :as drawdown]
             [hyperopen.portfolio.metrics.history :as history]
             [hyperopen.portfolio.metrics.returns :as returns]))
 
@@ -118,6 +119,7 @@
   [acc {:keys [drawdown-stats
                drawdown-reliable?
                strategy-returns
+               strategy-rows
                periods-per-year
                mtd-cumulative
                m3-cumulative
@@ -150,6 +152,26 @@
                                 :drawdown-unavailable)
       (core/assoc-metric-result :longest-dd-days (:longest-dd-days drawdown-stats)
                                 (boolean drawdown-stats)
+                                (if drawdown-reliable? :ok :low-confidence)
+                                :drawdown-unavailable)
+      (core/assoc-metric-result :avg-drawdown (drawdown/avg-drawdown strategy-rows)
+                                (boolean drawdown-stats)
+                                (if drawdown-reliable? :ok :low-confidence)
+                                :drawdown-unavailable)
+      (core/assoc-metric-result :avg-drawdown-days (drawdown/avg-drawdown-days strategy-rows)
+                                (boolean drawdown-stats)
+                                (if drawdown-reliable? :ok :low-confidence)
+                                :drawdown-unavailable)
+      (core/assoc-metric-result :recovery-factor (drawdown/recovery-factor strategy-returns)
+                                (seq strategy-returns)
+                                (if drawdown-reliable? :ok :low-confidence)
+                                :drawdown-unavailable)
+      (core/assoc-metric-result :ulcer-index (drawdown/ulcer-index strategy-returns)
+                                (seq strategy-returns)
+                                (if drawdown-reliable? :ok :low-confidence)
+                                :drawdown-unavailable)
+      (core/assoc-metric-result :serenity-index (drawdown/serenity-index strategy-returns)
+                                (seq strategy-returns)
                                 (if drawdown-reliable? :ok :low-confidence)
                                 :drawdown-unavailable)
       (core/assoc-metric-result :calmar
