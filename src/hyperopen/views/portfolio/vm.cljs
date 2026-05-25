@@ -146,7 +146,7 @@
   (atom nil))
 
 (def ^:private benchmark-computation-context-cache-version
-  1)
+  2)
 
 (defn- summary-entry-source-version
   [summary-entry]

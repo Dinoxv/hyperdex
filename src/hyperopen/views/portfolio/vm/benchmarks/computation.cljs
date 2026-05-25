@@ -66,11 +66,10 @@
                                              strategy-cumulative-rows
                                              anchor-time-ms
                                              end-time-ms))
-  ([state summary-scope summary-time-range benchmark-coins strategy-cumulative-rows anchor-time-ms end-time-ms]
+  ([state summary-scope summary-time-range benchmark-coins _strategy-cumulative-rows anchor-time-ms end-time-ms]
    (if (seq benchmark-coins)
      (let [{:keys [interval]} (portfolio-actions/returns-benchmark-candle-request summary-time-range)
-           normalized-range (portfolio-actions/normalize-summary-time-range summary-time-range)
-           strategy-time-points (vm-history/cumulative-return-time-points strategy-cumulative-rows)]
+           normalized-range (portfolio-actions/normalize-summary-time-range summary-time-range)]
        (reduce (fn [rows-by-coin coin]
                  (if (seq coin)
                    (if-let [vault-address (selector/vault-benchmark-address coin)]
@@ -79,9 +78,7 @@
                                                                                 normalized-range)]
                        (assoc rows-by-coin
                               coin
-                              (vm-history/aligned-summary-return-rows
-                               (portfolio-metrics/returns-history-rows state summary :all)
-                               strategy-time-points)))
+                              (portfolio-metrics/returns-history-rows state summary :all)))
                      (if-let [trader-address (portfolio-actions/trader-benchmark-address coin)]
                        (let [summary (trader-benchmark-summary state
                                                                trader-address
@@ -89,9 +86,7 @@
                                                                normalized-range)]
                          (assoc rows-by-coin
                                 coin
-                                (vm-history/aligned-summary-return-rows
-                                 (portfolio-metrics/returns-history-rows state summary summary-scope)
-                                 strategy-time-points)))
+                                (portfolio-metrics/returns-history-rows state summary summary-scope)))
                        (let [candles (vm-history/benchmark-candle-points (get-in state [:candles coin interval]))]
                          (assoc rows-by-coin
                                 coin

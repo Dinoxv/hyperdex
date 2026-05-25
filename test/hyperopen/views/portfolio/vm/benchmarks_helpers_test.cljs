@@ -335,6 +335,42 @@
       (is (number? (get (:benchmark-source-version-map context) "SPY")))
       (is (number? (get (:benchmark-source-version-map context) vault-ref))))))
 
+(deftest benchmark-computation-context-keeps-trader-native-return-window-test
+  (let [t0 1704067200000
+        t1 (+ t0 (* 24 60 60 1000))
+        t2 (+ t1 (* 24 60 60 1000))
+        t3 (+ t2 (* 24 60 60 1000))
+        trader-address "0x7c930969fcf3e5a5c78bcf2e1cefda3f53e3c8fd"
+        trader-ref (str "trader:" trader-address)
+        strategy-summary {:pnlHistory [[t0 0]
+                                       [t2 5]]
+                          :accountValueHistory [[t0 100]
+                                                [t2 105]]}
+        trader-summary {:pnlHistory [[t0 0]
+                                     [t1 278.963059]
+                                     [t3 259.534912]]
+                        :accountValueHistory [[t0 100]
+                                              [t1 378.963059]
+                                              [t3 359.534912]]}
+        state {:portfolio {:summary-by-key {:three-month strategy-summary}
+                           :trader-benchmarks-by-address
+                           {trader-address {:summary-by-key {:three-month trader-summary}}}}}
+        selector {:selected-coins [trader-ref]
+                  :label-by-coin {trader-ref "Trader 0x7c93...c8fd"}}]
+    (let [context (vm-benchmarks/benchmark-computation-context state
+                                                               strategy-summary
+                                                               :all
+                                                               :three-month
+                                                               selector)
+          trader-rows (get (:benchmark-cumulative-rows-by-coin context)
+                           trader-ref)]
+      (is (= [t0 t1 t3]
+             (mapv first trader-rows)))
+      (is (every? true?
+                  (map approx=
+                       [0 278.963059 259.534912]
+                       (mapv second trader-rows)))))))
+
 (deftest benchmark-computation-context-keeps-dense-market-benchmark-rows-on-candle-timestamps-test
   (let [c0 1704067200000
         c1 (+ c0 3600000)
