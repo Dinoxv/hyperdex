@@ -18,9 +18,7 @@
                                                                      rows))]
       (is (= {:portfolio-request {:strategy-cumulative-rows strategy-cumulative-rows
                                   :strategy-daily-rows [{:time-ms 1 :value 0}
-                                                        {:time-ms 2 :value 5}]
-                                  :benchmark-cumulative-rows [[1 0]
-                                                              [2 3]]}
+                                                        {:time-ms 2 :value 5}]}
               :benchmark-requests [{:coin "SPY"
                                     :request {:strategy-cumulative-rows [[1 0]
                                                                          [2 3]]}}
@@ -69,6 +67,57 @@
              :benchmark-reasons {"SPY" nil
                                  "QQQ" :coverage-gate}}]
            rows))))
+
+(deftest performance-row-helpers-place-benchmark-relative-metrics-in-benchmark-columns-test
+  (let [groups [{:title "Risk"
+                 :rows [{:key :r2
+                         :label "R^2"}
+                        {:key :information-ratio
+                         :label "Information Ratio"}
+                        {:key :cumulative-return
+                         :label "Cumulative Return"}]}]
+        portfolio-values {:r2 0.99
+                          :information-ratio 1.4
+                          :cumulative-return 0.25
+                          :metric-status {:r2 :low-confidence
+                                          :information-ratio :low-confidence
+                                          :cumulative-return :ok}
+                          :metric-reason {:r2 :benchmark-sparse-intervals
+                                          :information-ratio :benchmark-sparse-intervals}}
+        benchmark-columns [{:coin "SPY"
+                            :values {:r2 0.7
+                                     :information-ratio 0.2
+                                     :cumulative-return 0.08
+                                     :metric-status {:r2 :low-confidence
+                                                     :information-ratio :low-confidence
+                                                     :cumulative-return :ok}
+                                     :metric-reason {:r2 :benchmark-sparse-intervals
+                                                     :information-ratio :benchmark-sparse-intervals}}}
+                           {:coin "QQQ"
+                            :values {:r2 0.4
+                                     :information-ratio -0.1
+                                     :cumulative-return 0.12
+                                     :metric-status {:r2 :low-confidence
+                                                     :information-ratio :low-confidence
+                                                     :cumulative-return :ok}
+                                     :metric-reason {:r2 :benchmark-sparse-intervals
+                                                     :information-ratio :benchmark-sparse-intervals}}}]
+        rows-by-key (->> (vm-performance/with-performance-metric-columns groups
+                                                                          portfolio-values
+                                                                          benchmark-columns)
+                         first
+                         :rows
+                         (map (juxt :key identity))
+                         (into {}))]
+    (is (nil? (get-in rows-by-key [:r2 :portfolio-value])))
+    (is (nil? (get-in rows-by-key [:r2 :portfolio-status])))
+    (is (= 0.7 (get-in rows-by-key [:r2 :benchmark-values "SPY"])))
+    (is (= 0.4 (get-in rows-by-key [:r2 :benchmark-values "QQQ"])))
+    (is (nil? (get-in rows-by-key [:information-ratio :portfolio-value])))
+    (is (= 0.2 (get-in rows-by-key [:information-ratio :benchmark-values "SPY"])))
+    (is (= -0.1 (get-in rows-by-key [:information-ratio :benchmark-values "QQQ"])))
+    (is (= 0.25 (get-in rows-by-key [:cumulative-return :portfolio-value])))
+    (is (= 0.08 (get-in rows-by-key [:cumulative-return :benchmark-values "SPY"])))))
 
 (deftest performance-metrics-model-skips-request-build-when-worker-signature-is-unchanged-test
   (let [strategy-cumulative-rows [[1 0]

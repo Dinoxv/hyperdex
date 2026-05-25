@@ -164,6 +164,90 @@
              :benchmark-requests [{:coin "SPY"
                                    :request {:strategy-cumulative-rows [[1 0] [2 3]]}}]})))))
 
+(deftest compute-metrics-sync-overlays-portfolio-relative-metrics-into-each-benchmark-result-test
+  (let [portfolio-cumulative [[1 0] [2 5]]
+        portfolio-daily [{:time-ms 1 :return 0.01}
+                         {:time-ms 2 :return 0.04}]
+        spy-cumulative [[1 0] [2 3]]
+        qqq-cumulative [[1 0] [2 4]]
+        spy-daily [{:time-ms 2 :return 0.03}]
+        qqq-daily [{:time-ms 2 :return 0.04}]
+        captured-requests (atom [])]
+    (with-redefs [portfolio-metrics/daily-compounded-returns (fn [rows]
+                                                               (cond
+                                                                 (= rows spy-cumulative) spy-daily
+                                                                 (= rows qqq-cumulative) qqq-daily
+                                                                 :else []))
+                  portfolio-metrics/compute-performance-metrics
+                  (fn [{:keys [strategy-cumulative-rows benchmark-daily-rows] :as request}]
+                    (swap! captured-requests conj request)
+                    (cond
+                      (= benchmark-daily-rows spy-daily)
+                      {:r2 0.7
+                       :information-ratio 0.2
+                       :metric-status {:r2 :low-confidence
+                                       :information-ratio :low-confidence}
+                       :metric-reason {:r2 :benchmark-sparse-intervals
+                                       :information-ratio :benchmark-sparse-intervals}}
+
+                      (= benchmark-daily-rows qqq-daily)
+                      {:r2 0.4
+                       :information-ratio -0.1
+                       :metric-status {:r2 :low-confidence
+                                       :information-ratio :low-confidence}
+                       :metric-reason {:r2 :benchmark-sparse-intervals
+                                       :information-ratio :benchmark-sparse-intervals}}
+
+                      (= strategy-cumulative-rows portfolio-cumulative)
+                      {:cumulative-return 0.25
+                       :r2 0.99
+                       :metric-status {:cumulative-return :ok
+                                       :r2 :low-confidence}
+                       :metric-reason {:r2 :benchmark-sparse-intervals}}
+
+                      (= strategy-cumulative-rows spy-cumulative)
+                      {:cumulative-return 0.08
+                       :r2 nil
+                       :metric-status {:cumulative-return :ok
+                                       :r2 :suppressed}
+                       :metric-reason {:r2 :benchmark-coverage-gate-failed}}
+
+                      (= strategy-cumulative-rows qqq-cumulative)
+                      {:cumulative-return 0.12
+                       :r2 nil
+                       :metric-status {:cumulative-return :ok
+                                       :r2 :suppressed}
+                       :metric-reason {:r2 :benchmark-coverage-gate-failed}}))]
+      (is (= {:portfolio-values {:cumulative-return 0.25
+                                  :r2 0.99
+                                  :metric-status {:cumulative-return :ok
+                                                  :r2 :low-confidence}
+                                  :metric-reason {:r2 :benchmark-sparse-intervals}}
+              :benchmark-values-by-coin {"SPY" {:cumulative-return 0.08
+                                                :r2 0.7
+                                                :information-ratio 0.2
+                                                :metric-status {:cumulative-return :ok
+                                                                :r2 :low-confidence
+                                                                :information-ratio :low-confidence}
+                                                :metric-reason {:r2 :benchmark-sparse-intervals
+                                                                :information-ratio :benchmark-sparse-intervals}}
+                                         "QQQ" {:cumulative-return 0.12
+                                                :r2 0.4
+                                                :information-ratio -0.1
+                                                :metric-status {:cumulative-return :ok
+                                                                :r2 :low-confidence
+                                                                :information-ratio :low-confidence}
+                                                :metric-reason {:r2 :benchmark-sparse-intervals
+                                                                :information-ratio :benchmark-sparse-intervals}}}}
+             (metrics-bridge/compute-metrics-sync
+              {:portfolio-request {:strategy-cumulative-rows portfolio-cumulative
+                                   :strategy-daily-rows portfolio-daily}
+               :benchmark-requests [{:coin "SPY"
+                                     :request {:strategy-cumulative-rows spy-cumulative}}
+                                    {:coin "QQQ"
+                                     :request {:strategy-cumulative-rows qqq-cumulative}}]})))
+      (is (= 5 (count @captured-requests))))))
+
 (deftest vault-snapshot-and-alignment-helpers-cover-branches-test
   (is (= ["1d" "7d" "30d"]
          (metrics-bridge/vault-snapshot-range-keys)))

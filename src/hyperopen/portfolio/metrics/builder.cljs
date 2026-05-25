@@ -28,6 +28,7 @@
         quality-context (core/build-quality-context intervals strategy-rows mar gates)
         benchmark-context (benchmark/build-benchmark-context strategy-rows
                                                              benchmark-daily-rows
+                                                             intervals
                                                              gates)
         core-context (core/build-core-metric-context intervals
                                                      strategy-rows

@@ -45,7 +45,14 @@
               {:strategy-cumulative-rows [[:btc 1]]
                :strategy-daily-rows [[:btc-daily 0.03]]
                :rf 0
-               :periods-per-year 365}]
+               :periods-per-year 365}
+              {:strategy-cumulative-rows [[:portfolio 1]]
+               :strategy-daily-rows [[:portfolio-daily 0.10]]
+               :benchmark-daily-rows [[:btc-daily 0.03]]
+               :rf 0.01
+               :mar 0.02
+               :periods-per-year 52
+               :quality-gates {:minimum-samples 2}}]
              @captured-requests*)))))
 
 (deftest metrics-result-payload-derives-fallback-daily-rows-from-cumulative-test
@@ -89,5 +96,12 @@
               {:strategy-cumulative-rows [[:eth 1] [:eth 2]]
                :strategy-daily-rows [[:daily-from [[:eth 1] [:eth 2]]]]
                :rf 0
-               :periods-per-year 365}]
+               :periods-per-year 365}
+              {:strategy-cumulative-rows [[:portfolio 1]]
+               :strategy-daily-rows nil
+               :benchmark-daily-rows [[:daily-from [[:eth 1] [:eth 2]]]]
+               :rf 0
+               :mar 0
+               :periods-per-year 365
+               :quality-gates nil}]
              @captured-requests*)))))

@@ -3,6 +3,35 @@
             [hyperopen.portfolio.metrics :as metrics]
             [hyperopen.portfolio.metrics.test-utils :refer [approx= fixture-daily-rows day->ms quantstats-returns quantstats-benchmark]]))
 
+(def ^:private test-day-ms
+  (* 24 60 60 1000))
+
+(defn- cumulative-percent-rows-from-interval-returns
+  [start-day interval-days returns]
+  (let [start-ms (day->ms start-day)]
+    (loop [idx 0
+           factor 1
+           remaining returns
+           rows [[start-ms 0]]]
+      (if (empty? remaining)
+        rows
+        (let [factor* (* factor (+ 1 (first remaining)))
+              time-ms (+ start-ms (* (inc idx) interval-days test-day-ms))
+              percent (* 100 (- factor* 1))]
+          (recur (inc idx)
+                 factor*
+                 (rest remaining)
+                 (conj rows [time-ms percent])))))))
+
+(defn- benchmark-daily-rows-at-interval-ends
+  [start-day interval-days returns]
+  (let [start-ms (day->ms start-day)]
+    (mapv (fn [idx value]
+            {:time-ms (+ start-ms (* (inc idx) interval-days test-day-ms))
+             :return value})
+          (range)
+          returns)))
+
 (deftest metric-rows-propagates-status-and-reason-metadata-test
   (let [rows (->> (metrics/metric-rows {:cagr 0.123
                                         :metric-status {:cagr :ok
@@ -128,6 +157,53 @@
     (is (number? (:prob-sharpe-ratio metrics*)))
     (is (= :low-confidence (get-in metrics* [:metric-status :omega])))
     (is (= :daily-coverage-gate-failed (get-in metrics* [:metric-reason :omega])))))
+
+(deftest compute-performance-metrics-estimates-benchmark-relative-metrics-from-sparse-portfolio-intervals-test
+  (let [strategy-returns (vec (take 24 (cycle [0.04 -0.02 0.03 0.01 -0.015 0.05 -0.01 0.025 -0.03 0.02 0.035 -0.005])))
+        benchmark-returns (vec (take 24 (cycle [0.03 -0.015 0.02 0.005 -0.01 0.04 -0.02 0.015 -0.025 0.018 0.025 -0.01])))
+        metrics* (metrics/compute-performance-metrics
+                  {:strategy-cumulative-rows (cumulative-percent-rows-from-interval-returns
+                                              "2024-01-01"
+                                              14
+                                              strategy-returns)
+                   :benchmark-daily-rows (benchmark-daily-rows-at-interval-ends
+                                          "2024-01-01"
+                                          14
+                                          benchmark-returns)
+                   :rf 0
+                   :periods-per-year 365})]
+    (is (false? (get-in metrics* [:quality :daily-min?])))
+    (is (number? (:r2 metrics*)))
+    (is (<= 0 (:r2 metrics*) 1))
+    (is (= :low-confidence (get-in metrics* [:metric-status :r2])))
+    (is (= :benchmark-sparse-intervals (get-in metrics* [:metric-reason :r2])))
+    (is (number? (:information-ratio metrics*)))
+    (is (= :low-confidence (get-in metrics* [:metric-status :information-ratio])))
+    (is (= :benchmark-sparse-intervals
+           (get-in metrics* [:metric-reason :information-ratio])))))
+
+(deftest compute-performance-metrics-suppresses-benchmark-relative-metrics-for-short-sparse-windows-test
+  (let [strategy-returns (vec (take 13 (cycle [0.04 -0.02 0.03 0.01 -0.015 0.05 -0.01])))
+        benchmark-returns (vec (take 13 (cycle [0.03 -0.015 0.02 0.005 -0.01 0.04 -0.02])))
+        metrics* (metrics/compute-performance-metrics
+                  {:strategy-cumulative-rows (cumulative-percent-rows-from-interval-returns
+                                              "2024-01-01"
+                                              7
+                                              strategy-returns)
+                   :benchmark-daily-rows (benchmark-daily-rows-at-interval-ends
+                                          "2024-01-01"
+                                          7
+                                          benchmark-returns)
+                   :rf 0
+                   :periods-per-year 365})]
+    (is (false? (get-in metrics* [:quality :daily-min?])))
+    (is (nil? (:r2 metrics*)))
+    (is (= :suppressed (get-in metrics* [:metric-status :r2])))
+    (is (= :benchmark-coverage-gate-failed (get-in metrics* [:metric-reason :r2])))
+    (is (nil? (:information-ratio metrics*)))
+    (is (= :suppressed (get-in metrics* [:metric-status :information-ratio])))
+    (is (= :benchmark-coverage-gate-failed
+           (get-in metrics* [:metric-reason :information-ratio])))))
 
 (deftest compute-performance-metrics-parity-test
   (let [metrics* (metrics/compute-performance-metrics

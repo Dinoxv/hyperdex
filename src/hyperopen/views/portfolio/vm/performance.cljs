@@ -8,6 +8,9 @@
 (def ^:private hidden-portfolio-metric-keys
   #{:time-in-market})
 
+(def ^:private benchmark-relative-metric-keys
+  #{:r2 :information-ratio})
+
 (def ^:private empty-source-version-counter
   0)
 
@@ -45,25 +48,30 @@
     (mapv (fn [{:keys [rows] :as group}]
             (assoc group
                    :rows (mapv (fn [{:keys [key] :as row}]
-                                 (assoc row
-                                        :portfolio-value (get portfolio-values key)
-                                        :portfolio-status (get-in portfolio-values [:metric-status key])
-                                        :portfolio-reason (get-in portfolio-values [:metric-reason key])
-                                        :benchmark-value (get primary-benchmark-values key)
-                                        :benchmark-status (get-in primary-benchmark-values [:metric-status key])
-                                        :benchmark-reason (get-in primary-benchmark-values [:metric-reason key])
-                                        :benchmark-values (into {}
-                                                               (map (fn [{:keys [coin]}]
-                                                                      [coin (get-in benchmark-values-by-coin [coin key])]))
-                                                               benchmark-columns)
-                                        :benchmark-statuses (into {}
+                                 (let [benchmark-relative-row? (and (seq benchmark-columns)
+                                                                    (contains? benchmark-relative-metric-keys key))]
+                                   (assoc row
+                                          :portfolio-value (when-not benchmark-relative-row?
+                                                             (get portfolio-values key))
+                                          :portfolio-status (when-not benchmark-relative-row?
+                                                              (get-in portfolio-values [:metric-status key]))
+                                          :portfolio-reason (when-not benchmark-relative-row?
+                                                             (get-in portfolio-values [:metric-reason key]))
+                                          :benchmark-value (get primary-benchmark-values key)
+                                          :benchmark-status (get-in primary-benchmark-values [:metric-status key])
+                                          :benchmark-reason (get-in primary-benchmark-values [:metric-reason key])
+                                          :benchmark-values (into {}
                                                                  (map (fn [{:keys [coin]}]
-                                                                        [coin (get-in benchmark-values-by-coin [coin :metric-status key])]))
+                                                                        [coin (get-in benchmark-values-by-coin [coin key])]))
                                                                  benchmark-columns)
-                                        :benchmark-reasons (into {}
-                                                                (map (fn [{:keys [coin]}]
-                                                                       [coin (get-in benchmark-values-by-coin [coin :metric-reason key])]))
-                                                                benchmark-columns)))
+                                          :benchmark-statuses (into {}
+                                                                   (map (fn [{:keys [coin]}]
+                                                                          [coin (get-in benchmark-values-by-coin [coin :metric-status key])]))
+                                                                   benchmark-columns)
+                                          :benchmark-reasons (into {}
+                                                                  (map (fn [{:keys [coin]}]
+                                                                         [coin (get-in benchmark-values-by-coin [coin :metric-reason key])]))
+                                                                  benchmark-columns))))
                                (or rows []))))
           (or groups []))))
 
@@ -87,9 +95,7 @@
                                                                             [])}})
                                  selected-benchmark-coins)
         portfolio-request {:strategy-cumulative-rows strategy-cumulative-rows
-                           :strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)
-                           :benchmark-cumulative-rows (or (some-> benchmark-requests first :request :strategy-cumulative-rows)
-                                                          [])}]
+                           :strategy-daily-rows (portfolio-metrics/daily-compounded-returns strategy-cumulative-rows)}]
     {:portfolio-request portfolio-request
      :benchmark-requests benchmark-requests}))
 

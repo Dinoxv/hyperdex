@@ -10,6 +10,7 @@
     :drawdown-unavailable "Estimated from sparse drawdown observations."
     :rolling-window-span-insufficient "Estimated from limited history in this window."
     :benchmark-coverage-gate-failed "Estimated from limited benchmark overlap."
+    :benchmark-sparse-intervals "Estimated from sparse portfolio intervals."
     "Low-confidence estimate."))
 
 (def ^:private low-confidence-reason-order
@@ -18,7 +19,8 @@
    :drawdown-reliability-gate-failed
    :drawdown-unavailable
    :rolling-window-span-insufficient
-   :benchmark-coverage-gate-failed])
+   :benchmark-coverage-gate-failed
+   :benchmark-sparse-intervals])
 
 (defn ordered-low-confidence-reasons
   [reasons]
@@ -40,7 +42,7 @@
       (every? #{:drawdown-reliability-gate-failed :drawdown-unavailable} reason-set)
       "Some metrics are estimated from sparse drawdown data."
 
-      (= reason-set #{:benchmark-coverage-gate-failed})
+      (every? #{:benchmark-coverage-gate-failed :benchmark-sparse-intervals} reason-set)
       "Some metrics are estimated from limited benchmark overlap."
 
       :else
