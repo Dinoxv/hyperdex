@@ -8,11 +8,8 @@
 (def ^:private empty-source-version-counter
   0)
 
-(def ^:private benchmark-relative-metric-keys
-  [:r2 :information-ratio])
-
 (def metrics-request-signature-schema-version
-  2)
+  3)
 
 (defn- metric-token
   [value]
@@ -127,42 +124,10 @@
     (portfolio-metrics/daily-compounded-returns (or (:strategy-cumulative-rows request)
                                                     []))))
 
-(defn- overlay-metric-token
-  [metric-values token-key metric-key token-value]
-  (update metric-values
-          token-key
-          (fn [tokens]
-            (let [tokens* (or tokens {})]
-              (if (some? token-value)
-                (assoc tokens* metric-key token-value)
-                (dissoc tokens* metric-key))))))
-
-(defn- overlay-relative-metric
-  [benchmark-values relative-values metric-key]
-  (if (or (contains? relative-values metric-key)
-          (contains? (or (:metric-status relative-values) {}) metric-key)
-          (contains? (or (:metric-reason relative-values) {}) metric-key))
-    (-> benchmark-values
-        (assoc metric-key (get relative-values metric-key))
-        (overlay-metric-token :metric-status
-                              metric-key
-                              (get-in relative-values [:metric-status metric-key]))
-        (overlay-metric-token :metric-reason
-                              metric-key
-                              (get-in relative-values [:metric-reason metric-key])))
-    benchmark-values))
-
-(defn- overlay-relative-benchmark-metrics
-  [benchmark-values relative-values]
-  (reduce (fn [acc metric-key]
-            (overlay-relative-metric acc relative-values metric-key))
-          benchmark-values
-          benchmark-relative-metric-keys))
-
-(defn- portfolio-relative-benchmark-request
-  [portfolio-request benchmark-daily-rows]
+(defn- benchmark-relative-metrics-request
+  [portfolio-request portfolio-strategy-daily-rows benchmark-daily-rows]
   {:strategy-cumulative-rows (:strategy-cumulative-rows portfolio-request)
-   :strategy-daily-rows (:strategy-daily-rows portfolio-request)
+   :strategy-daily-rows portfolio-strategy-daily-rows
    :benchmark-daily-rows benchmark-daily-rows
    :rf (or (:rf portfolio-request) 0)
    :mar (or (:mar portfolio-request) 0)
@@ -174,9 +139,10 @@
   (let [portfolio-request (:portfolio-request request-data)
         benchmark-requests (:benchmark-requests request-data)
         benchmark-daily-rows (request-benchmark-daily-rows portfolio-request)
+        portfolio-strategy-daily-rows (request-strategy-daily-rows portfolio-request)
         portfolio-result (portfolio-metrics/compute-performance-metrics
                           {:strategy-cumulative-rows (:strategy-cumulative-rows portfolio-request)
-                           :strategy-daily-rows (:strategy-daily-rows portfolio-request)
+                           :strategy-daily-rows portfolio-strategy-daily-rows
                            :benchmark-daily-rows benchmark-daily-rows
                            :rf (or (:rf portfolio-request) 0)
                            :mar (or (:mar portfolio-request) 0)
@@ -185,16 +151,17 @@
         benchmark-results (into {}
                                 (map (fn [{:keys [coin request]}]
                                        (let [strategy-daily-rows (request-strategy-daily-rows request)]
-                                         [coin (let [benchmark-values (portfolio-metrics/compute-performance-metrics
-                                                                       {:strategy-cumulative-rows (:strategy-cumulative-rows request)
-                                                                        :strategy-daily-rows strategy-daily-rows
-                                                                        :rf 0
-                                                                        :periods-per-year 365})
-                                                     relative-values (portfolio-metrics/compute-performance-metrics
-                                                                      (portfolio-relative-benchmark-request portfolio-request
-                                                                                                            strategy-daily-rows))]
-                                                 (overlay-relative-benchmark-metrics benchmark-values
-                                                                                     relative-values))]))
+                                         [coin
+                                          (portfolio-metrics/merge-benchmark-column-relative-metrics
+                                           (portfolio-metrics/compute-performance-metrics
+                                            {:strategy-cumulative-rows (:strategy-cumulative-rows request)
+                                             :strategy-daily-rows strategy-daily-rows
+                                             :rf 0
+                                             :periods-per-year 365})
+                                           (portfolio-metrics/compute-performance-metrics
+                                            (benchmark-relative-metrics-request portfolio-request
+                                                                               portfolio-strategy-daily-rows
+                                                                               strategy-daily-rows)))]))
                                 benchmark-requests))]
     {:portfolio-values portfolio-result
      :benchmark-values-by-coin benchmark-results}))

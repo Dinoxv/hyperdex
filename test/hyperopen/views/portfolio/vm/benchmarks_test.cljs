@@ -335,7 +335,6 @@
              (get-in view-model [:performance-metrics :benchmark-columns])))
       (is (= trader-label
              (get-in view-model [:performance-metrics :benchmark-label]))))))
-
 (deftest portfolio-vm-performance-metrics-include-all-selected-benchmarks-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                               {:spot-equity 10
@@ -377,18 +376,11 @@
                  :borrow-lend {:total-supplied-usd 0}}
           view-model (vm/portfolio-vm state)
           cumulative-return-row (performance-metric-row view-model :cumulative-return)
-          r2-row (performance-metric-row view-model :r2)
-          information-ratio-row (performance-metric-row view-model :information-ratio)
-          beta-row (performance-metric-row view-model :beta)
-          alpha-row (performance-metric-row view-model :alpha)
-          correlation-row (performance-metric-row view-model :correlation)
-          treynor-row (performance-metric-row view-model :treynor-ratio)]
+          relative-metric-keys [:r2 :information-ratio :beta :alpha :correlation :treynor-ratio]]
       (is (true? (get-in view-model [:performance-metrics :benchmark-selected?])))
       (is (= ["SPY" "QQQ"] (get-in view-model [:performance-metrics :benchmark-coins])))
-      (is (= [{:coin "SPY"
-               :label "SPY (SPOT)"}
-              {:coin "QQQ"
-               :label "QQQ (SPOT)"}]
+      (is (= [{:coin "SPY" :label "SPY (SPOT)"}
+              {:coin "QQQ" :label "QQQ (SPOT)"}]
              (get-in view-model [:performance-metrics :benchmark-columns])))
       (is (= "SPY" (get-in view-model [:performance-metrics :benchmark-coin])))
       (is (= "SPY (SPOT)" (get-in view-model [:performance-metrics :benchmark-label])))
@@ -396,17 +388,11 @@
       (is (number? (:benchmark-value cumulative-return-row)))
       (is (number? (get-in cumulative-return-row [:benchmark-values "SPY"])))
       (is (number? (get-in cumulative-return-row [:benchmark-values "QQQ"])))
-      (is (number? (:value r2-row)))
-      (is (number? (:value information-ratio-row)))
-      (is (number? (:value beta-row)))
-      (is (number? (:value alpha-row)))
-      (is (number? (:value correlation-row)))
-      (is (number? (:value treynor-row)))
-      (is (nil? (get-in beta-row [:benchmark-values "SPY"])))
-      (is (nil? (get-in alpha-row [:benchmark-values "SPY"])))
-      (is (nil? (get-in correlation-row [:benchmark-values "SPY"])))
-      (is (nil? (get-in treynor-row [:benchmark-values "SPY"]))))))
-
+      (doseq [metric-key relative-metric-keys
+              coin ["SPY" "QQQ"]
+              :let [row (performance-metric-row view-model metric-key)]]
+        (is (number? (:value row)))
+        (is (number? (get-in row [:benchmark-values coin])))))))
 
 (deftest portfolio-vm-sync-metrics-derives-benchmark-daily-rows-from-cumulative-test
   (let [t0 fixture-start-ms
@@ -431,11 +417,15 @@
                                                                    {:metric-status {}
                                                                     :metric-reason {}})]
       (@#'vm/compute-metrics-sync request-data)
-      (is (= 2 (count @captured-requests)))
+      (is (= 3 (count @captured-requests)))
       (is (= expected-spy-daily
              (:benchmark-daily-rows (first @captured-requests))))
       (is (= expected-spy-daily
-             (:strategy-daily-rows (second @captured-requests)))))))
+             (:strategy-daily-rows (second @captured-requests))))
+      (is (= expected-strategy-daily
+             (:strategy-daily-rows (nth @captured-requests 2))))
+      (is (= expected-spy-daily
+             (:benchmark-daily-rows (nth @captured-requests 2)))))))
 
 (deftest portfolio-vm-request-metrics-computation-dedupes-by-lightweight-signature-test
   (let [write-count (atom 0)

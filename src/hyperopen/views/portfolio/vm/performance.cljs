@@ -8,8 +8,8 @@
 (def ^:private hidden-portfolio-metric-keys
   #{:time-in-market})
 
-(def ^:private benchmark-relative-metric-keys
-  #{:r2 :information-ratio})
+(def ^:private benchmark-column-relative-metric-key-set
+  (set portfolio-metrics/benchmark-column-relative-metric-keys))
 
 (def ^:private empty-source-version-counter
   0)
@@ -48,14 +48,15 @@
     (mapv (fn [{:keys [rows] :as group}]
             (assoc group
                    :rows (mapv (fn [{:keys [key] :as row}]
-                                 (let [benchmark-relative-row? (and (seq benchmark-columns)
-                                                                    (contains? benchmark-relative-metric-keys key))]
+                                 (let [render-relative-in-benchmark-columns? (and (seq benchmark-columns)
+                                                                                  (contains? benchmark-column-relative-metric-key-set
+                                                                                             key))]
                                    (assoc row
-                                          :portfolio-value (when-not benchmark-relative-row?
+                                          :portfolio-value (when-not render-relative-in-benchmark-columns?
                                                              (get portfolio-values key))
-                                          :portfolio-status (when-not benchmark-relative-row?
+                                          :portfolio-status (when-not render-relative-in-benchmark-columns?
                                                               (get-in portfolio-values [:metric-status key]))
-                                          :portfolio-reason (when-not benchmark-relative-row?
+                                          :portfolio-reason (when-not render-relative-in-benchmark-columns?
                                                              (get-in portfolio-values [:metric-reason key]))
                                           :benchmark-value (get primary-benchmark-values key)
                                           :benchmark-status (get-in primary-benchmark-values [:metric-status key])

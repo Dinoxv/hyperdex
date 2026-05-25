@@ -68,56 +68,85 @@
                                  "QQQ" :coverage-gate}}]
            rows))))
 
-(deftest performance-row-helpers-place-benchmark-relative-metrics-in-benchmark-columns-test
-  (let [groups [{:title "Risk"
+(deftest performance-row-helpers-render-relative-metrics-under-benchmark-columns-test
+  (let [groups [{:title "Benchmark Relative"
                  :rows [{:key :r2
                          :label "R^2"}
                         {:key :information-ratio
                          :label "Information Ratio"}
-                        {:key :cumulative-return
-                         :label "Cumulative Return"}]}]
+                        {:key :beta
+                         :label "Beta"}
+                        {:key :alpha
+                         :label "Alpha"}
+                        {:key :cagr
+                         :label "CAGR"}]}]
         portfolio-values {:r2 0.99
                           :information-ratio 1.4
-                          :cumulative-return 0.25
+                          :beta 1.4
+                          :alpha 0.12
+                          :cagr 0.2
                           :metric-status {:r2 :low-confidence
                                           :information-ratio :low-confidence
-                                          :cumulative-return :ok}
+                                          :beta :ok
+                                          :alpha :ok
+                                          :cagr :ok}
                           :metric-reason {:r2 :benchmark-sparse-intervals
                                           :information-ratio :benchmark-sparse-intervals}}
-        benchmark-columns [{:coin "SPY"
+        benchmark-columns [{:coin "BTC"
                             :values {:r2 0.7
                                      :information-ratio 0.2
-                                     :cumulative-return 0.08
+                                     :beta 1.4
+                                     :alpha 0.12
+                                     :cagr 0.1
                                      :metric-status {:r2 :low-confidence
                                                      :information-ratio :low-confidence
-                                                     :cumulative-return :ok}
+                                                     :beta :low-confidence
+                                                     :alpha :ok
+                                                     :cagr :ok}
                                      :metric-reason {:r2 :benchmark-sparse-intervals
-                                                     :information-ratio :benchmark-sparse-intervals}}}
-                           {:coin "QQQ"
+                                                     :information-ratio :benchmark-sparse-intervals
+                                                     :beta :benchmark-sparse-intervals}}}
+                           {:coin "ETH"
                             :values {:r2 0.4
                                      :information-ratio -0.1
-                                     :cumulative-return 0.12
+                                     :beta 0.9
+                                     :alpha 0.08
+                                     :cagr 0.15
                                      :metric-status {:r2 :low-confidence
                                                      :information-ratio :low-confidence
-                                                     :cumulative-return :ok}
+                                                     :beta :ok
+                                                     :alpha :ok
+                                                     :cagr :ok}
                                      :metric-reason {:r2 :benchmark-sparse-intervals
                                                      :information-ratio :benchmark-sparse-intervals}}}]
-        rows-by-key (->> (vm-performance/with-performance-metric-columns groups
-                                                                          portfolio-values
-                                                                          benchmark-columns)
-                         first
-                         :rows
-                         (map (juxt :key identity))
-                         (into {}))]
+        rows (-> groups
+                 (vm-performance/with-performance-metric-columns portfolio-values benchmark-columns)
+                 first
+                 :rows)
+        rows-by-key (into {} (map (juxt :key identity)) rows)]
+    (is (= {:portfolio-value nil
+            :portfolio-status nil
+            :portfolio-reason nil
+             :benchmark-values {"BTC" 1.4
+                                "ETH" 0.9}
+             :benchmark-statuses {"BTC" :low-confidence
+                                  "ETH" :ok}
+             :benchmark-reasons {"BTC" :benchmark-sparse-intervals
+                                 "ETH" nil}}
+            (select-keys (get rows-by-key :beta)
+                         [:portfolio-value
+                         :portfolio-status
+                         :portfolio-reason
+                          :benchmark-values
+                          :benchmark-statuses
+                          :benchmark-reasons])))
     (is (nil? (get-in rows-by-key [:r2 :portfolio-value])))
-    (is (nil? (get-in rows-by-key [:r2 :portfolio-status])))
-    (is (= 0.7 (get-in rows-by-key [:r2 :benchmark-values "SPY"])))
-    (is (= 0.4 (get-in rows-by-key [:r2 :benchmark-values "QQQ"])))
+    (is (= 0.7 (get-in rows-by-key [:r2 :benchmark-values "BTC"])))
+    (is (= 0.4 (get-in rows-by-key [:r2 :benchmark-values "ETH"])))
     (is (nil? (get-in rows-by-key [:information-ratio :portfolio-value])))
-    (is (= 0.2 (get-in rows-by-key [:information-ratio :benchmark-values "SPY"])))
-    (is (= -0.1 (get-in rows-by-key [:information-ratio :benchmark-values "QQQ"])))
-    (is (= 0.25 (get-in rows-by-key [:cumulative-return :portfolio-value])))
-    (is (= 0.08 (get-in rows-by-key [:cumulative-return :benchmark-values "SPY"])))))
+    (is (= 0.2 (get-in rows-by-key [:information-ratio :benchmark-values "BTC"])))
+    (is (= -0.1 (get-in rows-by-key [:information-ratio :benchmark-values "ETH"])))
+    (is (= 0.2 (:portfolio-value (get rows-by-key :cagr))))))
 
 (deftest performance-metrics-model-skips-request-build-when-worker-signature-is-unchanged-test
   (let [strategy-cumulative-rows [[1 0]

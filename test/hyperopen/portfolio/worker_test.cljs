@@ -72,7 +72,7 @@
                     (swap! captured-requests* conj request)
                     {:request request})]
       (is (= {:portfolio-values {:request {:strategy-cumulative-rows [[:portfolio 1]]
-                                           :strategy-daily-rows nil
+                                           :strategy-daily-rows [[:daily-from [[:portfolio 1]]]]
                                            :benchmark-daily-rows [[:daily-from [[:spy 1] [:spy 2]]]]
                                            :rf 0
                                            :mar 0
@@ -84,10 +84,11 @@
                                                           :periods-per-year 365}}}}
              (metrics-result-payload request-data)))
       (is (= [[[:spy 1] [:spy 2]]
+              [[:portfolio 1]]
               [[:eth 1] [:eth 2]]]
              @daily-rows-calls*))
       (is (= [{:strategy-cumulative-rows [[:portfolio 1]]
-               :strategy-daily-rows nil
+               :strategy-daily-rows [[:daily-from [[:portfolio 1]]]]
                :benchmark-daily-rows [[:daily-from [[:spy 1] [:spy 2]]]]
                :rf 0
                :mar 0
@@ -98,7 +99,7 @@
                :rf 0
                :periods-per-year 365}
               {:strategy-cumulative-rows [[:portfolio 1]]
-               :strategy-daily-rows nil
+               :strategy-daily-rows [[:daily-from [[:portfolio 1]]]]
                :benchmark-daily-rows [[:daily-from [[:eth 1] [:eth 2]]]]
                :rf 0
                :mar 0

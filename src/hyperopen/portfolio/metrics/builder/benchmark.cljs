@@ -79,6 +79,7 @@
      :benchmark-aligned (mapv :benchmark-return aligned-benchmark)
      :benchmark-min? (>= (count aligned-benchmark)
                          (:benchmark-min-points gates))
+     :sparse-interval-history? sparse-interval-history?
      :sparse-aligned-benchmark sparse-aligned-benchmark
      :sparse-strategy-aligned (mapv :strategy-return sparse-aligned-benchmark)
      :sparse-benchmark-aligned (mapv :benchmark-return sparse-aligned-benchmark)
@@ -90,20 +91,13 @@
                             strategy-aligned
                             benchmark-aligned
                             benchmark-enabled?
+                            benchmark-high-confidence?
+                            sparse-interval-history?
                             sparse-aligned-benchmark
                             sparse-strategy-aligned
                             sparse-benchmark-aligned
                             sparse-benchmark-min?]}]
   (cond
-    benchmark-enabled?
-    (core/assoc-metric-result acc
-                              key
-                              (when (seq aligned-benchmark)
-                                (metric-fn strategy-aligned benchmark-aligned))
-                              true
-                              :ok
-                              :benchmark-coverage-gate-failed)
-
     sparse-benchmark-min?
     (core/assoc-metric-result acc
                               key
@@ -112,6 +106,27 @@
                               true
                               :low-confidence
                               :benchmark-sparse-intervals)
+
+    sparse-interval-history?
+    (core/assoc-metric-result acc
+                              key
+                              nil
+                              false
+                              :ok
+                              :benchmark-coverage-gate-failed)
+
+    benchmark-enabled?
+    (core/assoc-metric-result acc
+                              key
+                              (when (seq aligned-benchmark)
+                                (metric-fn strategy-aligned benchmark-aligned))
+                              true
+                              (if benchmark-high-confidence?
+                                :ok
+                                :low-confidence)
+                              (if benchmark-high-confidence?
+                                :benchmark-coverage-gate-failed
+                                :daily-coverage-gate-failed))
 
     :else
     (core/assoc-metric-result acc

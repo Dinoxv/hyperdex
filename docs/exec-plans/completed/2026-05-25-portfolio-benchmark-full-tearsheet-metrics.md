@@ -43,6 +43,7 @@ Local scratch refs (non-authoritative):
 - [x] (2026-05-25) `npm run test:websocket` passed.
 - [x] (2026-05-25) Moved this ExecPlan to `/hyperopen/docs/exec-plans/completed/` with completed outcomes after acceptance passed.
 - [x] (2026-05-25) Added a metrics request signature schema version so already-open worker-backed portfolio and vault detail pages recompute after this metric surface change.
+- [x] (2026-05-25) Follow-up: rendered Beta, Alpha, Correlation, and Treynor Ratio under each selected benchmark column relative to the portfolio, and bumped the portfolio metrics request signature schema to `3`.
 
 ## Surprises & Discoveries
 
@@ -75,7 +76,7 @@ Implemented the requested QuantStats full-report rows in the existing portfolio 
 
 Validation completed with targeted metric and benchmark tests plus the required repository gates. Browser QA was not applicable because the production change does not alter UI interaction behavior, layout primitives, or browser flows; the existing generic Performance Metrics table renders the new catalog rows.
 
-A follow-up runtime check found that an already-open dev page could retain the previous worker metric result because the request signature tracked only time range, selected benchmark coins, and source versions. The signature now includes `:metrics-schema-version 2`, forcing recomputation after this metric schema expansion while preserving normal dedupe behavior for unchanged inputs.
+A follow-up runtime check found that an already-open dev page could retain the previous worker metric result because the request signature tracked only time range, selected benchmark coins, and source versions. The signature now includes `:metrics-schema-version`, currently `3`, forcing recomputation after metric schema expansions while preserving normal dedupe behavior for unchanged inputs.
 
 ## Context and Orientation
 

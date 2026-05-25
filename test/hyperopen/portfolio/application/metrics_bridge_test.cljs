@@ -36,7 +36,7 @@
                                                               {"SPY" 201
                                                                "QQQ" 301})]
     (is (= :month (:summary-time-range signature-a)))
-    (is (= 2 (:metrics-schema-version signature-a)))
+    (is (= 3 (:metrics-schema-version signature-a)))
     (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
     (is (= [["SPY" 201] ["QQQ" 301]]
            (:benchmark-source-versions signature-a)))
@@ -133,7 +133,7 @@
                                                               {"SPY" 201
                                                                "QQQ" 301})]
     (is (= :month (:summary-time-range signature-a)))
-    (is (= 2 (:metrics-schema-version signature-a)))
+    (is (= 3 (:metrics-schema-version signature-a)))
     (is (= ["SPY" "QQQ"] (:selected-benchmark-coins signature-a)))
     (is (= [["SPY" 201] ["QQQ" 301]]
            (:benchmark-source-versions signature-a)))
@@ -142,29 +142,62 @@
          (metrics-bridge/request-benchmark-daily-rows {:benchmark-daily-rows [{:time-ms 1}]})))
   (is (= [[1 5]]
          (metrics-bridge/request-strategy-daily-rows {:strategy-daily-rows [[1 5]]})))
-  (with-redefs [portfolio-metrics/daily-compounded-returns (fn [rows]
-                                                             (mapv (fn [[time-ms value]]
-                                                                     {:time-ms time-ms :value value})
-                                                                   rows))
-                portfolio-metrics/compute-performance-metrics (fn [{:keys [strategy-daily-rows benchmark-daily-rows]}]
-                                                                {:strategy-count (count strategy-daily-rows)
-                                                                 :benchmark-count (count benchmark-daily-rows)
-                                                                 :metric-status {}
-                                                                 :metric-reason {}})]
-    (is (= {:portfolio-values {:strategy-count 2
-                               :benchmark-count 2
-                               :metric-status {}
-                               :metric-reason {}}
-            :benchmark-values-by-coin {"SPY" {:strategy-count 2
-                                              :benchmark-count 0
-                                              :metric-status {}
-                                              :metric-reason {}}}}
-           (metrics-bridge/compute-metrics-sync
-            {:portfolio-request {:strategy-cumulative-rows [[1 0] [2 5]]
-                                 :strategy-daily-rows [{:time-ms 1 :value 0} {:time-ms 2 :value 5}]
-                                 :benchmark-cumulative-rows [[1 0] [2 3]]}
-             :benchmark-requests [{:coin "SPY"
-                                   :request {:strategy-cumulative-rows [[1 0] [2 3]]}}]})))))
+  (let [portfolio-daily-rows [{:time-ms 1 :value 0} {:time-ms 2 :value 5}]
+        spy-daily-rows [{:time-ms 1 :value 0} {:time-ms 2 :value 3}]
+        captured-requests (atom [])]
+    (with-redefs [portfolio-metrics/daily-compounded-returns (fn [rows]
+                                                               (mapv (fn [[time-ms value]]
+                                                                       {:time-ms time-ms :value value})
+                                                                     rows))
+                  portfolio-metrics/compute-performance-metrics (fn [{:keys [strategy-daily-rows] :as request}]
+                                                                  (swap! captured-requests conj request)
+                                                                  (if (= portfolio-daily-rows strategy-daily-rows)
+                                                                    {:beta :portfolio-vs-spy-beta
+                                                                     :alpha :portfolio-vs-spy-alpha
+                                                                     :correlation :portfolio-vs-spy-correlation
+                                                                     :treynor-ratio :portfolio-vs-spy-treynor
+                                                                     :metric-status {:beta :ok
+                                                                                     :alpha :low-confidence
+                                                                                     :correlation :ok
+                                                                                     :treynor-ratio :ok}
+                                                                     :metric-reason {:alpha :daily-coverage-gate-failed}}
+                                                                    {:cumulative-return :spy-standalone-return
+                                                                     :beta :spy-standalone-beta
+                                                                     :metric-status {:beta :suppressed}
+                                                                     :metric-reason {:beta :benchmark-coverage-gate-failed}}))]
+      (is (= {:portfolio-values {:beta :portfolio-vs-spy-beta
+                                 :alpha :portfolio-vs-spy-alpha
+                                 :correlation :portfolio-vs-spy-correlation
+                                 :treynor-ratio :portfolio-vs-spy-treynor
+                                 :metric-status {:beta :ok
+                                                 :alpha :low-confidence
+                                                 :correlation :ok
+                                                 :treynor-ratio :ok}
+                                 :metric-reason {:alpha :daily-coverage-gate-failed}}
+              :benchmark-values-by-coin {"SPY" {:cumulative-return :spy-standalone-return
+                                                :beta :portfolio-vs-spy-beta
+                                                :alpha :portfolio-vs-spy-alpha
+                                                :correlation :portfolio-vs-spy-correlation
+                                                :treynor-ratio :portfolio-vs-spy-treynor
+                                                :metric-status {:beta :ok
+                                                                :alpha :low-confidence
+                                                                :correlation :ok
+                                                                :treynor-ratio :ok}
+                                                :metric-reason {:alpha :daily-coverage-gate-failed}}}}
+             (metrics-bridge/compute-metrics-sync
+              {:portfolio-request {:strategy-cumulative-rows [[1 0] [2 5]]
+                                   :strategy-daily-rows portfolio-daily-rows
+                                   :benchmark-cumulative-rows [[1 0] [2 3]]}
+               :benchmark-requests [{:coin "SPY"
+                                     :request {:strategy-cumulative-rows [[1 0] [2 3]]}}]})))
+      (is (= [portfolio-daily-rows
+              spy-daily-rows
+              portfolio-daily-rows]
+             (mapv :strategy-daily-rows @captured-requests)))
+      (is (= [spy-daily-rows
+              nil
+              spy-daily-rows]
+             (mapv :benchmark-daily-rows @captured-requests))))))
 
 (deftest compute-metrics-sync-overlays-portfolio-relative-metrics-into-each-benchmark-result-test
   (let [portfolio-cumulative [[1 0] [2 5]]
