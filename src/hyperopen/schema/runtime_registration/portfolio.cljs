@@ -2,6 +2,8 @@
 
 (def effect-binding-rows
   [[:effects/run-portfolio-optimizer :run-portfolio-optimizer]
+   [:effects/api-fetch-trader-portfolio-benchmark
+    :api-fetch-trader-portfolio-benchmark]
    [:effects/run-portfolio-optimizer-pipeline :run-portfolio-optimizer-pipeline]
    [:effects/load-portfolio-optimizer-history :load-portfolio-optimizer-history]
    [:effects/load-portfolio-optimizer-history-discovery

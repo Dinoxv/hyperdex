@@ -43,13 +43,15 @@
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? true
-    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot
+                        :effects/api-fetch-trader-portfolio-benchmark}}
 
    :actions/select-portfolio-chart-tab
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? true
-    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot
+                        :effects/api-fetch-trader-portfolio-benchmark}}
 
    :actions/add-portfolio-optimizer-universe-instrument
    {:required-phase-order [:projection :persistence :heavy-io]
@@ -86,7 +88,8 @@
     :require-projection-before-heavy? true
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/fetch-candle-snapshot
-                        :effects/api-fetch-vault-benchmark-details}}
+                        :effects/api-fetch-vault-benchmark-details
+                        :effects/api-fetch-trader-portfolio-benchmark}}
 
    :actions/set-portfolio-returns-benchmark-suggestions-open
    {:required-phase-order [:projection :persistence :heavy-io]

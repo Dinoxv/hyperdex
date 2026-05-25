@@ -82,7 +82,10 @@
 
 (defn- portfolio-route-support-effects
   [state]
-  (portfolio-actions/ensure-portfolio-vault-benchmark-effects state))
+  (into []
+        (distinct
+         (concat (portfolio-actions/ensure-portfolio-vault-benchmark-effects state)
+                 (portfolio-actions/ensure-portfolio-trader-benchmark-effects state)))))
 
 (defn load-vaults
   [state]

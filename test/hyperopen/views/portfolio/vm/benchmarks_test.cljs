@@ -13,6 +13,18 @@
 (def ^:private fixture-start-ms
   (.getTime (js/Date. "2024-01-01T00:00:00.000Z")))
 
+(def ^:private mixed-case-trader-address
+  "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234")
+
+(def ^:private trader-address
+  "0xabcdefabcdefabcdefabcdefabcdefabcdef1234")
+
+(def ^:private trader-benchmark
+  (str "trader:" trader-address))
+
+(def ^:private trader-label
+  "Trader 0xabcd...1234")
+
 (defn- now-ms []
   (if (exists? js/performance)
     (.now js/performance)
@@ -130,6 +142,64 @@
                     vault-candidates))
       (is (= [] (:selected-coins benchmark-selector))))))
 
+(deftest portfolio-vm-builds-trader-benchmark-option-from-address-search-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns
+                                :returns-benchmark-search mixed-case-trader-address
+                                :returns-benchmark-suggestions-open? true}
+                 :asset-selector {:markets [{:coin "BTC"
+                                             :symbol "BTC-USD"
+                                             :market-type :perp
+                                             :openInterest "900"
+                                             :cache-order 1}]}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0]]
+                                                      :accountValueHistory [[1 100] [2 110]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          benchmark-selector (get-in (vm/portfolio-vm state) [:selectors :returns-benchmark])
+          candidate (first (:candidates benchmark-selector))]
+      (is (= trader-benchmark (:top-coin benchmark-selector)))
+      (is (= {:value trader-benchmark
+              :label trader-label}
+             (select-keys candidate [:value :label])))
+      (is (nil? (:empty-message benchmark-selector))))))
+
+(deftest portfolio-vm-labels-selected-trader-benchmark-before-data-load-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns
+                                :returns-benchmark-coins [trader-benchmark]
+                                :returns-benchmark-coin trader-benchmark}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[1 0] [2 0]]
+                                                      :accountValueHistory [[1 100] [2 110]]
+                                                      :vlm 10}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          benchmark-selector (get-in (vm/portfolio-vm state) [:selectors :returns-benchmark])]
+      (is (= [trader-benchmark] (:selected-coins benchmark-selector)))
+      (is (= [{:value trader-benchmark
+               :label trader-label}]
+             (mapv #(select-keys % [:value :label])
+                   (:selected-options benchmark-selector))))
+      (is (= trader-label
+             (get-in benchmark-selector [:label-by-coin trader-benchmark]))))))
+
 (deftest portfolio-vm-memoizes-benchmark-selector-options-by-markets-identity-and-signature-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                               {:spot-equity 10
@@ -216,6 +286,54 @@
       (is (= [vault-ref]
              (get-in view-model [:performance-metrics :benchmark-coins])))
       (is (= "Growi HF (VAULT)"
+             (get-in view-model [:performance-metrics :benchmark-label]))))))
+
+(deftest portfolio-vm-builds-trader-benchmark-series-and-performance-columns-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 10
+                                                               :perps-value 10
+                                                               :cross-account-value 10
+                                                               :unrealized-pnl 0})]
+    (let [t0 fixture-start-ms
+          t1 (+ fixture-start-ms day-ms)
+          t2 (+ fixture-start-ms (* 2 day-ms))
+          state {:account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns
+                                :returns-benchmark-coins [trader-benchmark]
+                                :returns-benchmark-coin trader-benchmark}
+                 :portfolio {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                   [t1 10]
+                                                                   [t2 25]]
+                                                      :accountValueHistory [[t0 100]
+                                                                            [t1 110]
+                                                                            [t2 125]]
+                                                      :vlm 10}}
+                             :trader-benchmarks-by-address {trader-address
+                                                            {:summary-by-key {:month {:pnlHistory [[t0 0]
+                                                                                                   [t1 20]
+                                                                                                   [t2 60]]
+                                                                                      :accountValueHistory [[t0 200]
+                                                                                                            [t1 220]
+                                                                                                            [t2 260]]
+                                                                                      :vlm 0}}}}}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 10}}
+                           :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)
+          benchmark-series (->> (get-in view-model [:chart :series])
+                                (filter #(= :benchmark-0 (:id %)))
+                                first)]
+      (is (= trader-label (:label benchmark-series)))
+      (is (= [0 10 30]
+             (mapv :value (:points benchmark-series))))
+      (is (= [trader-benchmark]
+             (get-in view-model [:performance-metrics :benchmark-coins])))
+      (is (= [{:coin trader-benchmark
+               :label trader-label}]
+             (get-in view-model [:performance-metrics :benchmark-columns])))
+      (is (= trader-label
              (get-in view-model [:performance-metrics :benchmark-label]))))))
 
 (deftest portfolio-vm-performance-metrics-include-all-selected-benchmarks-test

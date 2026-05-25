@@ -5,6 +5,15 @@
 (def ^:private replace-shareable-route-query-effect
   [:effects/replace-shareable-route-query])
 
+(def ^:private mixed-case-trader-address
+  "0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234")
+
+(def ^:private trader-address
+  "0xabcdefabcdefabcdefabcdefabcdefabcdef1234")
+
+(def ^:private trader-benchmark
+  (str "trader:" trader-address))
+
 (deftest select-portfolio-summary-time-range-fetches-selected-benchmark-candles-test
   (is (= [[:effects/save-many [[[:portfolio-ui :summary-time-range] :week]
                                [[:portfolio-ui :summary-scope-dropdown-open?] false]
@@ -13,10 +22,12 @@
           [:effects/local-storage-set "portfolio-summary-time-range" "week"]
           replace-shareable-route-query-effect
           [:effects/fetch-candle-snapshot :coin "BTC" :interval :15m :bars 800]
-          [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]]
+          [:effects/fetch-candle-snapshot :coin "ETH" :interval :15m :bars 800]
+          [:effects/api-fetch-trader-portfolio-benchmark trader-address]]
          (actions/select-portfolio-summary-time-range
           {:portfolio-ui {:returns-benchmark-coins ["BTC"
                                                     "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                    trader-benchmark
                                                     "ETH"
                                                     "BTC"]
                           :returns-benchmark-coin "DOGE"}}
@@ -37,10 +48,12 @@
            [[[:portfolio-ui :chart-tab] :returns]]]
           replace-shareable-route-query-effect
           [:effects/fetch-candle-snapshot :coin "ETH" :interval :1h :bars 800]
-          [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]]
+          [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]
+          [:effects/api-fetch-trader-portfolio-benchmark trader-address]]
          (actions/select-portfolio-chart-tab
           {:portfolio-ui {:returns-benchmark-coins ["ETH"
                                                     "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                    trader-benchmark
                                                     "SPY"]
                           :summary-time-range :month}}
           :returns)))
@@ -106,6 +119,23 @@
          (actions/selected-portfolio-vault-benchmark-addresses
           {:portfolio-ui {:returns-benchmark-coin "vault:0xABC"}}))))
 
+(deftest selected-portfolio-trader-benchmark-addresses-normalizes-selected-traders-test
+  (is (= trader-address
+         (actions/trader-benchmark-address (str " Trader:" mixed-case-trader-address " "))))
+  (is (= trader-benchmark
+         (actions/trader-benchmark-value mixed-case-trader-address)))
+  (is (nil? (actions/trader-benchmark-address "BTC")))
+  (is (nil? (actions/trader-benchmark-address "trader:0xabc")))
+  (is (= [trader-address "0x1111111111111111111111111111111111111111"]
+         (actions/selected-portfolio-trader-benchmark-addresses
+          {:portfolio-ui {:returns-benchmark-coins [(str "Trader:" mixed-case-trader-address)
+                                                    "BTC"
+                                                    {:coin "trader:0x1111111111111111111111111111111111111111"}
+                                                    trader-benchmark]}})))
+  (is (= [trader-address]
+         (actions/selected-portfolio-trader-benchmark-addresses
+          {:portfolio-ui {:returns-benchmark-coin (str "trader:" mixed-case-trader-address)}}))))
+
 (deftest ensure-portfolio-vault-benchmark-effects-fetches-only-missing-data-test
   (is (= []
          (actions/ensure-portfolio-vault-benchmark-effects
@@ -135,6 +165,26 @@
          (actions/set-portfolio-returns-benchmark-suggestions-open
           {:vaults {:merged-index-rows [{:address "0xaaa"}]}}
           true))))
+
+(deftest ensure-portfolio-trader-benchmark-effects-fetches-only-missing-data-test
+  (is (= []
+         (actions/ensure-portfolio-trader-benchmark-effects
+          {:portfolio-ui {:returns-benchmark-coins []}})))
+  (is (= [[:effects/api-fetch-trader-portfolio-benchmark trader-address]
+          [:effects/api-fetch-trader-portfolio-benchmark "0x2222222222222222222222222222222222222222"]]
+         (actions/ensure-portfolio-trader-benchmark-effects
+          {:portfolio-ui {:returns-benchmark-coins [(str "trader:" mixed-case-trader-address)
+                                                    "BTC"
+                                                    "trader:0x1111111111111111111111111111111111111111"
+                                                    "trader:0x2222222222222222222222222222222222222222"]}
+           :portfolio {:trader-benchmarks-by-address {"0x1111111111111111111111111111111111111111"
+                                                       {:summary-by-key {:month {}}}}
+                       :loading {:trader-benchmarks-by-address {"0x3333333333333333333333333333333333333333"
+                                                                 true}}}})))
+  (is (= []
+         (actions/ensure-portfolio-trader-benchmark-effects
+          {:portfolio-ui {:returns-benchmark-coins [trader-benchmark]}
+           :portfolio {:loading {:trader-benchmarks-by-address {trader-address true}}}}))))
 
 (deftest select-and-clear-portfolio-returns-benchmark-test
   (is (= [[:effects/save-many
@@ -201,6 +251,27 @@
                           :returns-benchmark-coins []}}
           "vault:0x1234567890abcdef1234567890abcdef12345678")))
   (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] [trader-benchmark]]
+            [[:portfolio-ui :returns-benchmark-coin] trader-benchmark]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
+          replace-shareable-route-query-effect
+          [:effects/api-fetch-trader-portfolio-benchmark trader-address]]
+         (actions/select-portfolio-returns-benchmark
+          {:portfolio-ui {:summary-time-range :all-time
+                          :returns-benchmark-coins []}}
+          (str "trader:" mixed-case-trader-address))))
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] [trader-benchmark]]
+            [[:portfolio-ui :returns-benchmark-coin] trader-benchmark]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
+          replace-shareable-route-query-effect]
+         (actions/select-portfolio-returns-benchmark
+          {:portfolio-ui {:summary-time-range :all-time
+                          :returns-benchmark-coins [trader-benchmark]}}
+          trader-benchmark)))
+  (is (= [[:effects/save-many
            [[[:portfolio-ui :returns-benchmark-coins] []]
             [[:portfolio-ui :returns-benchmark-coin] nil]
             [[:portfolio-ui :returns-benchmark-search] ""]
@@ -260,6 +331,17 @@
           {:portfolio-ui {:summary-time-range :week}}
           "Enter"
           "vault:0x1234567890abcdef1234567890abcdef12345678")))
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :returns-benchmark-coins] [trader-benchmark]]
+            [[:portfolio-ui :returns-benchmark-coin] trader-benchmark]
+            [[:portfolio-ui :returns-benchmark-search] ""]
+            [[:portfolio-ui :returns-benchmark-suggestions-open?] false]]]
+          replace-shareable-route-query-effect
+          [:effects/api-fetch-trader-portfolio-benchmark trader-address]]
+         (actions/handle-portfolio-returns-benchmark-search-keydown
+          {:portfolio-ui {:summary-time-range :week}}
+          "Enter"
+          (str "trader:" mixed-case-trader-address))))
   (is (= []
          (actions/handle-portfolio-returns-benchmark-search-keydown
           {:portfolio-ui {:summary-time-range :week}}

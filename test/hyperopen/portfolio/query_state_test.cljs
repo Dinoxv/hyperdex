@@ -6,10 +6,13 @@
   (is (= {:summary-time-range :three-month
           :summary-scope :perps
           :chart-tab :pnl
-          :returns-benchmark-coins ["BTC" "ETH" "vault:0x1234567890abcdef1234567890abcdef12345678"]
+          :returns-benchmark-coins ["BTC"
+                                     "ETH"
+                                     "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                     "trader:0xabcdefabcdefabcdefabcdefabcdefabcdef1234"]
           :account-info-tab :positions}
          (query-state/parse-portfolio-query
-          "?range=3m&scope=perp&chart=pnl&bench=BTC&bench=ETH&bench=BTC&bench=vault%3A0x1234567890abcdef1234567890abcdef12345678&tab=positions"))))
+          "?range=3m&scope=perp&chart=pnl&bench=BTC&bench=ETH&bench=BTC&bench=vault%3A0x1234567890abcdef1234567890abcdef12345678&bench=Trader%3A0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234&tab=positions"))))
 
 (deftest parse-portfolio-query-supports-cleared-benchmarks-test
   (is (= {:returns-benchmark-coins []}
@@ -43,6 +46,7 @@
           ["chart" "returns"]
           ["bench" "BTC"]
           ["bench" "vault:0x1234567890abcdef1234567890abcdef12345678"]
+          ["bench" "trader:0xabcdefabcdefabcdefabcdefabcdefabcdef1234"]
           ["tab" "open-orders"]]
          (query-state/portfolio-query-params
           {:portfolio-ui {:summary-time-range :all-time
@@ -50,6 +54,7 @@
                           :chart-tab :returns
                           :returns-benchmark-coins ["BTC"
                                                     "vault:0x1234567890abcdef1234567890abcdef12345678"
+                                                    "Trader:0xABCDEFabcdefABCDEFabcdefABCDEFabcdef1234"
                                                     "BTC"]
                           :account-info-tab :open-orders}}))))
 

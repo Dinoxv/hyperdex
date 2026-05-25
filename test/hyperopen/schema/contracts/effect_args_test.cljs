@@ -50,6 +50,13 @@
            :detail-route-vault-address "0x1234567890abcdef1234567890abcdef12345678"]
           {:phase :test}))))
 
+(deftest assert-effect-args-accepts-trader-portfolio-benchmark-address-test
+  (is (= ["0x1234567890abcdef1234567890abcdef12345678"]
+         (contracts/assert-effect-args!
+          :effects/api-fetch-trader-portfolio-benchmark
+          ["0x1234567890abcdef1234567890abcdef12345678"]
+          {:phase :test}))))
+
 (deftest assert-effect-args-rejects-fetch-candle-snapshot-with-odd-kv-arity-test
   (is (thrown-with-msg?
        js/Error

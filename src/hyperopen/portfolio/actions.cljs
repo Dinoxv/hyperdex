@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.actions
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.fee-schedule :as fee-schedule]
             [hyperopen.platform :as platform]))
 
@@ -153,6 +154,26 @@
       normalized
       default-account-info-tab)))
 
+(def ^:private vault-benchmark-prefix
+  "vault:")
+
+(def ^:private trader-benchmark-prefix
+  "trader:")
+
+(defn trader-benchmark-address
+  [value]
+  (let [benchmark (some-> value str str/trim)
+        benchmark-lower (some-> benchmark str/lower-case)]
+    (when (and (seq benchmark-lower)
+               (str/starts-with? benchmark-lower trader-benchmark-prefix))
+      (account-context/normalize-address
+       (subs benchmark (count trader-benchmark-prefix))))))
+
+(defn trader-benchmark-value
+  [address]
+  (when-let [address* (account-context/normalize-address address)]
+    (str trader-benchmark-prefix address*)))
+
 (defn normalize-portfolio-returns-benchmark-coin
   [value]
   (let [coin (cond
@@ -162,7 +183,8 @@
                :else nil)
         coin* (some-> coin str str/trim)]
     (when (seq coin*)
-      coin*)))
+      (or (some-> coin* trader-benchmark-address trader-benchmark-value)
+          coin*))))
 
 (defn normalize-portfolio-returns-benchmark-coins
   [value]
@@ -193,9 +215,6 @@
     value
     (str (or value ""))))
 
-(def ^:private vault-benchmark-prefix
-  "vault:")
-
 (defn vault-benchmark-address
   [value]
   (let [coin (normalize-portfolio-returns-benchmark-coin value)
@@ -212,6 +231,13 @@
   [state]
   (->> (selected-returns-benchmark-coins state)
        (keep vault-benchmark-address)
+       distinct
+       vec))
+
+(defn selected-portfolio-trader-benchmark-addresses
+  [state]
+  (->> (selected-returns-benchmark-coins state)
+       (keep trader-benchmark-address)
        distinct
        vec))
 
@@ -242,12 +268,28 @@
                     (vault-list-metadata-fetch-effects state))
                   (vault-benchmark-details-fetch-effects state addresses)))))
 
+(defn- trader-benchmark-portfolio-fetch-effects
+  [state addresses]
+  (->> addresses
+       (remove (fn [address]
+                 (or (get-in state [:portfolio :trader-benchmarks-by-address address])
+                     (true? (get-in state [:portfolio :loading :trader-benchmarks-by-address address])))))
+       (mapv (fn [address]
+               [:effects/api-fetch-trader-portfolio-benchmark address]))))
+
+(defn ensure-portfolio-trader-benchmark-effects
+  [state]
+  (trader-benchmark-portfolio-fetch-effects
+   state
+   (selected-portfolio-trader-benchmark-addresses state)))
+
 (defn- fetchable-benchmark-coin
   [value]
   (let [coin (normalize-portfolio-returns-benchmark-coin value)
         coin-lower (some-> coin str/lower-case)]
     (when (and (seq coin)
-               (not (str/starts-with? coin-lower vault-benchmark-prefix)))
+               (not (str/starts-with? coin-lower vault-benchmark-prefix))
+               (not (str/starts-with? coin-lower trader-benchmark-prefix)))
       coin)))
 
 (defn returns-benchmark-candle-request
@@ -490,7 +532,8 @@
   [state time-range]
   (let [time-range* (normalize-summary-time-range time-range)
         benchmark-coins (selected-returns-benchmark-coins state)
-        fetch-effects (returns-benchmark-fetch-effects time-range* benchmark-coins)]
+        fetch-effects (concat (returns-benchmark-fetch-effects time-range* benchmark-coins)
+                              (ensure-portfolio-trader-benchmark-effects state))]
     (into [(selector-projection-effect nil [[[:portfolio-ui :summary-time-range]
                                              time-range*]])
            [:effects/local-storage-set
@@ -513,7 +556,8 @@
                                     default-summary-time-range))
         benchmark-coins (selected-returns-benchmark-coins state)
         fetch-effects (if (= chart-tab* :returns)
-                        (returns-benchmark-fetch-effects summary-time-range benchmark-coins)
+                        (concat (returns-benchmark-fetch-effects summary-time-range benchmark-coins)
+                                (ensure-portfolio-trader-benchmark-effects state))
                         [])]
     (into [[:effects/save-many
             [[[:portfolio-ui :chart-tab] chart-tab*]]]
@@ -569,11 +613,17 @@
                                      []
                                      (if-let [vault-address (vault-benchmark-address coin)]
                                        (vault-benchmark-details-fetch-effects state [vault-address])
-                                       []))]
+                                       []))
+          trader-effects (if already-selected?
+                           []
+                           (if-let [trader-address (trader-benchmark-address coin)]
+                             (trader-benchmark-portfolio-fetch-effects state [trader-address])
+                             []))]
       (into [projection-effect]
             (concat [replace-shareable-route-query-effect]
                     candle-effects
-                    benchmark-detail-effects)))
+                    benchmark-detail-effects
+                    trader-effects)))
     (clear-portfolio-returns-benchmark state)))
 
 (defn remove-portfolio-returns-benchmark

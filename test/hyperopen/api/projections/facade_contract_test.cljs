@@ -37,6 +37,15 @@
    ["begin-portfolio-load" projections/begin-portfolio-load portfolio/begin-portfolio-load]
    ["apply-portfolio-success" projections/apply-portfolio-success portfolio/apply-portfolio-success]
    ["apply-portfolio-error" projections/apply-portfolio-error portfolio/apply-portfolio-error]
+   ["begin-trader-benchmark-portfolio-load"
+    projections/begin-trader-benchmark-portfolio-load
+    portfolio/begin-trader-benchmark-portfolio-load]
+   ["apply-trader-benchmark-portfolio-success"
+    projections/apply-trader-benchmark-portfolio-success
+    portfolio/apply-trader-benchmark-portfolio-success]
+   ["apply-trader-benchmark-portfolio-error"
+    projections/apply-trader-benchmark-portfolio-error
+    portfolio/apply-trader-benchmark-portfolio-error]
    ["begin-user-fees-load" projections/begin-user-fees-load user-fees/begin-load]
    ["apply-user-fees-success" projections/apply-user-fees-success user-fees/apply-success]
    ["apply-user-fees-error" projections/apply-user-fees-error user-fees/apply-error]

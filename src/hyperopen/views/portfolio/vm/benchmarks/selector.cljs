@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.vm.benchmarks.selector
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.portfolio.vm.utils :as vm-utils]))
 
@@ -85,6 +86,32 @@
     (when (and (seq benchmark-lower)
                (str/starts-with? benchmark-lower vault-benchmark-prefix))
       (normalize-vault-address (subs benchmark* (count vault-benchmark-prefix))))))
+
+(defn- short-address
+  [address]
+  (when (and (string? address)
+             (>= (count address) 10))
+    (str (subs address 0 6)
+         "..."
+         (subs address (- (count address) 4)))))
+
+(defn trader-benchmark-label
+  [value]
+  (when-let [address (or (portfolio-actions/trader-benchmark-address value)
+                         (account-context/normalize-address value))]
+    (str "Trader " (or (short-address address) address))))
+
+(defn- trader-benchmark-option
+  [address]
+  (when-let [value (portfolio-actions/trader-benchmark-value address)]
+    {:value value
+     :label (trader-benchmark-label value)}))
+
+(defn- searched-trader-benchmark-option
+  [search]
+  (when-let [address (or (portfolio-actions/trader-benchmark-address search)
+                         (account-context/normalize-address search))]
+    (trader-benchmark-option address)))
 
 (defn benchmark-vault-tvl
   [row]
@@ -378,6 +405,10 @@
   (let [options-by-coin (into {} (map (juxt :value identity)) options)]
     (mapv (fn [coin]
             (or (get options-by-coin coin)
+                (when-let [label (trader-benchmark-label coin)]
+                  {:value coin
+                   :label label
+                   :open-interest 0})
                 {:value coin
                  :label coin
                  :open-interest 0}))
@@ -402,23 +433,33 @@
       cache
       (let [selected-coin-set (set selected-coins)
             search-query (normalize-benchmark-search-query search)
+            trader-option (searched-trader-benchmark-option search-query)
+            candidate-options (cond->> options
+                                trader-option (cons trader-option))
             selected-options (selected-benchmark-options options selected-coins)
             candidates (if (str/blank? search-query)
                          (->> options
                               (remove (fn [{:keys [value]}]
                                         (contains? selected-coin-set value)))
                               vec)
-                         (->> options
+                         (->> candidate-options
                               (remove (fn [{:keys [value]}]
                                         (contains? selected-coin-set value)))
                               (filter #(*benchmark-option-matches-search?* % search-query))
                               vec))
             top-coin (some-> candidates first :value)
             empty-message (cond
-                            (empty? options) "No benchmark symbols available."
                             (seq candidates) nil
+                            (empty? options) "No benchmark symbols available."
                             (seq search-query) "No matching symbols."
                             :else "All symbols selected.")
+            label-options (into (vec options)
+                                (keep (fn [coin]
+                                        (when-let [address (portfolio-actions/trader-benchmark-address coin)]
+                                          (trader-benchmark-option address))))
+                                selected-coins)
+            label-options (cond-> label-options
+                            trader-option (conj trader-option))
             derived {:options-signature options-signature
                      :selected-coins selected-coins
                      :search search
@@ -426,7 +467,7 @@
                      :candidates candidates
                      :top-coin top-coin
                      :empty-message empty-message
-                     :label-by-coin (into {} (map (juxt :value :label)) options)}]
+                     :label-by-coin (into {} (map (juxt :value :label)) label-options)}]
         (reset! returns-benchmark-selector-derived-cache derived)
         derived))))
 

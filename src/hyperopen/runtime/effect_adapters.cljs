@@ -3,6 +3,7 @@
             [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.api-wallets.effects :as api-wallets-effects]
+            [hyperopen.account.context :as account-context]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
@@ -283,6 +284,28 @@
     :apply-user-fills-success api-projections/apply-user-fills-success
     :apply-user-fills-error api-projections/apply-user-fills-error
     :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!}))
+
+(defn api-fetch-trader-portfolio-benchmark-effect
+  [_ store address]
+  (if-let [address* (account-context/normalize-address address)]
+    (do
+      (swap! store api-projections/begin-trader-benchmark-portfolio-load address*)
+      (-> (api/request-portfolio! address*
+                                   {:priority :low
+                                    :dedupe-key [:trader-portfolio-benchmark address*]})
+          (.then (fn [summary-by-key]
+                   (swap! store
+                          api-projections/apply-trader-benchmark-portfolio-success
+                          address*
+                          summary-by-key)
+                   summary-by-key))
+          (.catch (fn [err]
+                    (swap! store
+                           api-projections/apply-trader-benchmark-portfolio-error
+                           address*
+                           err)
+                    (js/Promise.reject err)))))
+    (js/Promise.resolve nil)))
 
 (def api-fetch-predicted-fundings-effect
   funding-adapters/api-fetch-predicted-fundings-effect)

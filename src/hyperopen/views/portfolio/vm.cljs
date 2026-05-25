@@ -222,6 +222,7 @@
         merged-index-rows (get-in state [:vaults :merged-index-rows])
         benchmark-details-by-address (get-in state [:vaults :benchmark-details-by-address])
         details-by-address (get-in state [:vaults :details-by-address])
+        trader-benchmarks-by-address (get-in state [:portfolio :trader-benchmarks-by-address])
         cache @benchmark-computation-context-cache]
     (if (and (map? cache)
              (= summary-source-version (:summary-source-version cache))
@@ -231,7 +232,8 @@
              (identical? candles (:candles cache))
              (identical? merged-index-rows (:merged-index-rows cache))
              (identical? benchmark-details-by-address (:benchmark-details-by-address cache))
-             (identical? details-by-address (:details-by-address cache)))
+             (identical? details-by-address (:details-by-address cache))
+             (identical? trader-benchmarks-by-address (:trader-benchmarks-by-address cache)))
       (:context cache)
       (let [context (vm-benchmarks/benchmark-computation-context state
                                                                  summary-context
@@ -246,6 +248,7 @@
                                                      :merged-index-rows merged-index-rows
                                                      :benchmark-details-by-address benchmark-details-by-address
                                                      :details-by-address details-by-address
+                                                     :trader-benchmarks-by-address trader-benchmarks-by-address
                                                      :context context})
         context))))
 
