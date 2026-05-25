@@ -62,6 +62,19 @@
 (s/def ::portfolio-volume-history-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
+(defn- chart-candle-backfill-args?
+  [args]
+  (and (= 1 (count args))
+       (let [payload (first args)]
+         (and (map? payload)
+              (every? #{:coin :interval :bars :end-time-ms} (keys payload))
+              (common/non-empty-string? (:coin payload))
+              (or (not (contains? payload :interval))
+                  (keyword? (:interval payload)))
+              (or (not (contains? payload :bars))
+                  (common/positive-int? (:bars payload)))
+              (common/positive-int? (:end-time-ms payload))))))
+(s/def ::chart-candle-backfill-args chart-candle-backfill-args?)
 (s/def ::portfolio-optimizer-model-kind-args ::common/keyword-or-string-args)
 (s/def ::portfolio-optimizer-instrument-value-args
   (s/tuple ::common/non-empty-string any?))
@@ -182,6 +195,7 @@
    :actions/set-funding-hypothetical-value ::common/coin-number-input-args
    :actions/toggle-timeframes-dropdown ::common/no-args
    :actions/select-chart-timeframe ::common/keyword-args
+   :actions/request-chart-candle-backfill ::chart-candle-backfill-args
    :actions/toggle-chart-type-dropdown ::common/no-args
    :actions/select-chart-type ::common/keyword-args
    :actions/toggle-indicators-dropdown ::common/no-args

@@ -51,9 +51,52 @@
         (assoc-in [:perp-dexs-error] message)
         (assoc-in [:perp-dexs-error-category] category))))
 
+(defn- candle-rows
+  [payload]
+  (cond
+    (vector? payload)
+    payload
+
+    (sequential? payload)
+    (vec payload)
+
+    (map? payload)
+    (let [nested (or (:data payload)
+                     (:rows payload)
+                     (:candles payload))]
+      (if (sequential? nested)
+        (vec nested)
+        []))
+
+    :else
+    []))
+
+(defn- candle-row-timestamp
+  [row]
+  (when (map? row)
+    (or (:t row)
+        (:time row)
+        (get row "t")
+        (get row "time"))))
+
+(defn- merge-candle-rows
+  [existing incoming]
+  (->> (concat (candle-rows existing)
+               (candle-rows incoming))
+       (reduce (fn [rows-by-time row]
+                 (if-let [timestamp (candle-row-timestamp row)]
+                   (assoc rows-by-time timestamp row)
+                   rows-by-time))
+               {})
+       vals
+       (sort-by candle-row-timestamp)
+       vec))
+
 (defn apply-candle-snapshot-success
   [state coin interval rows]
-  (assoc-in state [:candles coin interval] rows))
+  (let [path [:candles coin interval]
+        merged-rows (merge-candle-rows (get-in state path) rows)]
+    (assoc-in state path merged-rows)))
 
 (defn apply-candle-snapshot-error
   [state coin interval err]

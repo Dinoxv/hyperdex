@@ -34,6 +34,37 @@
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
+(deftest request-candle-snapshot-builds-explicit-historical-window-test
+  (async done
+    (let [calls (atom [])
+          deps {:post-info! (fn [body opts]
+                              (swap! calls conj {:body body :opts opts})
+                              (js/Promise.resolve []))
+                :now-ms-fn (fn [] 10000000)}]
+      (-> (market-gateway/request-candle-snapshot!
+           deps
+           "BTC"
+           {:interval :1m
+            :bars 2
+            :priority :low
+            :end-time-ms 5000000})
+          (.then (fn [_]
+                   (is (= {"type" "candleSnapshot"
+                           "req" {"coin" "BTC"
+                                  "interval" "1m"
+                                  "startTime" 4880000
+                                  "endTime" 5000000}}
+                          (get-in @calls [0 :body])))
+                   (is (= {:priority :low
+                           :dedupe-key [:candle-snapshot "BTC" "1m" 2 5000000]
+                           :cache-key [:candle-snapshot "BTC" "1m" 2 5000000]
+                           :cache-ttl-ms 4000}
+                          (get-in @calls [0 :opts])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest request-candle-snapshot-skips-nil-asset-test
   (async done
     (let [calls (atom 0)

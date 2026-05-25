@@ -1,5 +1,41 @@
 (ns hyperopen.chart.actions
-  (:require [hyperopen.websocket.migration-flags :as migration-flags]))
+  (:require [clojure.string :as str]
+            [hyperopen.websocket.migration-flags :as migration-flags]))
+
+(def ^:private default-chart-backfill-bars
+  330)
+
+(defn- normalized-non-empty-string
+  [value]
+  (when (string? value)
+    (let [value* (str/trim value)]
+      (when (seq value*)
+        value*))))
+
+(defn- positive-int-or-default
+  [value fallback]
+  (let [parsed (cond
+                 (integer? value) value
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (if (and (number? parsed)
+             (js/isFinite parsed)
+             (pos? parsed))
+      (js/Math.floor parsed)
+      fallback)))
+
+(defn- positive-int-value
+  [value]
+  (let [parsed (cond
+                 (integer? value) value
+                 (number? value) value
+                 (string? value) (js/Number value)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (js/isFinite parsed)
+               (pos? parsed))
+      (js/Math.floor parsed))))
 
 (defn- chart-dropdown-visibility-path-values
   [open-dropdown]
@@ -29,6 +65,28 @@
                                                    (:active-asset state)
                                                    timeframe)
     (conj [:effects/fetch-candle-snapshot :interval timeframe])))
+
+(defn request-chart-candle-backfill
+  [state payload]
+  (let [active-asset (normalized-non-empty-string (:active-asset state))
+        requested-coin (normalized-non-empty-string (:coin payload))
+        interval (or (:interval payload)
+                     (get-in state [:chart-options :selected-timeframe])
+                     :1d)
+        bars (positive-int-or-default (:bars payload)
+                                      default-chart-backfill-bars)
+        end-time-ms (positive-int-value (:end-time-ms payload))]
+    (if (and active-asset
+             requested-coin
+             (= active-asset requested-coin)
+             (keyword? interval)
+             end-time-ms)
+      [[:effects/fetch-candle-snapshot
+        :coin requested-coin
+        :interval interval
+        :bars bars
+        :end-time-ms end-time-ms]]
+      [])))
 
 (defn toggle-chart-type-dropdown
   [state]

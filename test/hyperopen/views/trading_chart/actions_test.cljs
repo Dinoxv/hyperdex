@@ -1,8 +1,15 @@
 (ns hyperopen.views.trading-chart.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [replicant.core :as replicant-core]
+            [hyperopen.runtime.bootstrap :as runtime-bootstrap]
+            [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.runtime.wiring :as runtime-wiring]
             [hyperopen.system :as app-system]
             [hyperopen.views.trading-chart.actions :as actions]))
+
+(defn- register-runtime-under-test! []
+  (runtime-bootstrap/register-runtime!
+   (runtime-wiring/runtime-registration-deps runtime-state/runtime)))
 
 (deftest chart-actions-owner-preserves-dispatch-and-prefill-contract-test
   (let [dispatch-calls (atom [])
@@ -39,6 +46,7 @@
                :px "101"}]
     (try
       (set! app-system/store store)
+      (register-runtime-under-test!)
       (binding [replicant-core/*dispatch* nil]
         (actions/dispatch-chart-cancel-order! order))
       (is (= "Enable trading before cancelling orders."
@@ -92,3 +100,18 @@
      {:position {:coin "BTC"}}
      :not-a-suggestion)
     (is (empty? @dispatch-calls))))
+
+(deftest chart-history-backfill-callback-dispatches-current-asset-timeframe-test
+  (let [dispatch-calls (atom [])
+        dispatch-fn (fn [event action-vectors]
+                      (swap! dispatch-calls conj [event action-vectors]))
+        callback (actions/history-backfill-callback dispatch-fn "BTC" :1d)]
+    (callback {:bars 330
+               :end-time-ms 1751068799999})
+    (is (= [[{:replicant/trigger :chart-candle-history-backfill}
+             [[:actions/request-chart-candle-backfill
+               {:coin "BTC"
+                :interval :1d
+                :bars 330
+                :end-time-ms 1751068799999}]]]]
+           @dispatch-calls))))

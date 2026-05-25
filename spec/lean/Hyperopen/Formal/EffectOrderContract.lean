@@ -63,6 +63,12 @@ def defaultPolicy (allowDuplicateHeavyEffects : Bool) (heavyEffectIds : List Str
     allowDuplicateHeavyEffects := allowDuplicateHeavyEffects
     heavyEffectIds := heavyEffectIds }
 
+def heavyOnlyPolicy (allowDuplicateHeavyEffects : Bool) (heavyEffectIds : List String) : Policy :=
+  { requiredPhaseOrder := [.heavyIo]
+    requireProjectionBeforeHeavy := false
+    allowDuplicateHeavyEffects := allowDuplicateHeavyEffects
+    heavyEffectIds := heavyEffectIds }
+
 def policyCorpus : List (String × Policy) :=
   [("actions/apply-funding-history-filters", defaultPolicy false ["effects/api-fetch-user-funding-history"])
   ,("actions/cancel-order", defaultPolicy false ["effects/api-cancel-order"])
@@ -88,6 +94,7 @@ def policyCorpus : List (String × Policy) :=
   ,("actions/select-account-info-tab", defaultPolicy false ["effects/api-fetch-historical-orders", "effects/api-fetch-user-funding-history"])
   ,("actions/select-asset", defaultPolicy false ["effects/subscribe-active-asset", "effects/subscribe-orderbook", "effects/subscribe-trades", "effects/sync-active-asset-funding-predictability", "effects/unsubscribe-active-asset", "effects/unsubscribe-orderbook", "effects/unsubscribe-trades"])
   ,("actions/select-chart-timeframe", defaultPolicy false ["effects/fetch-candle-snapshot", "effects/sync-active-candle-subscription"])
+  ,("actions/request-chart-candle-backfill", heavyOnlyPolicy false ["effects/fetch-candle-snapshot"])
   ,("actions/select-orderbook-price-aggregation", defaultPolicy false ["effects/subscribe-orderbook"])
   ,("actions/select-portfolio-chart-tab", defaultPolicy true ["effects/fetch-candle-snapshot"])
   ,("actions/add-portfolio-optimizer-universe-instrument", defaultPolicy false ["effects/load-portfolio-optimizer-history"])

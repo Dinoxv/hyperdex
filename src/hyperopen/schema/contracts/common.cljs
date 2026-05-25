@@ -41,14 +41,16 @@
   [value]
   (cond
     (number? value)
-    (when-not (js/isNaN value)
+    (when (and (not (js/isNaN value))
+               (js/isFinite value))
       value)
     (string? value)
     (let [text (str/trim value)]
       (when (seq text)
         (let [parsed (js/Number text)]
           (when (and (number? parsed)
-                     (not (js/isNaN parsed)))
+                     (not (js/isNaN parsed))
+                     (js/isFinite parsed))
             parsed))))
     :else nil))
 
@@ -76,13 +78,15 @@
        (even? (count args))
        (every? keyword? (take-nth 2 args))
        (let [opts (apply hash-map args)]
-         (and (every? #{:coin :interval :bars :active?-fn :detail-route-vault-address} (keys opts))
+         (and (every? #{:coin :interval :bars :end-time-ms :active?-fn :detail-route-vault-address} (keys opts))
               (or (not (contains? opts :coin))
                   (non-empty-string? (:coin opts)))
               (or (not (contains? opts :interval))
                   (keyword? (:interval opts)))
               (or (not (contains? opts :bars))
                   (positive-int? (:bars opts)))
+              (or (not (contains? opts :end-time-ms))
+                  (positive-int? (:end-time-ms opts)))
               (or (not (contains? opts :detail-route-vault-address))
                   (and (string? (:detail-route-vault-address opts))
                        (re-matches #"(?i)^0x[0-9a-f]{40}$"

@@ -87,6 +87,7 @@
                           (:position-overlay second-runtime-options)))
           (is (identical? (:on-hide-volume-indicator runtime-options)
                           (:on-hide-volume-indicator second-runtime-options)))
+          (is (fn? (:on-history-backfill-request runtime-options)))
           (is (identical? (:on-liquidation-drag-preview runtime-options)
                           (:on-liquidation-drag-preview second-runtime-options)))
           (is (identical? (:on-liquidation-drag-confirm runtime-options)
@@ -139,3 +140,22 @@
         (is (= :long (:side valid-overlay)))
         (is (= 90 (:liquidation-price invalid-overlay)))
         (is (= 90 (:liquidation-price malformed-overlay)))))))
+
+(deftest chart-view-model-history-backfill-callback-dispatches-action-test
+  (let [dispatch-calls (atom [])
+        dispatch-fn (fn [event actions]
+                      (swap! dispatch-calls conj [event actions]))]
+    (binding [derived-cache/*process-candle-data* (fn [_] transformed-candles)]
+      (with-redefs [trading-state/position-for-active-asset (fn [_] nil)
+                    position-overlay-model/build-position-overlay (fn [_] nil)]
+        (let [callback (get-in (vm/chart-view-model (base-state) dispatch-fn)
+                               [:chart-runtime-options :on-history-backfill-request])]
+          (callback {:bars 330
+                     :end-time-ms 1751068799999})
+          (is (= [[{:replicant/trigger :chart-candle-history-backfill}
+                   [[:actions/request-chart-candle-backfill
+                     {:coin "BTC"
+                      :interval :1d
+                      :bars 330
+                      :end-time-ms 1751068799999}]]]]
+                 @dispatch-calls)))))))

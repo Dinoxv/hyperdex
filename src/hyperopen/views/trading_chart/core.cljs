@@ -68,6 +68,7 @@
          persistence-deps (:persistence-deps chart-runtime-options)
          volume-visible? (boolean (get chart-runtime-options :volume-visible? true))
          on-hide-volume-indicator (:on-hide-volume-indicator chart-runtime-options)
+         on-history-backfill-request (:on-history-backfill-request chart-runtime-options)
          main-series-markers (memoized-main-series-markers indicator-markers
                                                            fill-markers
                                                            (:entry-marker position-overlay))
@@ -107,6 +108,7 @@
                      :series-options series-options
                      :selected-timeframe selected-timeframe
                      :persistence-deps persistence-deps
+                     :on-history-backfill-request on-history-backfill-request
                      :volume-visible? volume-visible?
                      :main-series-markers main-series-markers
                      :position-overlay position-overlay

@@ -19,6 +19,112 @@
                                             (aget "cancelAnimationFrame"))]
     (cancel-animation-frame frame-id)))
 
+(def ^:private history-backfill-threshold-bars
+  32)
+
+(def ^:private history-backfill-bars
+  330)
+
+(def ^:private millisecond-time-threshold
+  100000000000)
+
+(defn- parse-number
+  [value]
+  (cond
+    (number? value)
+    (when (and (not (js/isNaN value))
+               (js/isFinite value))
+      value)
+
+    (string? value)
+    (let [parsed (js/Number value)]
+      (when (and (number? parsed)
+                 (not (js/isNaN parsed))
+                 (js/isFinite parsed))
+        parsed))
+
+    :else
+    nil))
+
+(defn- candle-time-ms
+  [candle]
+  (when (map? candle)
+    (when-let [parsed (parse-number (or (:time candle)
+                                        (:t candle)
+                                        (get candle "time")
+                                        (get candle "t")))]
+      (js/Math.floor
+       (if (> parsed millisecond-time-threshold)
+         parsed
+         (* parsed 1000))))))
+
+(defn- oldest-candle-time-ms
+  [candles]
+  (when-let [times (seq (keep candle-time-ms candles))]
+    (apply min times)))
+
+(defn- visible-logical-range
+  [chart]
+  (try
+    (let [time-scale (when chart (.timeScale ^js chart))]
+      (when (and time-scale
+                 (fn? (.-getVisibleLogicalRange ^js time-scale)))
+        (let [range-data (some-> (.getVisibleLogicalRange ^js time-scale)
+                                 (js->clj :keywordize-keys true))
+              from (parse-number (:from range-data))
+              to (parse-number (:to range-data))]
+          (when (and (some? from)
+                     (some? to)
+                     (<= from to))
+            {:from from
+             :to to}))))
+    (catch :default _
+      nil)))
+
+(defn- history-backfill-bars-for-visible-range
+  [visible-range]
+  (let [empty-left-bars (max 0 (- (:from visible-range)))
+        needed-bars (+ (js/Math.ceil empty-left-bars)
+                       history-backfill-threshold-bars)]
+    (max history-backfill-bars needed-bars)))
+
+(defn- mark-history-backfill-requested!
+  [node end-time-ms]
+  (let [requested (or (:history-backfill-requested-end-times (chart-runtime/get-state node))
+                      #{})]
+    (when-not (contains? requested end-time-ms)
+      (chart-runtime/assoc-state! node
+                                  :history-backfill-requested-end-times
+                                  (conj requested end-time-ms))
+      true)))
+
+(defn- maybe-request-history-backfill!
+  [node chart]
+  (let [{:keys [history-backfill-context]} (chart-runtime/get-state node)
+        {:keys [candles selected-timeframe on-history-backfill-request]} history-backfill-context
+        visible-range (visible-logical-range chart)]
+    (when (and (fn? on-history-backfill-request)
+               (seq candles)
+               (keyword? selected-timeframe)
+               visible-range
+               (<= (:from visible-range) history-backfill-threshold-bars))
+      (when-let [oldest-ms (oldest-candle-time-ms candles)]
+        (let [end-time-ms (dec oldest-ms)]
+          (when (and (pos? end-time-ms)
+                     (mark-history-backfill-requested! node end-time-ms))
+            (on-history-backfill-request
+             {:interval selected-timeframe
+              :bars (history-backfill-bars-for-visible-range visible-range)
+              :end-time-ms end-time-ms})))))))
+
+(defn- sync-history-backfill-context!
+  [node {:keys [candle-data selected-timeframe on-history-backfill-request]}]
+  (chart-runtime/assoc-state! node
+                              :history-backfill-context
+                              {:candles candle-data
+                               :selected-timeframe selected-timeframe
+                               :on-history-backfill-request on-history-backfill-request}))
+
 (defn- schedule-decoration-frame-fn
   [context]
   (let [schedule! (:schedule-decoration-frame! context)]
@@ -61,7 +167,9 @@
    chart
    selected-timeframe
    (assoc persistence-deps
-          :on-visible-range-change! #(mark-visible-range-interaction! node))))
+          :on-visible-range-change! (fn []
+                                      (mark-visible-range-interaction! node)
+                                      (maybe-request-history-backfill! node chart)))))
 
 (defn- start-visible-range-restore!
   [node chart candles selected-timeframe persistence-deps]
@@ -209,6 +317,7 @@
         chart (.-chart chart-obj)
         legend-control (ci/create-legend! node chart legend-meta legend-deps)]
     (initialize-chart-runtime-state! node chart-obj legend-control chart-type)
+    (sync-history-backfill-context! node context)
     (ci/sync-baseline-base-value-subscription! chart-obj chart-type)
     (schedule-chart-decoration-pass! node context)
     (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps)))
@@ -263,6 +372,7 @@
     (when volume-series
       (ci/set-volume-data! volume-series candle-data))
     (when chart
+      (sync-history-backfill-context! node context)
       (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps))
     (when chart-obj
       (schedule-chart-decoration-pass! node context))

@@ -54,6 +54,7 @@
    [:actions/set-funding-hypothetical-value :set-funding-hypothetical-value]
    [:actions/toggle-timeframes-dropdown :toggle-timeframes-dropdown]
    [:actions/select-chart-timeframe :select-chart-timeframe]
+   [:actions/request-chart-candle-backfill :request-chart-candle-backfill]
    [:actions/toggle-chart-type-dropdown :toggle-chart-type-dropdown]
    [:actions/select-chart-type :select-chart-type]
    [:actions/toggle-indicators-dropdown :toggle-indicators-dropdown]

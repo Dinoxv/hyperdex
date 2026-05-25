@@ -8,6 +8,7 @@
 (defn action-deps []
   {:toggle-timeframes-dropdown chart-actions/toggle-timeframes-dropdown
    :select-chart-timeframe chart-actions/select-chart-timeframe
+   :request-chart-candle-backfill chart-actions/request-chart-candle-backfill
    :toggle-chart-type-dropdown chart-actions/toggle-chart-type-dropdown
    :select-chart-type chart-actions/select-chart-type
    :toggle-indicators-dropdown chart-actions/toggle-indicators-dropdown

@@ -129,6 +129,9 @@
 (def select-chart-timeframe
   chart-actions/select-chart-timeframe)
 
+(def request-chart-candle-backfill
+  chart-actions/request-chart-candle-backfill)
+
 (def toggle-chart-type-dropdown
   chart-actions/toggle-chart-type-dropdown)
 

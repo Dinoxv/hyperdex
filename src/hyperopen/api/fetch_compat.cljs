@@ -43,21 +43,24 @@
 
 (defn fetch-candle-snapshot!
   [{:keys [log-fn
-           request-candle-snapshot!
-           apply-candle-snapshot-success
-           apply-candle-snapshot-error]}
+   request-candle-snapshot!
+   apply-candle-snapshot-success
+   apply-candle-snapshot-error]}
    store
-   {:keys [interval bars priority]}]
+   {:keys [interval bars priority end-time-ms]}]
   (let [active-asset (:active-asset @store)]
     (if (nil? active-asset)
       (do
         (log-fn "No active asset selected, skipping candle fetch")
         (js/Promise.resolve nil))
       (let [interval-s (name interval)]
-        (log-fn "Fetching" bars interval-s "bars for" active-asset)
+        (log-fn "Fetching" bars interval-s "bars for" active-asset
+                (when end-time-ms
+                  (str "ending at " end-time-ms)))
         (-> (request-candle-snapshot! active-asset
                                       :interval interval
                                       :bars bars
+                                      :end-time-ms end-time-ms
                                       :priority priority)
             (.then (promise-effects/apply-success-and-return
                     store

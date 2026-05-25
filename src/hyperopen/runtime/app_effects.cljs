@@ -47,6 +47,7 @@
            coin
            interval
            bars
+           end-time-ms
            active?-fn
            log-fn
            request-candle-snapshot-fn
@@ -62,13 +63,15 @@
     (log-fn "Fetching candle snapshot..."
             (clj->js {:coin target-coin
                       :interval interval*
-                      :bars bars*}))
+                      :bars bars*
+                      :endTimeMs end-time-ms}))
     (if (or (not target-coin)
             (not (request-active? active?-fn)))
       (js/Promise.resolve nil)
       (-> (request-candle-snapshot-fn target-coin
                                       :interval interval*
                                       :bars bars*
+                                      :end-time-ms end-time-ms
                                       :active?-fn active?-fn)
           (.then (fn [rows]
                    (when (request-active? active?-fn)

@@ -108,7 +108,8 @@
                 :apply-candle-snapshot-error custom-error-fn})
               nil
               store
-              :coin "BTC"))))
+              :coin "BTC"
+              :end-time-ms 123456789))))
     (let [[default-call custom-call] @calls]
       (is (= store (:store default-call)))
       (is (= "ETH" (:coin default-call)))
@@ -126,6 +127,7 @@
       (is (= "BTC" (:coin custom-call)))
       (is (= :1d (:interval custom-call)))
       (is (= 330 (:bars custom-call)))
+      (is (= 123456789 (:end-time-ms custom-call)))
       (is (identical? custom-log-fn (:log-fn custom-call)))
       (is (identical? custom-request-fn
                       (:request-candle-snapshot-fn custom-call)))

@@ -66,3 +66,19 @@
     (is (= {:margin 10} (get-in clearinghouse [:perp-dex-clearinghouse "vault"])))
     (is (= "Error: clearinghouse" (:perp-dex-clearinghouse-error clearinghouse-error)))
     (is (= :unexpected (:perp-dex-clearinghouse-error-category clearinghouse-error)))))
+
+(deftest candle-snapshot-success-merges-dedupes-and-sorts-existing-rows-test
+  (let [state {:candles {"BTC" {:1d [{:t 3000 :c "103"}
+                                     {:t 4000 :c "104"}]}}}
+        next-state (market/apply-candle-snapshot-success
+                    state
+                    "BTC"
+                    :1d
+                    [{:t 1000 :c "101"}
+                     {:t 3000 :c "103-updated"}
+                     {:t 2000 :c "102"}])]
+    (is (= [{:t 1000 :c "101"}
+            {:t 2000 :c "102"}
+            {:t 3000 :c "103-updated"}
+            {:t 4000 :c "104"}]
+           (get-in next-state [:candles "BTC" :1d])))))

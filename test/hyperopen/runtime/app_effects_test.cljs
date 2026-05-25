@@ -12,12 +12,13 @@
     (is (= true (get-in @store [:wallet :connected?])))
     (is (= "/trade" (get-in @store [:router :path])))))
 
-(deftest fetch-candle-snapshot-uses-defaults-custom-options-and-explicit-coin-test
+(deftest fetch-candle-snapshot-uses-defaults-custom-options-explicit-coin-and-end-time-test
   (let [calls (atom [])
-        request-fn (fn [coin & {:keys [interval bars]}]
+        request-fn (fn [coin & {:keys [interval bars end-time-ms]}]
                      (swap! calls conj {:coin coin
                                         :interval interval
-                                        :bars bars})
+                                        :bars bars
+                                        :end-time-ms end-time-ms})
                      (js/Promise.resolve [{:t 1}]))
         store (atom {:active-asset "BTC"})]
     (app-effects/fetch-candle-snapshot!
@@ -43,15 +44,16 @@
       :coin "SPY"
       :interval :1d
       :bars 50
+      :end-time-ms 123456789
       :log-fn (fn [& _] nil)
       :request-candle-snapshot-fn request-fn
       :apply-candle-snapshot-success (fn [state coin interval rows]
                                        (assoc-in state [:candles coin interval] rows))
       :apply-candle-snapshot-error (fn [state coin interval err]
                                      (assoc-in state [:candles coin interval :error] (str err)))})
-    (is (= [{:coin "BTC" :interval :1d :bars 330}
-            {:coin "BTC" :interval :4h :bars 100}
-            {:coin "SPY" :interval :1d :bars 50}]
+    (is (= [{:coin "BTC" :interval :1d :bars 330 :end-time-ms nil}
+            {:coin "BTC" :interval :4h :bars 100 :end-time-ms nil}
+            {:coin "SPY" :interval :1d :bars 50 :end-time-ms 123456789}]
            @calls))))
 
 (deftest fetch-candle-snapshot-skips-when-request-is-inactive-test

@@ -53,6 +53,26 @@
                             :chart-volume-indicator-remove
                             [[:actions/hide-volume-indicator]])))
 
+(defn dispatch-chart-history-backfill!
+  ([active-asset selected-timeframe payload]
+   (dispatch-chart-history-backfill!
+    (current-dispatch-fn)
+    active-asset
+    selected-timeframe
+    payload))
+  ([dispatch-fn active-asset selected-timeframe payload]
+   (when (and (string? active-asset)
+              (keyword? selected-timeframe)
+              (map? payload))
+     (dispatch-chart-actions!
+      dispatch-fn
+      :chart-candle-history-backfill
+      [[:actions/request-chart-candle-backfill
+        {:coin active-asset
+         :interval selected-timeframe
+         :bars (or (:bars payload) 330)
+         :end-time-ms (:end-time-ms payload)}]]))))
+
 (defn chart-liquidation-drag-prefill-actions
   [position-data suggestion]
   (when (and (map? position-data)
@@ -134,6 +154,16 @@
         active-position-data
         suggestion)))))
 
+(def ^:private memoized-history-backfill-callback
+  (memoize-last
+   (fn [dispatch-fn active-asset selected-timeframe]
+     (fn [payload]
+       (dispatch-chart-history-backfill!
+        dispatch-fn
+        active-asset
+        selected-timeframe
+        payload)))))
+
 (defn cancel-order-callback
   [dispatch-fn]
   (memoized-cancel-order-callback dispatch-fn))
@@ -149,3 +179,7 @@
 (defn liquidation-drag-confirm-callback
   [dispatch-fn active-position-data]
   (memoized-liquidation-drag-confirm-callback dispatch-fn active-position-data))
+
+(defn history-backfill-callback
+  [dispatch-fn active-asset selected-timeframe]
+  (memoized-history-backfill-callback dispatch-fn active-asset selected-timeframe))

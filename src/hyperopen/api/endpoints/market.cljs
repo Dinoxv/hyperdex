@@ -43,29 +43,50 @@
                     opts*)
       (.then perp-dexs/normalize-perp-dex-payload))))
 
+(defn- finite-number?
+  [value]
+  (and (number? value)
+       (not (js/isNaN value))
+       (js/isFinite value)))
+
+(defn- explicit-end-time-ms
+  [end-time-ms]
+  (let [candidate (cond
+                    (finite-number? end-time-ms) end-time-ms
+                    (string? end-time-ms) (js/Number end-time-ms)
+                    :else js/NaN)]
+    (when (and (finite-number? candidate)
+               (pos? candidate))
+      (js/Math.floor candidate))))
+
 (defn request-candle-snapshot!
-  [post-info! now-ms-fn coin {:keys [interval bars priority]
+  [post-info! now-ms-fn coin {:keys [interval bars priority end-time-ms]
                               :or {interval :1d bars 330 priority :high}
                               :as opts}]
   (if (nil? coin)
     (js/Promise.resolve nil)
-    (let [now (now-ms-fn)
+    (let [explicit-end (explicit-end-time-ms end-time-ms)
+          end (or explicit-end (now-ms-fn))
           ms (interval-to-milliseconds interval)
-          start (- now (* bars ms))
+          start (- end (* bars ms))
           interval-s (name interval)
+          historical-window? (some? explicit-end)
+          window-key (cond-> [:candle-snapshot coin interval-s bars]
+                       historical-window? (conj end))
           body {"type" "candleSnapshot"
                 "req" {"coin" coin
                        "interval" interval-s
                        "startTime" start
-                       "endTime" now}}
+                       "endTime" end}}
           request-opts (request-policy/apply-info-request-policy
                         :candle-snapshot
                         (merge {:priority priority
-                                :dedupe-key [:candle-snapshot coin interval-s bars]
-                                :cache-key [:candle-snapshot coin interval-s bars]}
+                                :dedupe-key window-key
+                                :cache-key window-key}
                                (dissoc (or opts {})
                                        :interval
                                        :bars
+                                       :end-time-ms
                                        :priority)))]
       (post-info! body request-opts))))
 
@@ -99,12 +120,6 @@
 
 (def ^:private default-market-funding-history-page-size
   500)
-
-(defn- finite-number?
-  [value]
-  (and (number? value)
-       (not (js/isNaN value))
-       (js/isFinite value)))
 
 (defn- parse-decimal
   [value]

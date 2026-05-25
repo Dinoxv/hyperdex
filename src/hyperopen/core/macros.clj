@@ -114,6 +114,7 @@
     open-spectate-mode-mobile-header-menu
     toggle-timeframes-dropdown
     select-chart-timeframe
+    request-chart-candle-backfill
     toggle-chart-type-dropdown
     select-chart-type
     toggle-indicators-dropdown

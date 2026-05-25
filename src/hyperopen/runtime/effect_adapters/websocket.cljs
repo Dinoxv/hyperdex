@@ -126,13 +126,14 @@
          request-candle-snapshot-fn api/request-candle-snapshot!
          apply-candle-snapshot-success api-projections/apply-candle-snapshot-success
          apply-candle-snapshot-error api-projections/apply-candle-snapshot-error}}]
-  (fn [_ store & {:keys [coin interval bars active?-fn detail-route-vault-address]
+  (fn [_ store & {:keys [coin interval bars end-time-ms active?-fn detail-route-vault-address]
                   :or {interval :1d bars 330}}]
     (app-effects/fetch-candle-snapshot!
      {:store store
       :coin coin
       :interval interval
       :bars bars
+      :end-time-ms end-time-ms
       :active?-fn (combined-active?-fn store active?-fn detail-route-vault-address)
       :log-fn log-fn
       :request-candle-snapshot-fn request-candle-snapshot-fn

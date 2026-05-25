@@ -140,6 +140,29 @@
         (is (= [:effects/sync-active-candle-subscription :interval :1h]
                (nth effects 2)))))))
 
+(deftest request-chart-candle-backfill-emits-single-bounded-historical-fetch-test
+  (let [effects (core/request-chart-candle-backfill
+                 {:active-asset "BTC"
+                  :chart-options {:selected-timeframe :1d}}
+                 {:coin "BTC"
+                  :interval :1d
+                  :bars 330
+                  :end-time-ms 1751068799999})]
+    (is (= [[:effects/fetch-candle-snapshot
+             :coin "BTC"
+             :interval :1d
+             :bars 330
+             :end-time-ms 1751068799999]]
+           effects)))
+  (is (= []
+         (core/request-chart-candle-backfill
+          {:active-asset "ETH"
+           :chart-options {:selected-timeframe :1d}}
+          {:coin "BTC"
+           :interval :1d
+           :bars 330
+           :end-time-ms 1751068799999}))))
+
 (deftest select-chart-type-emits-single-batched-projection-and-no-network-effects-test
   (with-test-local-storage
     (fn []

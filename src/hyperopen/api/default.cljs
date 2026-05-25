@@ -79,7 +79,7 @@
     opts)))
 
 (defn request-candle-snapshot!
-  [coin & {:keys [interval bars priority]
+  [coin & {:keys [interval bars priority end-time-ms]
            :or {interval :1d bars 330 priority :high}}]
   (market/request-candle-snapshot!
    {:post-info! post-info!
@@ -87,11 +87,12 @@
    coin
    {:interval interval
     :bars bars
+    :end-time-ms end-time-ms
     :priority priority}))
 
 (defn fetch-candle-snapshot!
   "Fetch `bars` worth of candles for the active asset at keyword interval (e.g. :1m, :1h)."
-  [store & {:keys [interval bars priority]
+  [store & {:keys [interval bars priority end-time-ms]
             :or {interval :1d bars 330 priority :high}}]
   (market/fetch-candle-snapshot!
    {:log-fn (api-log-fn)
@@ -99,6 +100,7 @@
    store
    {:interval interval
     :bars bars
+    :end-time-ms end-time-ms
     :priority priority}))
 
 (defn request-frontend-open-orders!

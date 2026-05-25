@@ -33,6 +33,12 @@
     :heavy-effect-ids #{:effects/sync-active-candle-subscription
                         :effects/fetch-candle-snapshot}}
 
+   :actions/request-chart-candle-backfill
+   {:required-phase-order [:heavy-io]
+    :require-projection-before-heavy? false
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot}}
+
    :actions/select-portfolio-summary-time-range
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
