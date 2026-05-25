@@ -69,6 +69,7 @@
          volume-visible? (boolean (get chart-runtime-options :volume-visible? true))
          on-hide-volume-indicator (:on-hide-volume-indicator chart-runtime-options)
          on-history-backfill-request (:on-history-backfill-request chart-runtime-options)
+         history-backfill-loading? (boolean (:history-backfill-loading? chart-runtime-options))
          main-series-markers (memoized-main-series-markers indicator-markers
                                                            fill-markers
                                                            (:entry-marker position-overlay))
@@ -97,7 +98,9 @@
          chart-accessible-label (str (or (:symbol legend-meta) "Asset")
                                      " price chart, "
                                      (or (:timeframe-label legend-meta) "selected")
-                                     " timeframe")
+                                     " timeframe"
+                                     (when history-backfill-loading?
+                                       ", loading older candles"))
          on-render (runtime/chart-canvas-on-render
                     {:candle-data candle-data
                      :chart-type chart-type
@@ -119,10 +122,14 @@
                      :context-menu-deps context-menu-deps
                      :schedule-decoration-frame! *schedule-chart-decoration-frame!*
                      :cancel-decoration-frame! *cancel-chart-decoration-frame!*})]
-     [:div {:class ["w-full" "min-w-0" "relative" "flex-1" "min-h-[360px]" "overflow-hidden" "bg-base-100" "trading-chart-host"]
+     [:div {:class (cond-> ["w-full" "min-w-0" "relative" "flex-1" "min-h-[360px]"
+                            "overflow-hidden" "bg-base-100" "trading-chart-host"]
+                     history-backfill-loading?
+                     (conj "trading-chart-host--history-loading"))
             :data-parity-id "chart-canvas"
             :data-role "trading-chart-canvas"
             :role "region"
+            :aria-busy history-backfill-loading?
             :aria-label chart-accessible-label
             :tabindex 0
             :replicant/key (str "chart-" (hash active-indicators) "-" legend-key "-" volume-visible?)

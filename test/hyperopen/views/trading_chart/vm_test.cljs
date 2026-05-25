@@ -88,6 +88,7 @@
           (is (identical? (:on-hide-volume-indicator runtime-options)
                           (:on-hide-volume-indicator second-runtime-options)))
           (is (fn? (:on-history-backfill-request runtime-options)))
+          (is (false? (:history-backfill-loading? runtime-options)))
           (is (identical? (:on-liquidation-drag-preview runtime-options)
                           (:on-liquidation-drag-preview second-runtime-options)))
           (is (identical? (:on-liquidation-drag-confirm runtime-options)
@@ -159,3 +160,15 @@
                       :bars 330
                       :end-time-ms 1751068799999}]]]]
                  @dispatch-calls)))))))
+
+(deftest chart-view-model-exposes-history-backfill-loading-state-test
+  (let [dispatch-fn (fn [_event _actions] nil)]
+    (binding [derived-cache/*process-candle-data* (fn [_] transformed-candles)]
+      (with-redefs [trading-state/position-for-active-asset (fn [_] nil)
+                    position-overlay-model/build-position-overlay (fn [_] nil)]
+        (let [model (vm/chart-view-model
+                     (assoc-in (base-state)
+                               [:chart-options :history-backfill-pending-count]
+                               1)
+                     dispatch-fn)]
+          (is (true? (get-in model [:chart-runtime-options :history-backfill-loading?]))))))))

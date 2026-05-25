@@ -125,6 +125,13 @@
                                :selected-timeframe selected-timeframe
                                :on-history-backfill-request on-history-backfill-request}))
 
+(defn- restore-token-current?
+  [node chart restore-token]
+  (let [{:keys [chart-obj visible-range-restore-token]} (chart-runtime/get-state node)
+        current-chart (when chart-obj (.-chart ^js chart-obj))]
+    (and (= restore-token visible-range-restore-token)
+         (identical? chart current-chart))))
+
 (defn- schedule-decoration-frame-fn
   [context]
   (let [schedule! (:schedule-decoration-frame! context)]
@@ -168,8 +175,9 @@
    selected-timeframe
    (assoc persistence-deps
           :on-visible-range-change! (fn []
-                                      (mark-visible-range-interaction! node)
-                                      (maybe-request-history-backfill! node chart)))))
+                                      (mark-visible-range-interaction! node))
+          :on-visible-range-event! (fn []
+                                     (maybe-request-history-backfill! node chart)))))
 
 (defn- start-visible-range-restore!
   [node chart candles selected-timeframe persistence-deps]
@@ -193,6 +201,9 @@
                             (:visible-range-restore-token runtime-state*))
                          (= interaction-epoch
                             (or (:visible-range-interaction-epoch runtime-state*) 0)))))))
+        (.then (fn [_]
+                 (when (restore-token-current? node chart restore-token)
+                   (maybe-request-history-backfill! node chart))))
         (.catch (fn [error]
                   (js/console.warn "Failed to restore persisted visible range:" error))))))
 
@@ -373,7 +384,8 @@
       (ci/set-volume-data! volume-series candle-data))
     (when chart
       (sync-history-backfill-context! node context)
-      (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps))
+      (ensure-visible-range-lifecycle! node chart candle-data selected-timeframe persistence-deps)
+      (maybe-request-history-backfill! node chart))
     (when chart-obj
       (schedule-chart-decoration-pass! node context))
     (sync-indicator-series! chart-obj indicator-series-data)

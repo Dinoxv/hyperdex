@@ -88,6 +88,7 @@
         indicator-runtime-ready?
         on-hide-volume-indicator
         on-history-backfill-request
+        history-backfill-loading?
         active-asset
         candle-data
         on-liquidation-drag-preview
@@ -103,6 +104,7 @@
       :show-fill-markers? show-fill-markers?
       :on-hide-volume-indicator on-hide-volume-indicator
       :on-history-backfill-request on-history-backfill-request
+      :history-backfill-loading? history-backfill-loading?
       :persistence-deps {:asset active-asset
                          :candles candle-data}
       :on-liquidation-drag-preview on-liquidation-drag-preview
@@ -214,6 +216,8 @@
                                      dispatch-fn
                                      active-asset
                                      selected-timeframe)
+        history-backfill-loading? (pos? (or (get-in state [:chart-options :history-backfill-pending-count])
+                                            0))
         symbol (or active-asset "—")
         timeframe-label (str/upper-case (name selected-timeframe))
         price-decimals (or (:price-decimals active-market)
@@ -229,6 +233,7 @@
                                indicator-runtime-ready?
                                on-hide-volume-indicator
                                on-history-backfill-request
+                               history-backfill-loading?
                                active-asset
                                candle-data
                                on-liquidation-drag-preview

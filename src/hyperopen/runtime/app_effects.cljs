@@ -20,6 +20,12 @@
                    state
                    path-values))))
 
+(defn- update-chart-history-backfill-pending
+  [state delta]
+  (let [current (or (get-in state [:chart-options :history-backfill-pending-count]) 0)
+        next-count (max 0 (+ current delta))]
+    (assoc-in state [:chart-options :history-backfill-pending-count] next-count)))
+
 (defn local-storage-set!
   [key value]
   (try
@@ -59,7 +65,8 @@
         active-asset (:active-asset @store)
         target-coin (if (seq requested-coin)
                       requested-coin
-                      active-asset)]
+                      active-asset)
+        historical-backfill? (some? end-time-ms)]
     (log-fn "Fetching candle snapshot..."
             (clj->js {:coin target-coin
                       :interval interval*
@@ -68,19 +75,26 @@
     (if (or (not target-coin)
             (not (request-active? active?-fn)))
       (js/Promise.resolve nil)
-      (-> (request-candle-snapshot-fn target-coin
-                                      :interval interval*
-                                      :bars bars*
-                                      :end-time-ms end-time-ms
-                                      :active?-fn active?-fn)
-          (.then (fn [rows]
-                   (when (request-active? active?-fn)
-                     (swap! store apply-candle-snapshot-success target-coin interval* rows))
-                   rows))
-          (.catch (fn [err]
-                    (when (request-active? active?-fn)
-                      (swap! store apply-candle-snapshot-error target-coin interval* err))
-                    (js/Promise.reject err)))))))
+      (do
+        (when historical-backfill?
+          (swap! store update-chart-history-backfill-pending 1))
+        (-> (request-candle-snapshot-fn target-coin
+                                        :interval interval*
+                                        :bars bars*
+                                        :end-time-ms end-time-ms
+                                        :active?-fn active?-fn)
+            (.then (fn [rows]
+                     (when (request-active? active?-fn)
+                       (swap! store apply-candle-snapshot-success target-coin interval* rows))
+                     (when historical-backfill?
+                       (swap! store update-chart-history-backfill-pending -1))
+                     rows))
+            (.catch (fn [err]
+                      (when (request-active? active?-fn)
+                        (swap! store apply-candle-snapshot-error target-coin interval* err))
+                      (when historical-backfill?
+                        (swap! store update-chart-history-backfill-pending -1))
+                      (js/Promise.reject err))))))))
 
 (defn init-websocket!
   [{:keys [ws-url

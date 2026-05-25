@@ -411,6 +411,25 @@
       (chart-core/chart-canvas candle-data-new-identity :candlestick active-indicators-b legend-meta :4h chart-runtime-options)
       (is (= 4 @calls*) "new candle data identity should recompute indicator output"))))
 
+(deftest chart-canvas-renders-history-backfill-loading-affordance-test
+  (let [candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]
+        legend-meta {:symbol "BTC"
+                     :timeframe-label "1D"
+                     :venue "Hyperopen"
+                     :candle-data candle-data}
+        canvas (chart-core/chart-canvas
+                candle-data
+                :candlestick
+                {}
+                legend-meta
+                :1d
+                {:history-backfill-loading? true})]
+    (is (some #{"trading-chart-host--history-loading"}
+              (collect-all-classes canvas)))
+    (is (true? (get-in canvas [1 :aria-busy])))
+    (is (= "BTC price chart, 1D timeframe, loading older candles"
+           (get-in canvas [1 :aria-label])))))
+
 (deftest chart-canvas-mount-uses-volume-chart-creation-when-no-indicators-test
   (let [node #js {}
         candle-data [{:time 1700000000 :open 100 :high 101 :low 99 :close 100 :volume 10}]

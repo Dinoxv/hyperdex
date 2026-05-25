@@ -56,6 +56,36 @@
             {:coin "SPY" :interval :1d :bars 50 :end-time-ms 123456789}]
            @calls))))
 
+(deftest fetch-candle-snapshot-tracks-historical-backfill-pending-state-test
+  (async done
+    (let [resolve-request (atom nil)
+          store (atom {:active-asset "BTC"
+                       :chart-options {}})
+          request-fn (fn [& _]
+                       (js/Promise.
+                        (fn [resolve _reject]
+                          (reset! resolve-request resolve))))]
+      (-> (app-effects/fetch-candle-snapshot!
+           {:store store
+            :coin "BTC"
+            :interval :1d
+            :bars 552
+            :end-time-ms 1699999999999
+            :log-fn (fn [& _] nil)
+            :request-candle-snapshot-fn request-fn
+            :apply-candle-snapshot-success (fn [state coin interval rows]
+                                             (assoc-in state [:candles coin interval] rows))
+            :apply-candle-snapshot-error (fn [state coin interval err]
+                                           (assoc-in state [:candles coin interval :error] (str err)))})
+          (.then (fn [_rows]
+                   (is (= 0 (get-in @store [:chart-options :history-backfill-pending-count])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done))))
+      (is (= 1 (get-in @store [:chart-options :history-backfill-pending-count])))
+      (@resolve-request [{:t 1}]))))
+
 (deftest fetch-candle-snapshot-skips-when-request-is-inactive-test
   (async done
     (let [calls (atom 0)

@@ -416,11 +416,13 @@
                             persist-visible-range-fn
                             set-timeout-fn
                             clear-timeout-fn
-                            on-visible-range-change!]
+                            on-visible-range-change!
+                            on-visible-range-event!]
                      :or {debounce-ms visible-range-write-debounce-ms
                           set-timeout-fn platform/set-timeout!
                           clear-timeout-fn platform/clear-timeout!
-                          on-visible-range-change! (fn [] nil)}}]
+                          on-visible-range-change! (fn [] nil)
+                          on-visible-range-event! (fn [] nil)}}]
    (let [persist-visible-range!* (or persist-visible-range-fn
                                      (if storage-set!
                                        (fn [asset* timeframe* range-data]
@@ -455,11 +457,13 @@
                                 (when-let [range-data (visible-range-from-time-scale time-scale)]
                                   (queue-persist! range-data)))
              logical-handler (fn [range]
+                               (on-visible-range-event!)
                                (notify-visible-range-change!)
                                (if-let [range-data (range-candidate->data :logical range)]
                                  (queue-persist! range-data)
                                  (persist-current!)))
              time-handler (fn [range]
+                            (on-visible-range-event!)
                             (notify-visible-range-change!)
                             (if-let [range-data (range-candidate->data :time range)]
                               (queue-persist! range-data)

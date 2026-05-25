@@ -532,6 +532,7 @@
             [hyperopen.views.trading-chart.core-test]
             [hyperopen.views.trading-chart.derived-cache-test]
             [hyperopen.views.trading-chart.runtime-edge-test]
+            [hyperopen.views.trading-chart.runtime-history-backfill-test]
             [hyperopen.views.trading-chart.runtime-state-test]
             [hyperopen.views.trading-chart.runtime-test]
             [hyperopen.views.trading-chart.timeframe-dropdown-test]
@@ -1190,6 +1191,7 @@
              'hyperopen.views.trading-chart.core-test
              'hyperopen.views.trading-chart.derived-cache-test
              'hyperopen.views.trading-chart.runtime-edge-test
+             'hyperopen.views.trading-chart.runtime-history-backfill-test
              'hyperopen.views.trading-chart.runtime-state-test
              'hyperopen.views.trading-chart.runtime-test
              'hyperopen.views.trading-chart.timeframe-dropdown-test

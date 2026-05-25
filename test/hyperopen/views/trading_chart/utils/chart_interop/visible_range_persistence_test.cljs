@@ -346,3 +346,38 @@
     (@handler* #js {:from 5 :to 6})
     (is (= 2 @interaction-calls*))
     (cleanup)))
+
+(deftest subscribe-visible-range-persistence-notifies-range-event-on-every-sample-test
+  (let [handler* (atom nil)
+        range-event-calls* (atom 0)
+        interaction-calls* (atom 0)
+        queued-timeouts (atom {})
+        next-timeout-id (atom 0)
+        time-scale #js {:subscribeVisibleTimeRangeChange (fn [handler]
+                                                           (reset! handler* handler))
+                        :unsubscribeVisibleTimeRangeChange (fn [_] nil)}
+        chart #js {:timeScale (fn [] time-scale)}
+        cleanup (chart-interop/subscribe-visible-range-persistence!
+                 chart
+                 :1h
+                 {:asset "BTC"
+                  :storage-set! (fn [_ _] nil)
+                  :on-visible-range-change! (fn []
+                                              (swap! interaction-calls* inc))
+                  :on-visible-range-event! (fn []
+                                             (swap! range-event-calls* inc))
+                  :set-timeout-fn (fn [f _ms]
+                                    (let [timeout-id (swap! next-timeout-id inc)]
+                                      (swap! queued-timeouts assoc timeout-id f)
+                                      timeout-id))
+                  :clear-timeout-fn (fn [timeout-id]
+                                      (swap! queued-timeouts dissoc timeout-id))})]
+    (@handler* #js {:from 1 :to 2})
+    (@handler* #js {:from 3 :to 4})
+    (is (= 2 @range-event-calls*))
+    (is (= 1 @interaction-calls*))
+    ((get @queued-timeouts 2))
+    (@handler* #js {:from 5 :to 6})
+    (is (= 3 @range-event-calls*))
+    (is (= 2 @interaction-calls*))
+    (cleanup)))
