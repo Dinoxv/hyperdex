@@ -68,6 +68,7 @@
     (is (= [{:command/type :optimizer.workflow/request-history-bundle
              :source :selection-prefetch
              :instrument-id "perp:BTC"
+             :instrument-ids ["perp:BTC" "perp:ETH"]
              :request-signature (get-in result
                                         [:state
                                          :portfolio
@@ -76,8 +77,39 @@
                                          :request-signature])
              :request (get-in result [:commands 0 :request])}]
            (:commands result)))
-    (is (= ["perp:BTC"]
+    (is (= ["perp:BTC" "perp:ETH"]
            (mapv :instrument-id (get-in result [:commands 0 :request :universe]))))))
+
+(deftest begin-selection-prefetch-batches-queued-instruments-test
+  (let [result (workflow/begin-selection-prefetch
+                {:state (prefetch-state)
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}
+                 :now-ms 1000})]
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (get-in result [:commands 0 :request :universe]))))
+    (is (= {:status :loading
+            :started-at-ms 1000
+            :completed-at-ms nil
+            :error nil
+            :warnings []}
+           (get-in result
+                   [:state
+                    :portfolio
+                    :optimizer
+                    :history-prefetch
+                    :by-instrument-id
+                    "perp:BTC"])))
+    (is (= :loading
+           (get-in result
+                   [:state
+                    :portfolio
+                    :optimizer
+                    :history-prefetch
+                    :by-instrument-id
+                    "perp:ETH"
+                    :status])))))
 
 (deftest begin-selection-prefetch-enriches-queued-instrument-from-discovery-test
   (let [state (assoc-in
@@ -262,6 +294,54 @@
                     :instrument-id])))
     (is (= "perp:ETH"
            (get-in result [:state :portfolio :optimizer :history-prefetch :active-instrument-id])))))
+
+(deftest complete-selection-prefetch-success-finishes-batched-queued-instruments-test
+  (let [started (workflow/begin-selection-prefetch
+                 {:state (prefetch-state)
+                  :opts {:source :selection-prefetch
+                         :queue? true
+                         :merge? true}
+                  :now-ms 1000})
+        signature (get-in started
+                          [:state
+                           :portfolio
+                           :optimizer
+                           :history-load-state
+                           :request-signature])
+        result (workflow/complete-selection-prefetch
+                {:state (:state started)
+                 :instrument-id "perp:BTC"
+                 :instrument-ids ["perp:BTC" "perp:ETH"]
+                 :request-signature signature
+                 :completed-at-ms 1100
+                 :bundle {:api-v2-history
+                          {:status :ok
+                           :series-by-instrument
+                           {"perp:BTC" {:instrument-id "hl:perp:BTC"}
+                            "perp:ETH" {:instrument-id "hl:perp:ETH"}}
+                           :warnings []}
+                          :warnings []}
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}})]
+    (is (= []
+           (get-in result [:state :portfolio :optimizer :history-prefetch :queue])))
+    (is (nil?
+         (get-in result [:state :portfolio :optimizer :history-prefetch :active-instrument-id])))
+    (is (= {:status :succeeded
+            :started-at-ms 1000
+            :completed-at-ms 1100
+            :error nil
+            :warnings []}
+           (get-in result
+                   [:state
+                    :portfolio
+                    :optimizer
+                    :history-prefetch
+                    :by-instrument-id
+                    "perp:ETH"])))
+    (is (= []
+           (:commands result)))))
 
 (deftest merge-history-bundle-preserves-existing-api-v2-instrument-maps-test
   (let [merged (workflow/merge-history-bundle

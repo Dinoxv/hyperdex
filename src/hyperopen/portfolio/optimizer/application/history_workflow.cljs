@@ -185,18 +185,41 @@
               #(vec (concat (or % []) (or (:warnings bundle) []))))
       (assoc :loaded-at-ms completed-at-ms)))
 
-(defn remove-queued-instrument
-  [queue instrument-id*]
-  (vec (remove #(= instrument-id* (history-prefetch/instrument-id %))
-               (or queue []))))
+(defn- queued-instruments
+  [prefetch-state]
+  (vec (:queue (merge history-prefetch/default-state prefetch-state))))
+
+(defn- instrument-ids
+  [instruments]
+  (vec (keep history-prefetch/instrument-id instruments)))
+
+(defn- completed-instrument-ids
+  [instrument-id* instrument-ids*]
+  (vec (distinct (keep identity (or (seq instrument-ids*)
+                                    [instrument-id*])))))
+
+(defn remove-queued-instruments
+  [queue instrument-ids*]
+  (let [ids (set instrument-ids*)]
+    (vec (remove #(contains? ids (history-prefetch/instrument-id %))
+                 (or queue [])))))
 
 (defn finish-selection-prefetch-state
-  [prefetch-state instrument-id* status]
-  (let [prefetch-state* (merge history-prefetch/default-state prefetch-state)]
+  [prefetch-state instrument-ids* status-by-instrument-id]
+  (let [prefetch-state* (merge history-prefetch/default-state prefetch-state)
+        ids (set instrument-ids*)]
     (cond-> (-> prefetch-state*
-                (update :queue remove-queued-instrument instrument-id*)
-                (assoc-in [:by-instrument-id instrument-id*] status))
-      (= instrument-id* (:active-instrument-id prefetch-state*))
+                (update :queue remove-queued-instruments instrument-ids*)
+                (update :by-instrument-id
+                        (fn [by-instrument-id]
+                          (reduce (fn [acc instrument-id*]
+                                    (if-let [status (get status-by-instrument-id
+                                                         instrument-id*)]
+                                      (assoc acc instrument-id* status)
+                                      acc))
+                                  (or by-instrument-id {})
+                                  instrument-ids*))))
+      (contains? ids (:active-instrument-id prefetch-state*))
       (assoc :active-instrument-id nil))))
 
 (defn current-universe-ids
@@ -205,31 +228,38 @@
         (get-in state contracts/draft-universe-path)))
 
 (defn begin-selection-prefetch-state
-  [state instrument-id* signature started-at-ms]
+  [state instrument-ids* signature started-at-ms]
   (-> state
       (assoc-in contracts/history-load-state-path
                 (begin-history-load-state signature started-at-ms))
       (update-in contracts/history-prefetch-path
                  (fn [prefetch-state]
-                   (-> (merge history-prefetch/default-state prefetch-state)
-                       (assoc :active-instrument-id instrument-id*)
-                       (assoc-in [:by-instrument-id instrument-id*]
-                                 (history-prefetch/loading-status started-at-ms)))))))
+                   (let [loading-status (history-prefetch/loading-status started-at-ms)]
+                     (reduce (fn [prefetch-state* instrument-id*]
+                               (assoc-in prefetch-state*
+                                         [:by-instrument-id instrument-id*]
+                                         loading-status))
+                             (assoc (merge history-prefetch/default-state prefetch-state)
+                                    :active-instrument-id (first instrument-ids*))
+                             instrument-ids*))))))
 
 (defn request-history-command
-  [{:keys [source instrument-id request signature]}]
-  {:command/type :optimizer.workflow/request-history-bundle
-   :source source
-   :instrument-id instrument-id
-   :request-signature signature
-   :request request})
+  [{:keys [source instrument-id instrument-ids request signature]}]
+  (cond-> {:command/type :optimizer.workflow/request-history-bundle
+           :source source
+           :instrument-id instrument-id
+           :request-signature signature
+           :request request}
+    (seq instrument-ids)
+    (assoc :instrument-ids (vec instrument-ids))))
 
 (defn begin-selection-prefetch
   [{:keys [state opts now-ms started-at-ms]}]
   (let [prefetch-state (history-prefetch/prefetch-state state)
         active-id (:active-instrument-id prefetch-state)
-        instrument (history-prefetch/first-queued-instrument state)
-        instrument-id* (history-prefetch/instrument-id instrument)]
+        queued (queued-instruments prefetch-state)
+        queued-ids (instrument-ids queued)
+        instrument-id* (first queued-ids)]
     (cond
       active-id
       {:state state
@@ -243,7 +273,7 @@
       (let [prefetch-universe (if (get-in state (conj contracts/history-data-path
                                                        :api-v2-history))
                                 (vec (get-in state contracts/draft-universe-path))
-                                [instrument])
+                                queued)
             request (history-request state
                                      (assoc (request-opts opts)
                                             :universe prefetch-universe
@@ -252,13 +282,14 @@
             signature (request-signature request)
             started-at-ms* (or started-at-ms now-ms)
             state* (begin-selection-prefetch-state state
-                                                   instrument-id*
+                                                   queued-ids
                                                    signature
                                                    started-at-ms*)]
         {:state state*
          :commands [(request-history-command
                      {:source :selection-prefetch
                       :instrument-id instrument-id*
+                      :instrument-ids queued-ids
                       :request request
                       :signature signature})]}))))
 
@@ -284,19 +315,43 @@
                 (failed-history-load-state current-state completed-at-ms err)))
     state))
 
+(defn- succeeded-prefetch-statuses
+  [prefetch-state instrument-ids* completed-at-ms warnings]
+  (into {}
+        (map (fn [instrument-id*]
+               [instrument-id*
+                (history-prefetch/succeeded-status
+                 (:started-at-ms (get-in prefetch-state
+                                         [:by-instrument-id instrument-id*]))
+                 completed-at-ms
+                 warnings)])
+             instrument-ids*)))
+
+(defn- failed-prefetch-statuses
+  [prefetch-state instrument-ids* completed-at-ms err]
+  (into {}
+        (map (fn [instrument-id*]
+               [instrument-id*
+                (history-prefetch/failed-status
+                 (:started-at-ms (get-in prefetch-state
+                                         [:by-instrument-id instrument-id*]))
+                 completed-at-ms
+                 {:message (error-message err)})])
+             instrument-ids*)))
+
 (defn apply-selection-prefetch-success
-  [state instrument-id* signature completed-at-ms bundle]
+  [state instrument-id* instrument-ids* signature completed-at-ms bundle]
   (let [current-prefetch-state (history-prefetch/prefetch-state state)
-        current-status (get-in current-prefetch-state
-                               [:by-instrument-id instrument-id*])
-        selected? (history-prefetch/instrument-selected? state instrument-id*)
+        completed-ids (completed-instrument-ids instrument-id* instrument-ids*)
+        selected? (boolean (some #(history-prefetch/instrument-selected? state %)
+                                 completed-ids))
         current-signature? (= signature
                               (get-in state
                                       contracts/history-load-state-request-signature-path))
-        status (history-prefetch/succeeded-status
-                (:started-at-ms current-status)
-                completed-at-ms
-                (:warnings bundle))]
+        statuses (succeeded-prefetch-statuses current-prefetch-state
+                                              completed-ids
+                                              completed-at-ms
+                                              (:warnings bundle))]
     (cond-> state
       (and selected? current-signature?)
       (update-in contracts/history-data-path
@@ -314,8 +369,8 @@
       :always
       (update-in contracts/history-prefetch-path
                  finish-selection-prefetch-state
-                 instrument-id*
-                 status)
+                 completed-ids
+                 statuses)
 
       :always
       (update-in contracts/history-prefetch-path
@@ -323,16 +378,15 @@
                  (current-universe-ids state)))))
 
 (defn apply-selection-prefetch-error
-  [state instrument-id* signature completed-at-ms err]
+  [state instrument-id* instrument-ids* signature completed-at-ms err]
   (let [current-prefetch-state (history-prefetch/prefetch-state state)
-        current-status (get-in current-prefetch-state
-                               [:by-instrument-id instrument-id*])
+        completed-ids (completed-instrument-ids instrument-id* instrument-ids*)
         current-load-state (get-in state contracts/history-load-state-path)
         current-signature? (= signature (:request-signature current-load-state))
-        status (history-prefetch/failed-status
-                (:started-at-ms current-status)
-                completed-at-ms
-                {:message (error-message err)})]
+        statuses (failed-prefetch-statuses current-prefetch-state
+                                           completed-ids
+                                           completed-at-ms
+                                           err)]
     (cond-> state
       current-signature?
       (assoc-in contracts/history-load-state-path
@@ -341,8 +395,8 @@
       :always
       (update-in contracts/history-prefetch-path
                  finish-selection-prefetch-state
-                 instrument-id*
-                 status)
+                 completed-ids
+                 statuses)
 
       :always
       (update-in contracts/history-prefetch-path
@@ -350,15 +404,18 @@
                  (current-universe-ids state)))))
 
 (defn complete-selection-prefetch
-  [{:keys [state instrument-id request-signature completed-at-ms bundle error opts]}]
+  [{:keys [state instrument-id instrument-ids request-signature completed-at-ms
+           bundle error opts]}]
   (let [state* (if error
                  (apply-selection-prefetch-error state
                                                  instrument-id
+                                                 instrument-ids
                                                  request-signature
                                                  completed-at-ms
                                                  error)
                  (apply-selection-prefetch-success state
                                                    instrument-id
+                                                   instrument-ids
                                                    request-signature
                                                    completed-at-ms
                                                    bundle))

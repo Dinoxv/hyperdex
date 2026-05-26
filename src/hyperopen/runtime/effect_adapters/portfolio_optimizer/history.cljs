@@ -84,6 +84,7 @@
                     (workflow/complete-selection-prefetch
                      {:state @store
                       :instrument-id (:instrument-id command)
+                      :instrument-ids (:instrument-ids command)
                       :request-signature (:request-signature command)
                       :completed-at-ms completed-at-ms
                       :bundle bundle
@@ -97,6 +98,7 @@
                      (workflow/complete-selection-prefetch
                       {:state @store
                        :instrument-id (:instrument-id command)
+                       :instrument-ids (:instrument-ids command)
                        :request-signature (:request-signature command)
                        :completed-at-ms completed-at-ms
                        :error err

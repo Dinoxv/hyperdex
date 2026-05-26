@@ -276,8 +276,21 @@
       (with-redefs [portfolio-optimizer-adapters/*request-history-bundle!*
                     (fn [_deps request]
                       (swap! calls conj request)
-                      (let [coin (get-in request [:universe 0 :coin])]
-                        (js/Promise.resolve (get bundle-by-coin coin))))
+                      (let [bundles (keep #(get bundle-by-coin (:coin %))
+                                          (:universe request))]
+                        (js/Promise.resolve
+                         {:candle-history-by-coin (apply merge
+                                                         (map :candle-history-by-coin
+                                                              bundles))
+                          :funding-history-by-coin (apply merge
+                                                          (map :funding-history-by-coin
+                                                               bundles))
+                          :warnings (vec (mapcat :warnings bundles))
+                          :request-plan
+                          {:candle-requests
+                           (vec (mapcat #(get-in % [:request-plan
+                                                    :candle-requests])
+                                        bundles))}})))
                     portfolio-optimizer-adapters/*now-ms* now-ms]
         (-> (portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect
              nil
@@ -286,7 +299,7 @@
               :queue? true
               :merge? true})
             (.then (fn [_result]
-                     (is (= [["perp:BTC"] ["perp:ETH"]]
+                     (is (= [["perp:BTC" "perp:ETH"]]
                             (mapv (fn [request]
                                     (mapv :instrument-id (:universe request)))
                                   @calls)))
