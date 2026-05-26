@@ -6,6 +6,11 @@
   [expected actual]
   (< (js/Math.abs (- expected actual)) 0.0000001))
 
+(defn- near-vec?
+  [expected actual]
+  (and (= (count expected) (count actual))
+       (every? true? (map near? expected actual))))
+
 (deftest build-rebalance-preview-generates-ready-perp-and-blocked-spot-rows-test
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 10000
@@ -139,3 +144,34 @@
             :after-utilization 0.14
             :warning nil}
            (get-in preview [:summary :margin])))))
+
+(deftest build-rebalance-preview-uses-signed-deltas-across-zero-test
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :rebalance-tolerance 0.0
+                  :instrument-ids ["increase-long"
+                                   "reduce-long"
+                                   "long-to-short"
+                                   "cover-short"
+                                   "short-to-long"
+                                   "increase-short"]
+                  :current-weights [0.20 0.50 0.20 -0.30 -0.10 -0.10]
+                  :target-weights [0.50 0.20 -0.10 -0.10 0.20 -0.40]
+                  :instruments-by-id {"increase-long" {:instrument-type :perp}
+                                      "reduce-long" {:instrument-type :perp}
+                                      "long-to-short" {:instrument-type :perp}
+                                      "cover-short" {:instrument-type :perp}
+                                      "short-to-long" {:instrument-type :perp}
+                                      "increase-short" {:instrument-type :perp}}
+                  :prices-by-id {"increase-long" 100
+                                 "reduce-long" 100
+                                 "long-to-short" 100
+                                 "cover-short" 100
+                                 "short-to-long" 100
+                                 "increase-short" 100}})
+        rows (:rows preview)]
+    (is (= [:buy :sell :sell :buy :buy :sell]
+           (mapv :side rows)))
+    (is (near-vec? [3000 -3000 -3000 2000 3000 -3000]
+                   (mapv :delta-notional-usd rows)))
+    (is (= 17000 (get-in preview [:summary :gross-trade-notional-usd])))))

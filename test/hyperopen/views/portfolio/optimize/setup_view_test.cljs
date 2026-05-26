@@ -62,7 +62,7 @@
            (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-long-only-input"))))
-    (is (= false
+    (is (= true
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-constraint-long-only-input")
                    [1 :checked])))

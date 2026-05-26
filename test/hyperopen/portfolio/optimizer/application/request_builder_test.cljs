@@ -211,7 +211,12 @@
                                    :max-asset-weight 0.6
                                    :allowlist ["perp:BTC"]
                                    :blocklist ["spot:PURR"]
-                                   :asset-overrides {"perp:BTC" {:max-weight 0.5}}
+                                   :max-long-weight 0.7
+                                   :max-short-weight 0.3
+                                   :asset-overrides {"perp:BTC" {:max-weight 0.5
+                                                                 :max-long-weight 0.45
+                                                                 :max-short-weight 0.2
+                                                                 :shortable? true}}
                                    :held-locks ["perp:BTC"]
                                    :perp-leverage {"perp:BTC" {:max-weight 0.4}}
                                    :max-turnover 0.25
@@ -230,7 +235,12 @@
     (is (= {:min -0.2 :max 0.8} (:net-exposure constraints)))
     (is (= ["perp:BTC"] (:allowlist constraints)))
     (is (= ["spot:PURR"] (:blocklist constraints)))
-    (is (= {"perp:BTC" {:max-weight 0.5}}
+    (is (= 0.7 (:max-long-weight constraints)))
+    (is (= 0.3 (:max-short-weight constraints)))
+    (is (= {"perp:BTC" {:max-weight 0.5
+                        :max-long-weight 0.45
+                        :max-short-weight 0.2
+                        :shortable? true}}
            (:per-asset-overrides constraints)))
     (is (= ["perp:BTC"] (:held-position-locks constraints)))
     (is (= {"perp:BTC" {:max-weight 0.4}}

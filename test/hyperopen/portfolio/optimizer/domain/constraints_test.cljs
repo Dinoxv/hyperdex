@@ -41,11 +41,12 @@
                   :current-weights {"C" 0.2}
                   :constraints {:long-only? true
                                 :max-asset-weight 0.6
+                                :max-long-weight 0.55
                                 :per-asset-overrides {"B" {:max-weight 0.25}}
                                 :held-position-locks #{"C"}}})]
     (is (= ["A" "B" "C"] (:instrument-ids encoded)))
     (is (= [0 0 0.2] (:lower-bounds encoded)))
-    (is (= [0.6 0.25 0.2] (:upper-bounds encoded)))
+    (is (= [0.55 0.25 0.2] (:upper-bounds encoded)))
     (is (= [{:instrument-id "C"
              :weight 0.2}]
            (:locked-weights encoded)))
@@ -135,8 +136,10 @@
 
 (deftest encode-signed-mode-bounds-supports-gross-and-net-exposure-contract-test
   (let [encoded (constraints/encode-constraints
-                 {:universe [{:instrument-id "A"}
-                             {:instrument-id "B"}]
+                 {:universe [{:instrument-id "A"
+                              :instrument-type :perp}
+                             {:instrument-id "B"
+                              :instrument-type :perp}]
                   :current-weights {"A" 0.3
                                     "B" -0.1}
                   :constraints {:long-only? false
@@ -151,3 +154,126 @@
     (is (= {:max 1.4} (:gross-exposure encoded)))
     (is (= 0.25 (:max-turnover encoded)))
     (is (= {:min -0.2 :max 0.8} (:net-exposure encoded)))))
+
+(deftest encode-shortability-aware-bounds-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:BTC"
+                              :instrument-type :perp}
+                             {:instrument-id "spot:PURR"
+                              :instrument-type :spot}
+                             {:instrument-id "vault:alpha"
+                              :instrument-type :vault
+                              :vault-address "0x1111111111111111111111111111111111111111"}
+                             {:instrument-id "unknown:THING"}
+                             {:instrument-id "spot:FORCED"
+                              :instrument-type :spot}]
+                  :constraints {:long-only? false
+                                :max-long-weight 0.6
+                                :max-short-weight 0.25
+                                :per-asset-overrides
+                                {"spot:FORCED" {:shortable? true
+                                                :max-short-weight 0.1}}}})]
+    (is (= [-0.25 0 0 0 -0.1] (:lower-bounds encoded)))
+    (is (= [0.6 0.6 0.2 0.6 0.6] (:upper-bounds encoded)))))
+
+(deftest encode-short-cap-precedence-and-backwards-compatible-max-weight-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:A"
+                              :instrument-type :perp}
+                             {:instrument-id "perp:B"
+                              :instrument-type :perp}
+                             {:instrument-id "perp:C"
+                              :instrument-type :perp}]
+                  :constraints {:long-only? false
+                                :max-asset-weight 0.9
+                                :max-long-weight 0.8
+                                :max-short-weight 0.4
+                                :per-asset-overrides
+                                {"perp:A" {:max-weight 0.7
+                                           :max-long-weight 0.6
+                                           :max-short-weight 0.2}
+                                 "perp:B" {:max-weight 0.5}
+                                 "perp:C" {:max-weight 0.25}}}})]
+    (is (= [-0.2 -0.4 -0.25] (:lower-bounds encoded)))
+    (is (= [0.6 0.5 0.25] (:upper-bounds encoded)))))
+
+(deftest encode-shortability-overrides-metadata-and-locks-current-weight-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:DISABLED"
+                              :instrument-type :perp
+                              :shortable? false}
+                             {:instrument-id "spot:LOCKED"
+                              :instrument-type :spot}]
+                  :current-weights {"spot:LOCKED" -0.15}
+                  :constraints {:long-only? false
+                                :max-asset-weight 0.5
+                                :held-position-locks #{"spot:LOCKED"}}})]
+    (is (= [0 -0.15] (:lower-bounds encoded)))
+    (is (= [0.5 -0.15] (:upper-bounds encoded)))
+    (is (= :infeasible (:status encoded)))
+    (is (some #(= :locked-short-non-shortable (:code %))
+              (:violations encoded)))))
+
+(deftest encode-gross-and-net-feasibility-violations-test
+  (let [gross-too-low (constraints/encode-constraints
+                       {:universe [{:instrument-id "perp:A"
+                                    :instrument-type :perp
+                                    :shortable? true}
+                                   {:instrument-id "perp:B"
+                                    :instrument-type :perp
+                                    :shortable? true}]
+                        :constraints {:long-only? false
+                                      :gross-leverage 0.5
+                                      :net-exposure {:min 1.0
+                                                     :max 1.0}}})
+        net-outside-bounds (constraints/encode-constraints
+                            {:universe [{:instrument-id "spot:A"
+                                         :instrument-type :spot}]
+                             :constraints {:long-only? false
+                                           :max-asset-weight 1.0
+                                           :gross-leverage 1.0
+                                           :net-exposure {:min -1.0
+                                                          :max -0.5}}})
+        locked-gross-too-high (constraints/encode-constraints
+                               {:universe [{:instrument-id "perp:A"
+                                            :instrument-type :perp
+                                            :shortable? true}
+                                           {:instrument-id "perp:B"
+                                            :instrument-type :perp
+                                            :shortable? true}]
+                                :current-weights {"perp:A" 0.4
+                                                  "perp:B" -0.3}
+                                :constraints {:long-only? false
+                                              :gross-leverage 0.6
+                                              :held-position-locks #{"perp:A"
+                                                                     "perp:B"}}})]
+    (is (= :infeasible (:status gross-too-low)))
+    (is (some #(= :gross-below-required-net (:code %))
+              (:violations gross-too-low)))
+    (is (= :infeasible (:status net-outside-bounds)))
+    (is (some #(= :sum-lower-above-net-max (:code %))
+              (:violations net-outside-bounds)))
+    (is (= :infeasible (:status locked-gross-too-high)))
+    (is (some #(= :locked-gross-above-gross-max (:code %))
+              (:violations locked-gross-too-high)))))
+
+(deftest encode-invalid-negative-caps-yield-violations-without-inverted-bounds-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:A"
+                              :instrument-type :perp}]
+                  :constraints {:long-only? false
+                                :max-short-weight -0.1
+                                :per-asset-overrides
+                                {"perp:A" {:max-long-weight -0.2}}}})
+        violations (:violations encoded)]
+    (is (= :infeasible (:status encoded)))
+    (is (= [-1] (:lower-bounds encoded))
+        "Invalid negative caps are ignored for bounds rather than inverted.")
+    (is (= [1] (:upper-bounds encoded)))
+    (is (some #(and (= :invalid-weight-cap (:code %))
+                    (= :max-short-weight (:field %)))
+              violations))
+    (is (some #(and (= :invalid-weight-cap (:code %))
+                    (= :max-long-weight (:field %))
+                    (= "perp:A" (:instrument-id %)))
+              violations))))

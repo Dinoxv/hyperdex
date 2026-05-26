@@ -61,8 +61,10 @@
 (deftest signed-gross-and-net-exposure-fixture-matches-between-solvers-test
   (async done
     (let [problem (first-problem
-                   {:universe [{:instrument-id "perp:A"}
-                               {:instrument-id "perp:B"}]
+                   {:universe [{:instrument-id "perp:A"
+                                :instrument-type :perp}
+                               {:instrument-id "perp:B"
+                                :instrument-type :perp}]
                     :constraints {:long-only? false
                                   :gross-leverage 1.2
                                   :net-exposure {:min 0
@@ -83,8 +85,10 @@
 (deftest turnover-cap-fixture-matches-between-solvers-test
   (async done
     (let [problem (first-problem
-                   {:universe [{:instrument-id "perp:A"}
-                               {:instrument-id "perp:B"}]
+                   {:universe [{:instrument-id "perp:A"
+                                :instrument-type :perp}
+                               {:instrument-id "perp:B"
+                                :instrument-type :perp}]
                     :current-weights {"perp:A" 0
                                       "perp:B" 0}
                     :constraints {:long-only? false
@@ -102,6 +106,35 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "turnover cap parity failed: " err))
+                    (done)))))))
+
+(deftest one-thirty-thirty-fixture-can-use-shortable-perp-test
+  (async done
+    (let [problem (first-problem
+                   {:universe [{:instrument-id "perp:A"
+                                :instrument-type :perp}
+                               {:instrument-id "perp:B"
+                                :instrument-type :perp}
+                               {:instrument-id "perp:C"
+                                :instrument-type :perp}]
+                    :constraints {:long-only? false
+                                  :max-long-weight 1.3
+                                  :max-short-weight 0.3
+                                  :gross-leverage 1.6
+                                  :net-exposure {:min 1.0
+                                                 :max 1.0}}
+                    :objective {:kind :minimum-variance}
+                    :expected-returns [1 0 -1]
+                    :covariance [[1 0 0]
+                                 [0 1 0]
+                                 [0 0 1]]})
+          problem* (assoc problem :linear [-10 0 10])]
+      (-> (assert-parity! "130/30" problem* [1.3 0 -0.3])
+          (.then (fn []
+                   (is (near? 1.6 (gross [1.3 0 -0.3])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "130/30 parity failed: " err))
                     (done)))))))
 
 (deftest held-position-lock-fixture-matches-between-solvers-test

@@ -29,6 +29,28 @@
     (is (= :ok (get-in result [:covariance-conditioning :status])))
     (is (contains? (:weight-sensitivity-by-instrument result) "A"))))
 
+(deftest portfolio-diagnostics-reports-signed-exposure-summary-test
+  (let [result (diagnostics/portfolio-diagnostics
+                {:instrument-ids ["A" "B" "C"]
+                 :current-weights [0 0 0]
+                 :target-weights [0.7 -0.2 0.1]
+                 :lower-bounds [-0.5 -0.5 0]
+                 :upper-bounds [1 1 1]
+                 :covariance [[1 0 0]
+                              [0 1 0]
+                              [0 0 1]]})]
+    (is (near? 0.8 (:long-exposure result)))
+    (is (near? 0.2 (:short-exposure result)))
+    (is (near? 1.0 (:gross-exposure result)))
+    (is (near? 0.6 (:net-exposure result)))))
+
+(deftest exposure-summary-splits-long-short-gross-and-net-exposure-test
+  (let [summary (diagnostics/exposure-summary [0.7 -0.2 0.1 0])]
+    (is (near? 0.8 (:long-exposure summary)))
+    (is (near? 0.2 (:short-exposure summary)))
+    (is (near? 1.0 (:gross-exposure summary)))
+    (is (near? 0.6 (:net-exposure summary)))))
+
 (deftest weight-sensitivity-perturbs-top-weights-and-reports-return-range-test
   (let [result (diagnostics/weight-sensitivity
                 {:instrument-ids ["A" "B"]

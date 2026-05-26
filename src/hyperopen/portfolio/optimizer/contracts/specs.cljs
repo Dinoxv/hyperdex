@@ -190,6 +190,9 @@
                 :gross-leverage
                 :net-min
                 :net-max
+                :max-weight
+                :max-long-weight
+                :max-short-weight
                 :max-asset-weight
                 :dust-usdc
                 :dust-threshold

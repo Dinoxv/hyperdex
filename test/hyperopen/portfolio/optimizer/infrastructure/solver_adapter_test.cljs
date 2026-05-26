@@ -71,6 +71,29 @@
     (is (near? 0.5 (first (:weights result))))
     (is (near? -0.5 (second (:weights result))))))
 
+(deftest quadprog-adapter-enforces-bounds-after-split-variable-transform-test
+  (let [result (solver-adapter/solve-with-quadprog
+                (assoc signed-gross-problem
+                       :lower-bounds [0 -0.2]
+                       :upper-bounds [1 1]))]
+    (is (= :solved (:status result)))
+    (is (near? 0.2 (first (:weights result))))
+    (is (near? -0.2 (second (:weights result))))))
+
+(deftest quadprog-adapter-gross-one-net-one-forbids-shorts-test
+  (let [result (solver-adapter/solve-with-quadprog
+                (assoc signed-gross-problem
+                       :linear [-10 10]
+                       :equalities [{:code :net-exposure
+                                     :coefficients [1 1]
+                                     :target 1}]
+                       :l1-constraints [{:code :gross-exposure
+                                         :max 1
+                                         :requires-split-variables? true}]))]
+    (is (= :solved (:status result)))
+    (is (near? 1 (first (:weights result))))
+    (is (near? 0 (second (:weights result))))))
+
 (deftest osqp-adapter-solves-long-only-minimum-variance-test
   (async done
     (-> (solver-adapter/solve-with-osqp min-variance-problem)
@@ -95,6 +118,41 @@
                  (done)))
         (.catch (fn [err]
                   (is false (str "OSQP split-variable solve failed: " err))
+                  (done))))))
+
+(deftest osqp-adapter-enforces-bounds-after-split-variable-transform-test
+  (async done
+    (-> (solver-adapter/solve-with-osqp
+         (assoc signed-gross-problem
+                :lower-bounds [0 -0.2]
+                :upper-bounds [1 1]))
+        (.then (fn [result]
+                 (is (= :solved (:status result)))
+                 (is (near? 0.2 (first (:weights result))))
+                 (is (near? -0.2 (second (:weights result))))
+                 (done)))
+        (.catch (fn [err]
+                  (is false (str "OSQP split bound solve failed: " err))
+                  (done))))))
+
+(deftest osqp-adapter-gross-one-net-one-forbids-shorts-test
+  (async done
+    (-> (solver-adapter/solve-with-osqp
+         (assoc signed-gross-problem
+                :linear [-10 10]
+                :equalities [{:code :net-exposure
+                              :coefficients [1 1]
+                              :target 1}]
+                :l1-constraints [{:code :gross-exposure
+                                  :max 1
+                                  :requires-split-variables? true}]))
+        (.then (fn [result]
+                 (is (= :solved (:status result)))
+                 (is (near? 1 (first (:weights result))))
+                 (is (near? 0 (second (:weights result))))
+                 (done)))
+        (.catch (fn [err]
+                  (is false (str "OSQP gross/net solve failed: " err))
                   (done))))))
 
 (deftest quadprog-adapter-solves-turnover-cap-with-split-variables-test

@@ -1,11 +1,19 @@
 (ns hyperopen.portfolio.optimizer.domain.constraints
-  (:require [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
 
 (def default-max-asset-weight
   1)
 
 (def unknown-sparse-history-max-weight
   0.2)
+
+(def ^:private finite-number? coercion/finite-number?)
+
+(defn- finite-nonnegative?
+  [value]
+  (and (finite-number? value)
+       (not (neg? value))))
 
 (defn- sparse-safety-max-weight
   [interval-count]
@@ -21,13 +29,18 @@
   [instrument]
   (:instrument-id instrument))
 
+(defn- normalized-market-type
+  [instrument]
+  (coercion/normalize-keyword-like
+   (or (:instrument-type instrument)
+       (:market-type instrument)
+       (:optimizer-history/instrument-kind instrument))))
+
 (defn- vault-like-instrument?
   [instrument]
   (let [id (instrument-id instrument)
-        market-type (or (:market-type instrument)
-                        (:instrument-type instrument))]
+        market-type (normalized-market-type instrument)]
     (or (= :vault market-type)
-        (= "vault" market-type)
         (some? (:vault-address instrument))
         (and (string? id)
              (.startsWith id "vault:")))))
@@ -52,13 +65,64 @@
                           (not (contains? blocklist id))))))
          vec)))
 
-(defn- max-weight-for
+(defn- cap-value
+  [value]
+  (when (finite-nonnegative? value)
+    value))
+
+(defn- cap-from
+  [m specific-key fallback-keys]
+  (some cap-value
+        (map #(get m %) (cons specific-key fallback-keys))))
+
+(defn- global-cap
+  [constraints specific-key]
+  (or (cap-from constraints specific-key [:max-weight :max-asset-weight])
+      default-max-asset-weight))
+
+(defn- scoped-cap
+  [m specific-key]
+  (cap-from m specific-key [:max-weight :max-asset-weight]))
+
+(defn- min-caps
+  [& caps]
+  (apply min (filter finite-nonnegative? caps)))
+
+(defn- max-long-weight-for
   [constraints instrument-id]
-  (min (or (:max-asset-weight constraints) default-max-asset-weight)
-      (or (get-in constraints [:per-asset-overrides instrument-id :max-weight])
-          default-max-asset-weight)
-      (or (get-in constraints [:per-perp-leverage-caps instrument-id :max-weight])
-          default-max-asset-weight)))
+  (min-caps (global-cap constraints :max-long-weight)
+            (scoped-cap (get-in constraints [:per-asset-overrides instrument-id])
+                        :max-long-weight)
+            (scoped-cap (get-in constraints [:per-perp-leverage-caps instrument-id])
+                        :max-long-weight)))
+
+(defn- max-short-weight-for
+  [constraints instrument-id]
+  (min-caps (global-cap constraints :max-short-weight)
+            (scoped-cap (get-in constraints [:per-asset-overrides instrument-id])
+                        :max-short-weight)
+            (scoped-cap (get-in constraints [:per-perp-leverage-caps instrument-id])
+                        :max-short-weight)))
+
+(defn- instrument-shortable?
+  [constraints instrument]
+  (let [id (instrument-id instrument)
+        override (get-in constraints [:per-asset-overrides id])]
+    (cond
+      (contains? (or override {}) :shortable?)
+      (true? (:shortable? override))
+
+      (contains? instrument :shortable?)
+      (true? (:shortable? instrument))
+
+      (vault-like-instrument? instrument)
+      false
+
+      (= :perp (normalized-market-type instrument))
+      true
+
+      :else
+      false)))
 
 (defn- native-cadence-for
   [history instrument-id]
@@ -83,11 +147,18 @@
 
 (defn- merge-max-weight-override
   [override max-weight]
-  (let [existing-max-weight (:max-weight override)]
-    (assoc (or override {})
-           :max-weight (if (number? existing-max-weight)
-                         (min existing-max-weight max-weight)
-                         max-weight))))
+  (let [override* (or override {})
+        merge-cap (fn [existing]
+                    (if (finite-nonnegative? existing)
+                      (min existing max-weight)
+                      max-weight))]
+    (cond-> (assoc override*
+                   :max-weight (merge-cap (:max-weight override*)))
+      (contains? override* :max-long-weight)
+      (update :max-long-weight merge-cap)
+
+      (contains? override* :max-short-weight)
+      (update :max-short-weight merge-cap))))
 
 (defn- sparse-cap-warning
   [{:keys [instrument-id interval-count max-weight reason]}]
@@ -136,18 +207,23 @@
 (defn- bounds-for
   [constraints current-weights instrument]
   (let [id (instrument-id instrument)
-        max-weight (max-weight-for constraints id)]
+        max-long-weight (max-long-weight-for constraints id)
+        max-short-weight (max-short-weight-for constraints id)
+        shortable? (instrument-shortable? constraints instrument)]
     (if (locked? constraints id)
       (let [weight (current-weight current-weights id)]
         {:lower weight
          :upper weight
          :locked {:instrument-id id
-                  :weight weight}})
+                  :weight weight}
+         :locked-validation {:instrument-id id
+                             :weight weight
+                             :shortable? shortable?}})
       (if (:long-only? constraints)
         {:lower 0
-         :upper max-weight}
-        {:lower (- max-weight)
-         :upper max-weight}))))
+         :upper max-long-weight}
+        {:lower (if shortable? (- max-short-weight) 0)
+         :upper max-long-weight}))))
 
 (defn- target-net
   [constraints]
@@ -155,12 +231,114 @@
     1
     nil))
 
-(defn- violations
-  [lower-bounds upper-bounds constraints]
+(defn- finite-net-limits
+  [constraints]
   (let [target-net* (target-net constraints)
+        net-exposure (:net-exposure constraints)
+        net-min (:min net-exposure)
+        net-max (:max net-exposure)]
+    (if (finite-number? target-net*)
+      {:min target-net*
+       :max target-net*
+       :target target-net*}
+      (cond-> {}
+        (finite-number? net-min)
+        (assoc :min net-min)
+
+        (finite-number? net-max)
+        (assoc :max net-max)))))
+
+(defn- minimum-required-gross
+  [{net-min :min net-max :max target :target}]
+  (cond
+    (finite-number? target)
+    (js/Math.abs target)
+
+    (and (finite-number? net-min)
+         (finite-number? net-max)
+         (<= net-min 0 net-max))
+    0
+
+    (and (finite-number? net-min)
+         (finite-number? net-max))
+    (min (js/Math.abs net-min)
+         (js/Math.abs net-max))
+
+    (and (finite-number? net-min)
+         (pos? net-min))
+    net-min
+
+    (and (finite-number? net-max)
+         (neg? net-max))
+    (js/Math.abs net-max)
+
+    :else
+    nil))
+
+(defn- locked-gross
+  [locked-weights]
+  (reduce + 0 (map #(js/Math.abs (:weight %)) locked-weights)))
+
+(defn- invalid-cap-violation
+  [scope instrument-id field value]
+  (cond-> {:code :invalid-weight-cap
+           :scope scope
+           :field field
+           :value value}
+    instrument-id
+    (assoc :instrument-id instrument-id)))
+
+(defn- invalid-cap-violations-for-map
+  [scope instrument-id m]
+  (->> [:max-long-weight :max-short-weight :max-weight :max-asset-weight]
+       (keep (fn [field]
+               (let [value (get m field)]
+                 (when (and (contains? (or m {}) field)
+                            (not (finite-nonnegative? value)))
+                   (invalid-cap-violation scope instrument-id field value)))))
+       vec))
+
+(defn- invalid-cap-violations
+  [constraints]
+  (vec (concat
+        (invalid-cap-violations-for-map :constraints nil constraints)
+        (mapcat (fn [[instrument-id override]]
+                  (invalid-cap-violations-for-map :per-asset-overrides
+                                                  instrument-id
+                                                  override))
+                (:per-asset-overrides constraints))
+        (mapcat (fn [[instrument-id cap]]
+                  (invalid-cap-violations-for-map :per-perp-leverage-caps
+                                                  instrument-id
+                                                  cap))
+                (:per-perp-leverage-caps constraints)))))
+
+(defn- locked-short-violations
+  [locked-weights]
+  (->> locked-weights
+       (keep (fn [{:keys [instrument-id weight shortable?]}]
+               (when (and (finite-number? weight)
+                          (neg? weight)
+                          (not shortable?))
+                 {:code :locked-short-non-shortable
+                  :instrument-id instrument-id
+                  :weight weight})))
+       vec))
+
+(defn- violations
+  [lower-bounds upper-bounds bounds constraints]
+  (let [target-net* (target-net constraints)
+        net-limits (finite-net-limits constraints)
+        net-min (:min net-limits)
+        net-max (:max net-limits)
         sum-lower (reduce + 0 lower-bounds)
-        sum-upper (reduce + 0 upper-bounds)]
+        sum-upper (reduce + 0 upper-bounds)
+        gross-max (:gross-leverage constraints)
+        min-required-gross (minimum-required-gross net-limits)
+        locked-weights (vec (keep :locked-validation bounds))
+        locked-gross* (locked-gross locked-weights)]
     (vec (concat
+          (invalid-cap-violations constraints)
           (when (and (number? target-net*)
                      (> sum-lower target-net*))
             [{:code :sum-lower-above-target
@@ -170,7 +348,41 @@
                      (< sum-upper target-net*))
             [{:code :sum-upper-below-target
               :sum-upper sum-upper
-              :target-net target-net*}])))))
+              :target-net target-net*}])
+          (when (and (not (number? target-net*))
+                     (finite-number? net-max)
+                     (> sum-lower net-max))
+            [{:code :sum-lower-above-net-max
+              :sum-lower sum-lower
+              :net-max net-max}])
+          (when (and (not (number? target-net*))
+                     (finite-number? net-min)
+                     (< sum-upper net-min))
+            [{:code :sum-upper-below-net-min
+              :sum-upper sum-upper
+              :net-min net-min}])
+          (when (and (contains? constraints :gross-leverage)
+                     (not (finite-number? gross-max)))
+            [{:code :invalid-gross-max
+              :gross-max gross-max}])
+          (when (and (finite-number? gross-max)
+                     (neg? gross-max))
+            [{:code :gross-max-negative
+              :gross-max gross-max}])
+          (when (and (finite-number? gross-max)
+                     (finite-number? min-required-gross)
+                     (< gross-max min-required-gross))
+            [{:code :gross-below-required-net
+              :gross-max gross-max
+              :minimum-required-gross min-required-gross
+              :net-min net-min
+              :net-max net-max}])
+          (when (and (finite-number? gross-max)
+                     (> locked-gross* gross-max))
+            [{:code :locked-gross-above-gross-max
+              :locked-gross locked-gross*
+              :gross-max gross-max}])
+          (locked-short-violations locked-weights)))))
 
 (defn- apply-runtime-caps
   [constraints sparse-caps]
@@ -194,7 +406,7 @@
                      universe)
         lower-bounds (mapv :lower bounds)
         upper-bounds (mapv :upper bounds)
-        violations* (violations lower-bounds upper-bounds constraints)]
+        violations* (violations lower-bounds upper-bounds bounds constraints)]
     {:status (if (seq violations*) :infeasible :ok)
      :long-only? (:long-only? constraints)
      :net-target (target-net constraints)

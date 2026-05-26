@@ -10,6 +10,30 @@
   [weights]
   (reduce + 0 (map abs-num weights)))
 
+(defn exposure-summary
+  [weights]
+  (reduce (fn [acc weight]
+            (let [weight* (or weight 0)]
+              (cond
+                (pos? weight*)
+                (-> acc
+                    (update :long-exposure + weight*)
+                    (update :gross-exposure + weight*)
+                    (update :net-exposure + weight*))
+
+                (neg? weight*)
+                (-> acc
+                    (update :short-exposure + (- weight*))
+                    (update :gross-exposure + (- weight*))
+                    (update :net-exposure + weight*))
+
+                :else acc)))
+          {:long-exposure 0
+           :short-exposure 0
+           :gross-exposure 0
+           :net-exposure 0}
+          weights))
+
 (defn- effective-n
   [weights]
   (let [denom (reduce + 0 (map #(* % %) weights))]
@@ -88,18 +112,18 @@
 
 (defn portfolio-diagnostics
   [{:keys [target-weights current-weights covariance expected-returns] :as opts}]
-  (cond-> {:gross-exposure (gross-exposure target-weights)
-           :net-exposure (reduce + 0 target-weights)
-           :effective-n (effective-n target-weights)
-           :max-weight (apply max (map abs-num target-weights))
-           :turnover (turnover current-weights target-weights)
-           :binding-constraints (binding-constraints opts)
-           :covariance-conditioning (risk/covariance-conditioning covariance)}
-    (seq expected-returns)
-    (assoc :weight-sensitivity-by-instrument
-           (weight-sensitivity-by-instrument
-            {:instrument-ids (:instrument-ids opts)
-             :weights target-weights
-             :expected-returns expected-returns
-             :shock 0.01
-             :top-n 5}))))
+  (let [exposure (exposure-summary target-weights)]
+    (cond-> (merge exposure
+                   {:effective-n (effective-n target-weights)
+                    :max-weight (apply max (map abs-num target-weights))
+                    :turnover (turnover current-weights target-weights)
+                    :binding-constraints (binding-constraints opts)
+                    :covariance-conditioning (risk/covariance-conditioning covariance)})
+      (seq expected-returns)
+      (assoc :weight-sensitivity-by-instrument
+             (weight-sensitivity-by-instrument
+              {:instrument-ids (:instrument-ids opts)
+               :weights target-weights
+               :expected-returns expected-returns
+               :shock 0.01
+               :top-n 5})))))
