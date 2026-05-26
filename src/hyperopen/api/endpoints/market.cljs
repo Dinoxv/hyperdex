@@ -90,6 +90,22 @@
                                        :priority)))]
       (post-info! body request-opts))))
 
+(defn request-l2-book-snapshot!
+  [post-info! coin opts]
+  (let [coin* (some-> coin str .trim)]
+    (if-not (seq coin*)
+      (js/Promise.resolve nil)
+      (let [opts* (or opts {})
+            body {"type" "l2Book"
+                  "coin" coin*}
+            request-opts (request-policy/apply-info-request-policy
+                          :l2-book-snapshot
+                          (merge {:priority :low
+                                  :dedupe-key [:l2-book-snapshot coin*]
+                                  :cache-key [:l2-book-snapshot coin*]}
+                                 opts*))]
+        (post-info! body request-opts)))))
+
 (defn request-spot-meta!
   [post-info! opts]
   (post-info! {"type" "spotMeta"}

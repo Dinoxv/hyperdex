@@ -3,6 +3,7 @@
             [hyperopen.api.default :as api]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.config :as app-config]
+            [hyperopen.portfolio.optimizer.application.rebalance-snapshot :as rebalance-snapshot]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -20,6 +21,7 @@
 (def ^:dynamic *request-run!* run-bridge/request-run!)
 (def ^:dynamic *request-history-bundle!* history-client/request-history-bundle!)
 (def ^:dynamic *request-candle-snapshot!* api/request-candle-snapshot!)
+(def ^:dynamic *request-l2-book-snapshot!* api/request-l2-book-snapshot!)
 (def ^:dynamic *request-market-funding-history!* api/request-market-funding-history!)
 (def ^:dynamic *request-vault-details!* api/request-vault-details!)
 (def ^:dynamic *optimizer-history-api-config*
@@ -131,6 +133,10 @@
                              :bars (:bars opts)
                              :priority (:priority opts)))
 
+(defn- request-l2-book-snapshot!
+  [coin opts]
+  (*request-l2-book-snapshot!* coin opts))
+
 (defn- history-env
   []
   {:now-ms *now-ms*
@@ -191,6 +197,71 @@
    (run-portfolio-optimizer-effect nil store request request-signature nil))
   ([_ store request request-signature opts]
    (request-run-with-controller! nil store request request-signature (or opts {}))))
+
+(defn- snapshot-request-opts
+  [opts]
+  {:priority :low
+   :cache-ttl-ms (or (:snapshot-cache-ttl-ms opts)
+                     rebalance-snapshot/default-snapshot-cache-ttl-ms)})
+
+(defn- fetch-snapshot-contexts!
+  [{:keys [request-l2-book-snapshot! now-ms]} plan opts]
+  (let [opts* (or opts {})
+        now-ms* (now-ms)
+        request-opts (snapshot-request-opts opts*)]
+    (reduce
+     (fn [promise request]
+       (.then promise
+              (fn [contexts-by-id]
+                (-> (request-l2-book-snapshot! (:coin request) request-opts)
+                    (.then
+                     (fn [payload]
+                       (if-let [context (rebalance-snapshot/normalize-l2-book-snapshot-context
+                                         (:coin request)
+                                         payload
+                                         {:now-ms now-ms*
+                                          :snapshot-stale-after-ms
+                                          (or (:snapshot-stale-after-ms opts*)
+                                              (:snapshot-stale-after-ms plan))})]
+                         (merge contexts-by-id
+                                (zipmap (:instrument-ids request)
+                                        (repeat context)))
+                         contexts-by-id)))
+                    (.catch (fn [_err]
+                              contexts-by-id))))))
+     (js/Promise.resolve {})
+     (:requests plan))))
+
+(defn refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+  ([_ store]
+   (refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect nil store {}))
+  ([_ store opts]
+   (let [last-run (get-in @store contracts/last-successful-run-path)
+         plan (rebalance-snapshot/build-snapshot-refresh-plan last-run opts)]
+     (if-not (seq (:requests plan))
+       (js/Promise.resolve plan)
+       (-> (fetch-snapshot-contexts! {:request-l2-book-snapshot!
+                                      (or (:request-l2-book-snapshot! opts)
+                                          request-l2-book-snapshot!)
+                                      :now-ms (or (:now-ms-fn opts)
+                                                  *now-ms*)}
+                                     plan
+                                     opts)
+           (.then
+            (fn [contexts-by-id]
+              (when (seq contexts-by-id)
+                (swap! store
+                       update-in
+                       contracts/last-successful-run-path
+                       (fn [current-run]
+                         (if (= (:request-signature last-run)
+                                (:request-signature current-run))
+                           (rebalance-snapshot/last-run-with-snapshot-contexts
+                            current-run
+                            contexts-by-id)
+                           current-run))))
+              {:plan plan
+               :contexts-by-id contexts-by-id})))))))
 
 (defn make-run-portfolio-optimizer
   ([runtime]

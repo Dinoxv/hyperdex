@@ -54,6 +54,8 @@
                                                        (record! :fetch-perp-dexs [deps store* opts]))
                          market-gateway/request-candle-snapshot! (fn [deps coin opts]
                                                                    (record! :request-candle-snapshot [deps coin opts]))
+                         market-gateway/request-l2-book-snapshot! (fn [deps coin opts]
+                                                                    (record! :request-l2-book-snapshot [deps coin opts]))
                          api-compat/fetch-candle-snapshot! (fn [deps store* opts]
                                                              (record! :fetch-candle-snapshot [deps store* opts]))
                          order-endpoints/request-frontend-open-orders! (fn [post-info! address dex opts]
@@ -194,6 +196,10 @@
              (api/request-candle-snapshot! "BTC")))
       (is (= {:ok :request-candle-snapshot}
              (api/request-candle-snapshot! "BTC" :interval :1h :bars 50 :priority :low)))
+      (is (= {:ok :request-l2-book-snapshot}
+             (api/request-l2-book-snapshot! "BTC")))
+      (is (= {:ok :request-l2-book-snapshot}
+             (api/request-l2-book-snapshot! "BTC" {:priority :low})))
       (is (= {:ok :fetch-candle-snapshot}
              (api/fetch-candle-snapshot! store)))
       (is (= {:ok :fetch-candle-snapshot}
@@ -392,6 +398,7 @@
       (is (some #(= :request-asset-contexts (first %)) @calls))
       (is (some #(= :request-frontend-open-orders (first %)) @calls))
       (is (some #(= :request-market-funding-history (first %)) @calls))
+      (is (some #(= :request-l2-book-snapshot (first %)) @calls))
       (is (some #(= :request-predicted-fundings (first %)) @calls))
       (is (some #(= :build-market-state (first %)) @calls))
       (is (some #(= :fetch-perp-dex-clearinghouse-states (first %)) @calls)))))

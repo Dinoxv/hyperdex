@@ -132,6 +132,12 @@
     :optimizer.workflow/navigate
     ((or dispatch! nxr/dispatch) store nil [[:actions/navigate (:path command)]])
 
+    :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots
+    ((or dispatch! nxr/dispatch)
+     store
+     nil
+     [[:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots]])
+
     nil))
 
 (defn request-run!

@@ -111,6 +111,32 @@
                (done))))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-l2-book-snapshot-builds-bounded-low-priority-request-test
+  (async done
+    (let [calls (atom [])
+          post-info! (api-stubs/post-info-stub calls {:levels []})]
+      (-> (market/request-l2-book-snapshot! post-info!
+                                            "BTC"
+                                            {:priority :low})
+          (.then
+           (fn []
+             (let [[body opts] (first @calls)]
+               (is (= {"type" "l2Book"
+                       "coin" "BTC"}
+                      body))
+               (is (= {:priority :low
+                       :dedupe-key [:l2-book-snapshot "BTC"]
+                       :cache-key [:l2-book-snapshot "BTC"]
+                       :cache-ttl-ms 30000}
+                      opts)))
+             (-> (market/request-l2-book-snapshot! post-info! "   " {})
+                 (.then (fn [result]
+                          (is (nil? result))
+                          (is (= 1 (count @calls)))
+                          (done)))
+                 (.catch (async-support/unexpected-error done)))))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-asset-contexts-normalizes-response-shape-test
   (async done
     (let [post-info! (api-stubs/post-info-stub [{:universe [{:name "BTC" :marginTableId 1}

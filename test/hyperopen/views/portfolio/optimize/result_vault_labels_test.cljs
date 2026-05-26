@@ -113,3 +113,37 @@
     (is (str/includes? text "Growi Vault"))
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
+
+(deftest rebalance-tab-renders-slippage-source-bps-and-freshness-test
+  (let [view-node (rebalance-tab/rebalance-tab
+                   {:result
+                    (fixtures/sample-solved-result
+                     {:labels-by-instrument {"perp:BTC" "BTC"}
+                      :rebalance-preview
+                      {:status :ready
+                       :capital-usd 300
+                       :summary {:ready-count 1
+                                 :blocked-count 0
+                                 :gross-trade-notional-usd 300
+                                 :estimated-fees-usd 0
+                                 :estimated-slippage-usd 5}
+                       :rows [{:instrument-id "perp:BTC"
+                               :instrument-type :perp
+                               :coin "BTC"
+                               :status :ready
+                               :side :buy
+                               :quantity 3
+                               :price 100
+                               :delta-notional-usd 300
+                               :cost {:source :snapshot
+                                      :estimated-slippage-usd 5
+                                      :slippage-bps 166.66666666666669
+                                      :age-ms 1000
+                                      :depth-status :full-visible-depth}}]}})})
+        text (node-text view-node)]
+    (is (str/includes? text "snapshot"))
+    (is (str/includes? text "1 snapshot"))
+    (is (str/includes? text "max age 1s old"))
+    (is (str/includes? text "166.67 bps"))
+    (is (str/includes? text "1s old"))
+    (is (str/includes? text "full depth"))))

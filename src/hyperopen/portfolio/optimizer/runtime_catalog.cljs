@@ -156,5 +156,7 @@
       effect-adapters/execute-portfolio-optimizer-plan-effect
       :refresh-portfolio-optimizer-tracking
       effect-adapters/refresh-portfolio-optimizer-tracking-effect
+      :refresh-portfolio-optimizer-rebalance-slippage-snapshots
+      effect-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
       :enable-portfolio-optimizer-manual-tracking
       effect-adapters/enable-portfolio-optimizer-manual-tracking-effect}}))

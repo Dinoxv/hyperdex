@@ -172,4 +172,5 @@
 	   :effects/save-portfolio-optimizer-scenario ::portfolio-optimizer-scenario-save-args
 	   :effects/execute-portfolio-optimizer-plan ::portfolio-optimizer-execution-plan-args
 	   :effects/refresh-portfolio-optimizer-tracking ::common/no-args
+	   :effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots ::common/no-args
 	   :effects/enable-portfolio-optimizer-manual-tracking ::common/no-args})

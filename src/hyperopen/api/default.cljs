@@ -90,6 +90,14 @@
     :end-time-ms end-time-ms
     :priority priority}))
 
+(defn request-l2-book-snapshot!
+  ([coin] (request-l2-book-snapshot! coin {}))
+  ([coin opts]
+   (market/request-l2-book-snapshot!
+    {:post-info! post-info!}
+    coin
+    opts)))
+
 (defn fetch-candle-snapshot!
   "Fetch `bars` worth of candles for the active asset at keyword interval (e.g. :1m, :1h)."
   [store & {:keys [interval bars priority end-time-ms]

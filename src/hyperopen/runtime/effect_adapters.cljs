@@ -253,6 +253,8 @@
   portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect)
 (def execute-portfolio-optimizer-plan-effect portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect)
 (def refresh-portfolio-optimizer-tracking-effect portfolio-optimizer-adapters/refresh-portfolio-optimizer-tracking-effect)
+(def refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+  portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect)
 (def enable-portfolio-optimizer-manual-tracking-effect
   portfolio-optimizer-adapters/enable-portfolio-optimizer-manual-tracking-effect)
 

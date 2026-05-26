@@ -4,6 +4,7 @@
   {:asset-contexts 4000
    :meta-and-asset-ctxs 4000
    :candle-snapshot 4000
+   :l2-book-snapshot 30000
    :perp-dexs 60000
    :spot-meta 60000
    :outcome-meta 60000

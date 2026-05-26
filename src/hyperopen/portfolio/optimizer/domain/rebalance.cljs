@@ -27,6 +27,67 @@
       (parse-number (:px level))
       (parse-number (:price level))))
 
+(defn- level-size
+  [level]
+  (or (parse-number (:sz-num level))
+      (parse-number (:sz level))
+      (parse-number (:size level))
+      (parse-number (:qty level))))
+
+(defn- snapshot-side-levels
+  [context side]
+  (case side
+    :buy (or (:asks context)
+             (:ask-levels context)
+             (second (:levels context)))
+    :sell (or (:bids context)
+              (:bid-levels context)
+              (first (:levels context)))
+    nil))
+
+(defn- slippage-bps-from-fill-price
+  [side reference-price fill-price]
+  (when (and (finite-positive? reference-price)
+             (finite-positive? fill-price))
+    (* 10000
+       (/ (max 0
+               (case side
+                 :buy (- fill-price reference-price)
+                 :sell (- reference-price fill-price)
+                 0))
+          reference-price))))
+
+(defn- visible-depth-fill
+  [levels quantity]
+  (when (and (finite-positive? quantity)
+             (seq levels))
+    (loop [remaining quantity
+           notional 0
+           filled 0
+           levels* (seq levels)]
+      (if (or (not (pos? remaining))
+              (nil? levels*))
+        (when (pos? filled)
+          (if (not (pos? remaining))
+            {:estimated-fill-price (/ notional filled)
+             :depth-status :full-visible-depth}
+            {:visible-size filled
+             :depth-status :insufficient-visible-depth}))
+        (let [level (first levels*)
+              price (level-price level)
+              size (level-size level)]
+          (if (and (finite-positive? price)
+                   (finite-positive? size))
+            (let [fill-size (min remaining size)]
+              (recur (- remaining fill-size)
+                     (+ notional (* fill-size price))
+                     (+ filled fill-size)
+                     (next levels*)))
+            (recur remaining
+                   notional
+                   filled
+                   (next levels*))))))))
+
 (defn- orderbook-fill-price
   [context side]
   (case side
@@ -39,13 +100,7 @@
   (let [fill-price (orderbook-fill-price context side)]
     (when (and (finite-positive? reference-price)
                (finite-positive? fill-price))
-      (* 10000
-         (/ (max 0
-                 (case side
-                   :buy (- fill-price reference-price)
-                   :sell (- reference-price fill-price)
-                   0))
-            reference-price)))))
+      (slippage-bps-from-fill-price side reference-price fill-price))))
 
 (defn- finite-nonzero?
   [value]
@@ -90,8 +145,12 @@
         0
         rounded))))
 
+(defn- cost-metadata
+  [context]
+  (select-keys context [:age-ms :stale? :observed-at-ms :loaded-at-ms :received-at-ms]))
+
 (defn- cost-context
-  [opts instrument-id side reference-price]
+  [opts instrument-id side reference-price quantity]
   (let [fallback (or (:fallback-slippage-bps opts)
                      default-fallback-slippage-bps)
         context (get-in opts [:cost-contexts-by-id instrument-id])
@@ -99,28 +158,60 @@
                  :fallback-cost-assumption :fallback-bps
                  nil :fallback-bps
                  (:source context))
-        fill-price (orderbook-fill-price context side)]
-    {:source source
-     :estimated-fill-price (or fill-price reference-price)
-     :slippage-bps (or (:slippage-bps context)
-                       (orderbook-slippage-bps context side reference-price)
-                       fallback)}))
+        snapshot-fill (visible-depth-fill (snapshot-side-levels context side) quantity)
+        fill-price (orderbook-fill-price context side)
+        metadata (cost-metadata context)]
+    (cond
+      (:slippage-bps context)
+      (merge metadata
+             {:source source
+              :estimated-fill-price (or fill-price reference-price)
+              :slippage-bps (:slippage-bps context)})
+
+      (= :full-visible-depth (:depth-status snapshot-fill))
+      (let [estimated-fill-price (:estimated-fill-price snapshot-fill)]
+        (merge metadata
+               {:source source
+                :estimated-fill-price estimated-fill-price
+                :slippage-bps (or (slippage-bps-from-fill-price side
+                                                                 reference-price
+                                                                 estimated-fill-price)
+                                  fallback)
+                :depth-status :full-visible-depth}))
+
+      (= :insufficient-visible-depth (:depth-status snapshot-fill))
+      (merge metadata
+             {:source :fallback-bps
+              :estimated-fill-price reference-price
+              :slippage-bps fallback
+              :depth-status :insufficient-visible-depth
+              :fallback-reason :snapshot-depth-limited})
+
+      :else
+      (merge metadata
+             {:source source
+              :estimated-fill-price (or fill-price reference-price)
+              :slippage-bps (or (orderbook-slippage-bps context side reference-price)
+                                fallback)}))))
 
 (defn- cost-estimate
-  [opts instrument-id side reference-price delta-notional-usd]
-  (let [{:keys [source slippage-bps estimated-fill-price]} (cost-context opts
-                                                                         instrument-id
-                                                                         side
-                                                                         reference-price)
+  [opts instrument-id side reference-price delta-notional-usd quantity]
+  (let [{:keys [source slippage-bps estimated-fill-price]
+         :as context} (cost-context opts
+                                    instrument-id
+                                    side
+                                    reference-price
+                                    quantity)
         fee-bps (or (get-in opts [:fee-bps-by-id instrument-id]) 0)
         notional (abs-num delta-notional-usd)]
-    {:source source
-     :estimated-fill-price estimated-fill-price
-     :notional-usd notional
-     :slippage-bps slippage-bps
-     :estimated-slippage-usd (* notional (/ slippage-bps 10000))
-     :fee-bps fee-bps
-     :estimated-fee-usd (* notional (/ fee-bps 10000))}))
+    (merge context
+           {:source source
+            :estimated-fill-price estimated-fill-price
+            :notional-usd notional
+            :slippage-bps slippage-bps
+            :estimated-slippage-usd (* notional (/ slippage-bps 10000))
+            :fee-bps fee-bps
+            :estimated-fee-usd (* notional (/ fee-bps 10000))})))
 
 (defn- row-status
   [{:keys [rebalance-tolerance]} instrument price capital-usd delta-weight delta-notional-usd quantity]
@@ -176,14 +267,15 @@
             :delta-notional-usd delta-notional-usd
             :side side
             :price price
-           :quantity quantity}
+            :quantity quantity}
            status
            (when (= :ready (:status status))
              {:cost (cost-estimate opts
                                    instrument-id
                                    side
                                    price
-                                   delta-notional-usd)}))))
+                                   delta-notional-usd
+                                   quantity)}))))
 
 (defn- preview-status
   [rows]

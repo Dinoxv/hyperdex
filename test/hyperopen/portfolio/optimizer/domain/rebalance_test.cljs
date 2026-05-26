@@ -175,3 +175,78 @@
     (is (near-vec? [3000 -3000 -3000 2000 3000 -3000]
                    (mapv :delta-notional-usd rows)))
     (is (= 17000 (get-in preview [:summary :gross-trade-notional-usd])))))
+
+(deftest build-rebalance-preview-uses-snapshot-visible-depth-for-buy-slippage-test
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [1.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                                  :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :asks [{:px "101" :sz "1"}
+                                                           {:px "102" :sz "2"}]
+                                                    :stale? false
+                                                    :age-ms 7000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :ready (get-in preview [:rows 0 :status])))
+    (is (= :snapshot (:source cost)))
+    (is (near? 101.66666666666667 (:estimated-fill-price cost)))
+    (is (near? 166.66666666666669 (:slippage-bps cost)))
+    (is (near? 5 (:estimated-slippage-usd cost)))
+    (is (= :full-visible-depth (:depth-status cost)))
+    (is (= false (:stale? cost)))
+    (is (= 7000 (:age-ms cost)))))
+
+(deftest build-rebalance-preview-uses-snapshot-visible-depth-for-sell-slippage-test
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [1.0]
+                  :target-weights [0.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                                  :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :bids [{:px "99" :sz "1"}
+                                                           {:px "98" :sz "2"}]
+                                                    :stale? false
+                                                    :age-ms 9000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :ready (get-in preview [:rows 0 :status])))
+    (is (= :sell (get-in preview [:rows 0 :side])))
+    (is (= :snapshot (:source cost)))
+    (is (near? 98.33333333333333 (:estimated-fill-price cost)))
+    (is (near? 166.66666666666674 (:slippage-bps cost)))
+    (is (near? 5 (:estimated-slippage-usd cost)))
+    (is (= :full-visible-depth (:depth-status cost)))))
+
+(deftest build-rebalance-preview-falls-back-when-snapshot-depth-is-insufficient-test
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [1.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                                  :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :asks [{:px "101" :sz "1"}]
+                                                    :stale? false
+                                                    :age-ms 5000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :ready (get-in preview [:rows 0 :status])))
+    (is (= :fallback-bps (:source cost)))
+    (is (= 25 (:slippage-bps cost)))
+    (is (near? 0.75 (:estimated-slippage-usd cost)))
+    (is (= :insufficient-visible-depth (:depth-status cost)))
+    (is (= :snapshot-depth-limited (:fallback-reason cost)))
+    (is (= 5000 (:age-ms cost)))))

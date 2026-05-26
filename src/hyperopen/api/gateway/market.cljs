@@ -119,6 +119,12 @@
                                              coin
                                              opts))
 
+(defn request-l2-book-snapshot!
+  [{:keys [post-info!]}
+   coin
+   opts]
+  (market-endpoints/request-l2-book-snapshot! post-info! coin opts))
+
 (defn fetch-candle-snapshot!
   [{:keys [log-fn
            request-candle-snapshot!

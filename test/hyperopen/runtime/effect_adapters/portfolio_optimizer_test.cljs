@@ -1,7 +1,9 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
-            [hyperopen.runtime.effect-adapters.portfolio-optimizer :as portfolio-optimizer-adapters]))
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer :as portfolio-optimizer-adapters]
+            [hyperopen.test-support.async :as async-support]))
 
 (def ^:private optimizer-history-api-browser-override
   @#'hyperopen.runtime.effect-adapters.portfolio-optimizer/optimizer-history-api-browser-override)
@@ -54,6 +56,8 @@
                   effect-adapters/execute-portfolio-optimizer-plan-effect))
   (is (identical? portfolio-optimizer-adapters/refresh-portfolio-optimizer-tracking-effect
                   effect-adapters/refresh-portfolio-optimizer-tracking-effect))
+  (is (identical? portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+                  effect-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect))
   (is (identical? portfolio-optimizer-adapters/enable-portfolio-optimizer-manual-tracking-effect
                   effect-adapters/enable-portfolio-optimizer-manual-tracking-effect)))
 
@@ -111,6 +115,126 @@
         (is (some? (:controller (first @calls))))
         (is (identical? (:controller (first @calls))
                         (:controller (second @calls))))))))
+
+(deftest refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect-fetches-capped-snapshots-and-updates-preview-test
+  (async done
+    (let [calls (atom [])
+          instruments [{:instrument-id "perp:BTC"
+                        :instrument-type :perp
+                        :coin "BTC"}
+                       {:instrument-id "perp:ETH"
+                        :instrument-type :perp
+                        :coin "ETH"}]
+          last-run {:request-signature
+                    {:request {:current-portfolio {:capital {:nav-usdc 300}}
+                               :constraints {:rebalance-tolerance 0}
+                               :execution-assumptions {:fallback-slippage-bps 25
+                                                       :prices-by-id {"perp:BTC" 100
+                                                                      "perp:ETH" 100}}
+                               :requested-universe instruments
+                               :universe instruments}}
+                    :result {:status :solved
+                             :instrument-ids ["perp:BTC" "perp:ETH"]
+                             :current-weights [0 0]
+                             :target-weights [1 0.5]
+                             :rebalance-preview
+                             {:rows [{:instrument-id "perp:BTC"
+                                      :instrument-type :perp
+                                      :coin "BTC"
+                                      :status :ready
+                                      :side :buy
+                                      :cost {:source :fallback-bps}}
+                                     {:instrument-id "perp:ETH"
+                                      :instrument-type :perp
+                                      :coin "ETH"
+                                      :status :ready
+                                      :side :buy
+                                      :cost {:source :fallback-bps}}]}}}
+          store (atom {:portfolio {:optimizer {:last-successful-run last-run}}})]
+      (-> (portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+           nil
+           store
+           {:max-snapshot-coins 1
+            :now-ms-fn (fn [] 10000)
+            :request-l2-book-snapshot!
+            (fn [coin opts]
+              (swap! calls conj [coin opts])
+              (js/Promise.resolve
+               {:time 9000
+                :levels [[{:px "99" :sz "10"}]
+                         [{:px "101" :sz "1"}
+                          {:px "102" :sz "2"}]]}))})
+          (.then
+           (fn [_]
+             (is (= [["BTC" {:priority :low
+                              :cache-ttl-ms 30000}]]
+                    @calls))
+             (is (= :snapshot
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:rebalance-preview :rows 0 :cost :source]))))
+             (is (= :fallback-bps
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:rebalance-preview :rows 1 :cost :source]))))
+             (is (= 1000
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:rebalance-preview :rows 0 :cost :age-ms]))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect-ignores-late-stale-run-response-test
+  (async done
+    (let [instruments [{:instrument-id "perp:BTC"
+                        :instrument-type :perp
+                        :coin "BTC"}]
+          last-run {:request-signature
+                    {:request {:current-portfolio {:capital {:nav-usdc 300}}
+                               :constraints {:rebalance-tolerance 0}
+                               :execution-assumptions {:fallback-slippage-bps 25
+                                                       :prices-by-id {"perp:BTC" 100}}
+                               :requested-universe instruments
+                               :universe instruments}}
+                    :result {:status :solved
+                             :scenario-id "old"
+                             :instrument-ids ["perp:BTC"]
+                             :current-weights [0]
+                             :target-weights [1]
+                             :rebalance-preview
+                             {:rows [{:instrument-id "perp:BTC"
+                                      :instrument-type :perp
+                                      :coin "BTC"
+                                      :status :ready
+                                      :side :buy
+                                      :cost {:source :fallback-bps}}]}}}
+          newer-run (assoc-in last-run [:result :scenario-id] "new")
+          newer-run (assoc-in newer-run [:request-signature :request :seed] "new-run")
+          store (atom {:portfolio {:optimizer {:last-successful-run last-run}}})
+          promise (portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+                   nil
+                   store
+                   {:now-ms-fn (fn [] 10000)
+                    :request-l2-book-snapshot!
+                    (fn [_coin _opts]
+                      (js/Promise.resolve
+                       {:time 9000
+                        :levels [[{:px "99" :sz "10"}]
+                                 [{:px "101" :sz "10"}]]}))})]
+      (reset! store {:portfolio {:optimizer {:last-successful-run newer-run}}})
+      (-> promise
+          (.then
+           (fn [_]
+             (is (= "new"
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:scenario-id]))))
+             (is (= :fallback-bps
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:rebalance-preview :rows 0 :cost :source]))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
 
 (deftest optimizer-history-api-browser-override-returns-nil-when-global-is-absent-test
   (with-optimizer-history-api-override

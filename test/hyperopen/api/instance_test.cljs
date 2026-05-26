@@ -44,6 +44,9 @@
                   market-gateway/request-candle-snapshot! (fn [deps coin opts]
                                                             (record! :request-candle-snapshot
                                                                      [coin opts ((:now-ms-fn deps))]))
+                  market-gateway/request-l2-book-snapshot! (fn [deps coin opts]
+                                                             (record! :request-l2-book-snapshot
+                                                                      [deps coin opts]))
                   market-gateway/request-spot-meta! (fn [deps opts]
                                                       (record! :request-spot-meta [deps opts]))
                   market-gateway/request-public-webdata2! (fn [deps opts]
@@ -155,6 +158,10 @@
                ((:request-candle-snapshot! api) "BTC")))
         (is (= {:ok :request-candle-snapshot}
                ((:request-candle-snapshot! api) "ETH" :interval :5m :bars 20 :priority :low)))
+        (is (= {:ok :request-l2-book-snapshot}
+               ((:request-l2-book-snapshot! api) "BTC")))
+        (is (= {:ok :request-l2-book-snapshot}
+               ((:request-l2-book-snapshot! api) "ETH" {:priority :low})))
         (is (= {:ok :request-spot-meta}
                ((:request-spot-meta! api))))
         (is (= {:ok :request-spot-meta}

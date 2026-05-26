@@ -132,5 +132,7 @@
                            :payload {:status :solved}}
                  :computed-at-ms 400})]
     (is (= [{:command/type :optimizer.workflow/navigate
-             :path "/portfolio/optimize/draft"}]
+             :path "/portfolio/optimize/draft"}
+            {:command/type
+             :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}]
            (:commands result)))))

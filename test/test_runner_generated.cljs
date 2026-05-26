@@ -206,6 +206,7 @@
             [hyperopen.portfolio.optimizer.application.instrument-labels-test]
             [hyperopen.portfolio.optimizer.application.orderbook-loader-test]
             [hyperopen.portfolio.optimizer.application.pipeline-workflow-test]
+            [hyperopen.portfolio.optimizer.application.rebalance-snapshot-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-boundary-test]
@@ -866,6 +867,7 @@
              'hyperopen.portfolio.optimizer.application.instrument-labels-test
              'hyperopen.portfolio.optimizer.application.orderbook-loader-test
              'hyperopen.portfolio.optimizer.application.pipeline-workflow-test
+             'hyperopen.portfolio.optimizer.application.rebalance-snapshot-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
              'hyperopen.portfolio.optimizer.application.run-bridge-boundary-test

@@ -26,11 +26,97 @@
       (str/replace #"(^-+|-+$)" "")))
 
 (defn- kpi-card
-  [label value]
+  ([label value]
+   (kpi-card label value nil))
+  ([label value detail]
   [:div {:class ["optimizer-summary-card" "rounded-lg" "border" "border-base-300" "bg-base-200/50" "p-3"]}
    [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
     label]
-   [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]} value]])
+   [:p {:class ["mt-2" "text-lg" "font-semibold" "tabular-nums"]} value]
+   (when (seq detail)
+     [:p {:class ["mt-1" "text-[0.65rem]" "font-medium" "normal-case" "tracking-normal" "text-trading-muted"]}
+      detail])]))
+
+(defn- format-bps
+  [value]
+  (if (opt-format/finite-number? value)
+    (str (opt-format/format-decimal value {:maximum-fraction-digits 2}) " bps")
+    "N/A"))
+
+(defn- format-age
+  [age-ms]
+  (when (opt-format/finite-number? age-ms)
+    (let [seconds (js/Math.max 0 (js/Math.round (/ age-ms 1000)))]
+      (if (< seconds 60)
+        (str seconds "s old")
+        (str (js/Math.round (/ seconds 60)) "m old")))))
+
+(defn- depth-label
+  [status]
+  (case status
+    :full-visible-depth "full depth"
+    :insufficient-visible-depth "depth limited"
+    nil))
+
+(defn- slippage-source-key
+  [cost]
+  (cond
+    (and (= :snapshot (:source cost)) (:stale? cost)) :stale-snapshot
+    (:source cost) (:source cost)
+    :else :unknown))
+
+(defn- counted-label
+  [[source count]]
+  (str count " " (opt-format/keyword-label source)))
+
+(defn- max-age-ms
+  [costs]
+  (let [ages (keep :age-ms costs)]
+    (when (seq ages)
+      (apply max ages))))
+
+(defn- slippage-summary-detail
+  [preview]
+  (let [costs (->> (:rows preview)
+                   (filter #(= :ready (:status %)))
+                   (keep :cost)
+                   vec)
+        source-labels (->> costs
+                           (map slippage-source-key)
+                           frequencies
+                           (sort-by (comp str key))
+                           (map counted-label))
+        depth-limited-count (count (filter #(= :insufficient-visible-depth
+                                               (:depth-status %))
+                                           costs))
+        age (format-age (max-age-ms costs))
+        details (cond-> (vec source-labels)
+                  (pos? depth-limited-count)
+                  (conj (str depth-limited-count " depth limited"))
+
+                  (seq age)
+                  (conj (str "max age " age)))]
+    (when (seq details)
+      (str/join " · " details))))
+
+(defn- cost-source-cell
+  [cost]
+  [:span
+   [:span (opt-format/keyword-label (:source cost))]
+   (when-let [age (format-age (:age-ms cost))]
+     [:span {:class ["mt-1" "block" "text-[0.65rem]" "font-medium" "normal-case" "tracking-normal" "text-trading-muted"]}
+      age])
+   (when-let [label (depth-label (:depth-status cost))]
+     [:span {:class ["mt-1" "block" "text-[0.65rem]" "font-medium" "normal-case" "tracking-normal" "text-trading-muted"]}
+      label])])
+
+(defn- slippage-cell
+  [cost]
+  [:span
+   [:span (opt-format/format-usdc (:estimated-slippage-usd cost))]
+   (when (opt-format/finite-number? (:slippage-bps cost))
+     [:span {:class ["mt-1" "block" "text-[0.65rem]" "font-medium" "normal-case" "tracking-normal" "text-trading-muted"]}
+      (format-bps (:slippage-bps cost))])])
 
 (defn- blocked-reason-summary
   [preview]
@@ -118,8 +204,8 @@
    [:span (opt-format/keyword-label (:side row))]
    [:span (opt-format/format-decimal (:quantity row) {:maximum-fraction-digits 4})]
    [:span (opt-format/format-usdc (:price row))]
-   [:span (opt-format/keyword-label (get-in row [:cost :source]))]
-   [:span (opt-format/format-usdc (get-in row [:cost :estimated-slippage-usd]))]
+   (cost-source-cell (:cost row))
+   (slippage-cell (:cost row))
    [:span (opt-format/format-usdc (:delta-notional-usd row))]
    [:span (opt-format/keyword-label (:reason row))]))
 
@@ -207,7 +293,9 @@
         (kpi-card "Blocked" (str (or (:blocked-count summary) 0)))
         (kpi-card "Gross Trade" (opt-format/format-usdc (:gross-trade-notional-usd summary)))
         (kpi-card "Fees" (opt-format/format-usdc (:estimated-fees-usd summary)))
-        (kpi-card "Slippage" (opt-format/format-usdc (:estimated-slippage-usd summary)))]
+        (kpi-card "Slippage"
+                  (opt-format/format-usdc (:estimated-slippage-usd summary))
+                  (slippage-summary-detail preview))]
        [:section {:class ["grid" "grid-cols-1" "gap-4" "xl:grid-cols-[minmax(0,1fr)_18rem]"]}
         (trade-table preview labels-by-instrument)
         [:aside {:class ["space-y-4"]}

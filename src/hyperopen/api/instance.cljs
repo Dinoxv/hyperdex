@@ -72,6 +72,14 @@
              {:interval interval
               :bars bars
               :priority priority}))
+          (request-l2-book-snapshot!
+            ([coin]
+             (request-l2-book-snapshot! coin {}))
+            ([coin opts]
+             (market-gateway/request-l2-book-snapshot!
+              {:post-info! post-info!}
+              coin
+              opts)))
           (request-spot-meta!
             ([] (request-spot-meta! {}))
             ([opts]
@@ -108,6 +116,7 @@
      :request-meta-and-asset-ctxs! request-meta-and-asset-ctxs!
      :request-perp-dexs! request-perp-dexs!
      :request-candle-snapshot! request-candle-snapshot!
+     :request-l2-book-snapshot! request-l2-book-snapshot!
      :request-spot-meta! request-spot-meta!
      :request-outcome-meta! request-outcome-meta!
      :request-public-webdata2! request-public-webdata2!

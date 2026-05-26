@@ -362,7 +362,10 @@
                                         :type "optimizer-result"
                                         :payload {:status :solved}}
                                        {:computed-at-ms 200})
-    (is (= [[store nil [[:actions/navigate "/portfolio/optimize/draft"]]]]
+    (is (= [[store nil [[:actions/navigate "/portfolio/optimize/draft"]]]
+            [store
+             nil
+             [[:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots]]]]
            @dispatches))))
 
 (deftest normalized-worker-result-with-string-status-updates-successful-run-test

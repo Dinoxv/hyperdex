@@ -158,10 +158,14 @@
 
 (defn- success-commands
   [state state*]
-  (if (new-optimizer-route? state)
-    [{:command/type :optimizer.workflow/navigate
-      :path (result-path state*)}]
-    []))
+  (cond-> []
+    (new-optimizer-route? state)
+    (conj {:command/type :optimizer.workflow/navigate
+           :path (result-path state*)})
+
+    true
+    (conj {:command/type
+           :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots})))
 
 (defn handle-worker-message
   [{:keys [state message computed-at-ms]}]

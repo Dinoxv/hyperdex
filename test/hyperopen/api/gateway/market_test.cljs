@@ -50,6 +50,19 @@
                     (is false (str "Unexpected error: " err))
                     (done)))))))
 
+(deftest request-l2-book-snapshot-delegates-to-market-endpoint-test
+  (let [called (atom nil)
+        post-info! (fn [& _] nil)]
+    (with-redefs [market-endpoints/request-l2-book-snapshot! (fn [& args]
+                                                               (reset! called args)
+                                                               {:ok :snapshot})]
+      (is (= {:ok :snapshot}
+             (market-gateway/request-l2-book-snapshot! {:post-info! post-info!}
+                                                       "BTC"
+                                                       {:priority :low})))
+      (is (= [post-info! "BTC" {:priority :low}]
+             @called)))))
+
 (deftest request-perp-dexs-rejects-non-canonical-payload-test
   (async done
     (with-redefs [market-endpoints/request-perp-dexs! (fn [_post-info! _opts]
@@ -154,6 +167,9 @@
                                                         (swap! called conj [:perp-dexs args])
                                                         (js/Promise.resolve {:dex-names ["dex-a"]
                                                                              :fee-config-by-name {}}))
+                  market-endpoints/request-l2-book-snapshot! (fn [& args]
+                                                               (swap! called conj [:l2-book-snapshot args])
+                                                               {:ok :l2-book-snapshot})
                   market-endpoints/request-spot-meta! (fn [& args]
                                                         (swap! called conj [:spot-meta args])
                                                         {:ok :spot-meta})
@@ -217,6 +233,10 @@
                                                      :apply-candle-snapshot-error identity}
                                                     nil
                                                     {:priority :low})))
+      (is (= {:ok :l2-book-snapshot}
+             (market-gateway/request-l2-book-snapshot! {:post-info! post-info!}
+                                                       "BTC"
+                                                       {:priority :low})))
       (is (= {:ok :spot-meta}
              (market-gateway/request-spot-meta! {:post-info! post-info!} {:priority :high})))
       (is (= {:ok :fetch-spot-meta}

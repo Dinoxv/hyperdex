@@ -185,6 +185,14 @@
       (assoc result :rebalance-preview preview)
       result)))
 
+(defn result-with-refreshed-rebalance-preview
+  [request result]
+  (if-let [preview (and (map? request)
+                        (= :solved (:status result))
+                        (build-derived-preview request result))]
+    (assoc result :rebalance-preview preview)
+    result))
+
 (defn last-successful-run-with-rebalance-preview
   [request last-successful-run]
   (if (map? last-successful-run)
