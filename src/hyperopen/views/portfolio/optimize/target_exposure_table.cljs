@@ -215,6 +215,20 @@
                            market-key]]}}
     "+ add"]])
 
+(defn- candidate-table-header
+  []
+  [:div {:class ["grid" "grid-cols-[58px_minmax(0,1fr)_48px_44px]"
+                 "items-center" "gap-2" "border-b" "border-base-300"
+                 "bg-base-200/40" "px-2" "py-1.5" "font-mono"
+                 "text-[0.55rem]" "font-semibold" "uppercase"
+                 "tracking-[0.12em]" "text-trading-muted/70"]
+         :data-role "portfolio-optimizer-draft-add-asset-candidate-header"
+         :role "presentation"}
+   [:span "Asset"]
+   [:span "Name"]
+   [:span {:class ["text-right"]} "Liquidity"]
+   [:span {:class ["sr-only"]} "Add"]])
+
 (defn- add-asset-popover
   [state draft]
   (let [{:keys [search-query markets candidate-rows active-index market-keys]}
@@ -283,9 +297,10 @@
                     :id "portfolio-optimizer-draft-add-asset-search-results"
                     :role "listbox"
                     :data-role "portfolio-optimizer-draft-add-asset-search-results"}]
-             (map-indexed (fn [idx row]
-                            (candidate-row row idx active-index))
-                          candidate-rows))
+             (cons (candidate-table-header)
+                   (map-indexed (fn [idx row]
+                                  (candidate-row row idx active-index))
+                                candidate-rows)))
        [:p {:class ["mt-2" "border" "border-base-300" "bg-base-200/70" "p-2"
                     "text-xs" "text-trading-muted"]
             :data-role "portfolio-optimizer-draft-add-asset-search-results-empty"}

@@ -168,6 +168,8 @@
                                   "portfolio-optimizer-draft-add-asset-search-add-hint")
         search-results (node-by-role open-view
                                      "portfolio-optimizer-draft-add-asset-search-results")
+        candidate-header (node-by-role open-view
+                                       "portfolio-optimizer-draft-add-asset-candidate-header")
         eth-row (node-by-role open-view
                               "portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH")
         eth-add (node-by-role open-view
@@ -200,12 +202,16 @@
     (is (nil? search-hint))
     (is (contains? (set (node-attr search-results :class))
                    "optimizer-draft-add-asset-results"))
+    (is (some? candidate-header))
     (is (some? eth-row))
     (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
            (click-actions eth-row)))
     (is (= [[:actions/add-portfolio-optimizer-universe-instrument-and-run "perp:ETH"]]
            (click-actions eth-add)))
     (is (contains? strings "Search a tradable asset"))
+    (is (contains? strings "Asset"))
+    (is (contains? strings "Name"))
+    (is (contains? strings "Liquidity"))
     (is (contains? strings "ETH-USDC"))
     (is (not (some? (node-by-role open-view
                                   "portfolio-optimizer-draft-add-asset-candidate-row-perp:BTC"))))))

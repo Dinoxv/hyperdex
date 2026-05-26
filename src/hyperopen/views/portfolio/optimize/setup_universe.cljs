@@ -99,6 +99,36 @@
                :on {:click [[:actions/add-portfolio-optimizer-universe-instrument market-key]]}}
       "+ add"]])
 
+(defn- selected-table-header
+  []
+  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_48px_20px]"
+                 "items-center" "gap-2" "border-b" "border-base-300"
+                 "bg-base-200/40" "px-2" "py-1.5" "font-mono"
+                 "text-[0.55rem]" "font-semibold" "uppercase"
+                 "tracking-[0.12em]" "text-trading-muted/70"]
+         :data-role "portfolio-optimizer-universe-selected-header"}
+   [:span ""]
+   [:span "Asset"]
+   [:span "Type"]
+   [:span "History"]
+   [:span "Liquidity"]
+   [:span {:class ["sr-only"]} "Remove"]])
+
+(defn- candidate-table-header
+  []
+  [:div {:class ["grid" "grid-cols-[66px_minmax(0,1fr)_58px_42px_44px]"
+                 "items-center" "gap-2" "border-b" "border-base-300"
+                 "bg-base-200/40" "px-2" "py-1.5" "font-mono"
+                 "text-[0.55rem]" "font-semibold" "uppercase"
+                 "tracking-[0.12em]" "text-trading-muted/70"]
+         :data-role "portfolio-optimizer-universe-candidate-header"
+         :role "presentation"}
+   [:span "Asset"]
+   [:span "Name"]
+   [:span "Type"]
+   [:span {:class ["text-right"]} "Liquidity"]
+   [:span {:class ["sr-only"]} "Add"]])
+
 (defn- selected-table
   [selected-rows universe]
   [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
@@ -110,7 +140,8 @@
      "cap: 25 assets"]]
    (if (seq universe)
      (into [:div {:class ["text-xs"]}]
-           (map selected-row selected-rows))
+           (cons (selected-table-header)
+                 (map selected-row selected-rows)))
      [:p {:class ["px-2" "py-3" "text-xs" "text-trading-muted"]}
       "No instruments selected yet."])])
 
@@ -205,7 +236,8 @@
                        :id "portfolio-optimizer-universe-search-results"
                        :role "listbox"
                        :data-role "portfolio-optimizer-universe-search-results"}]
-                (map-indexed (fn [idx row] (market-row row idx)) candidate-rows))
+                (cons (candidate-table-header)
+                      (map-indexed (fn [idx row] (market-row row idx)) candidate-rows)))
           [:p {:class ["mt-1" "border" "border-base-300" "bg-base-200/70" "p-2"
                        "text-xs" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-results-empty"}

@@ -113,6 +113,10 @@
                                                        :coin "PURR/USDC"
                                                        :symbol "PURR/USDC"}}}})
         strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node
+                              "portfolio-optimizer-universe-selected-header")))
+    (is (some? (node-by-role view-node
+                              "portfolio-optimizer-universe-candidate-header")))
     (is (= "eth"
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-universe-search-input")
@@ -139,6 +143,11 @@
     (is (nil? (node-by-role view-node
                             "portfolio-optimizer-universe-add-perp:BTC")))
     (is (contains? strings "Manual Add"))
+    (is (contains? strings "Asset"))
+    (is (contains? strings "Type"))
+    (is (contains? strings "History"))
+    (is (contains? strings "Liquidity"))
+    (is (contains? strings "Name"))
     (is (contains? strings "ETH-USDC"))
     (is (contains? strings "History starts loading after assets are included."))))
 
