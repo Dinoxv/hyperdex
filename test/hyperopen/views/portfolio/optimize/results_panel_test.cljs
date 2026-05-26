@@ -211,7 +211,8 @@
     (is (contains? strings "Search a tradable asset"))
     (is (contains? strings "Asset"))
     (is (contains? strings "Name"))
-    (is (contains? strings "Liquidity"))
+    (is (not (contains? strings "Liquidity")))
+    (is (not (contains? strings "$84m")))
     (is (contains? strings "ETH-USDC"))
     (is (not (some? (node-by-role open-view
                                   "portfolio-optimizer-draft-add-asset-candidate-row-perp:BTC"))))))

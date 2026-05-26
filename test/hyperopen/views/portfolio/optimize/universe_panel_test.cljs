@@ -146,8 +146,9 @@
     (is (contains? strings "Asset"))
     (is (contains? strings "Type"))
     (is (contains? strings "History"))
-    (is (contains? strings "Liquidity"))
     (is (contains? strings "Name"))
+    (is (not (contains? strings "Liquidity")))
+    (is (not (contains? strings "medium")))
     (is (contains? strings "ETH-USDC"))
     (is (contains? strings "History starts loading after assets are included."))))
 

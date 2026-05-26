@@ -46,10 +46,9 @@
            primary-label
            secondary-label
            history-label
-           history-tone
-           liquidity-label]}]
+           history-tone]}]
     [:div {:class ["optimizer-universe-row"
-                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_48px_20px]"
+                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)}
@@ -61,8 +60,6 @@
        secondary-label]]
      [:span {:class ["min-w-0"]} (market-type-tags market-type)]
      [:span {:class ["min-w-0"]} (tag history-label history-tone)]
-     [:span {:class ["truncate" "text-[0.65625rem]" "text-trading-muted"]}
-      liquidity-label]
      [:span {:class ["text-right"]}
       [:button {:type "button"
                 :class ["font-mono" "text-[0.6875rem]" "text-trading-muted" "hover:text-warning"]
@@ -73,9 +70,9 @@
        "x"]]])
 
 (defn- market-row
-  [{:keys [market-key market-type active? label name adv-label]} idx]
+  [{:keys [market-key market-type active? label name]} idx]
     [:div {:class ["optimizer-universe-candidate-row"
-                   "grid" "grid-cols-[66px_minmax(0,1fr)_58px_42px_44px]"
+                   "grid" "grid-cols-[66px_minmax(0,1fr)_58px_44px]"
                    "items-center" "gap-2" "border-b" "border-base-300" "cursor-pointer" "px-2"
                    "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-candidate-row-" market-key)
@@ -89,8 +86,6 @@
      [:span {:class ["truncate" "text-[0.6875rem]" "text-trading-muted"]}
       name]
      (market-type-tags market-type)
-     [:span {:class ["font-mono" "text-[0.6rem]" "text-trading-muted" "text-right"]}
-      adv-label]
      [:button {:type "button"
                :class ["optimizer-universe-add-button"
                        "text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
@@ -101,7 +96,7 @@
 
 (defn- selected-table-header
   []
-  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_48px_20px]"
+  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_20px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -111,12 +106,11 @@
    [:span "Asset"]
    [:span "Type"]
    [:span "History"]
-   [:span "Liquidity"]
    [:span {:class ["sr-only"]} "Remove"]])
 
 (defn- candidate-table-header
   []
-  [:div {:class ["grid" "grid-cols-[66px_minmax(0,1fr)_58px_42px_44px]"
+  [:div {:class ["grid" "grid-cols-[66px_minmax(0,1fr)_58px_44px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -126,7 +120,6 @@
    [:span "Asset"]
    [:span "Name"]
    [:span "Type"]
-   [:span {:class ["text-right"]} "Liquidity"]
    [:span {:class ["sr-only"]} "Add"]])
 
 (defn- selected-table

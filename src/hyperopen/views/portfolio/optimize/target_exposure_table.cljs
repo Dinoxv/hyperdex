@@ -187,9 +187,9 @@
     (format-compact-usdc delta-notional)]]))
 
 (defn- candidate-row
-  [{:keys [market-key label name adv-label]} idx active-index]
+  [{:keys [market-key label name]} idx active-index]
   [:div {:class ["optimizer-draft-add-asset-candidate-row"
-                 "grid" "grid-cols-[58px_minmax(0,1fr)_48px_44px]"
+                 "grid" "grid-cols-[58px_minmax(0,1fr)_44px]"
                  "items-center" "gap-2" "border-b" "border-base-300" "px-2"
                  "py-1.5" "last:border-b-0" "hover:bg-base-200/40"]
          :data-role (str "portfolio-optimizer-draft-add-asset-candidate-row-"
@@ -204,8 +204,6 @@
     label]
    [:span {:class ["truncate" "text-[0.6875rem]" "text-trading-muted"]}
     name]
-   [:span {:class ["font-mono" "text-[0.6rem]" "text-trading-muted" "text-right"]}
-    adv-label]
    [:button {:type "button"
              :class ["text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
                      "text-warning" "hover:text-warning"]
@@ -217,7 +215,7 @@
 
 (defn- candidate-table-header
   []
-  [:div {:class ["grid" "grid-cols-[58px_minmax(0,1fr)_48px_44px]"
+  [:div {:class ["grid" "grid-cols-[58px_minmax(0,1fr)_44px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -226,7 +224,6 @@
          :role "presentation"}
    [:span "Asset"]
    [:span "Name"]
-   [:span {:class ["text-right"]} "Liquidity"]
    [:span {:class ["sr-only"]} "Add"]])
 
 (defn- add-asset-popover
