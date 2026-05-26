@@ -27,7 +27,9 @@
    :loading "loading"
    :shared-gap "shared gap"
    :sufficient "sufficient"
+   :stale "stale"
    :insufficient "insufficient"
+   :rejected "rejected"
    :missing "missing"
    :pending "pending"})
 
@@ -223,6 +225,12 @@
 
       (= :loaded-but-misaligned readiness-status)
       :shared-gap
+
+      (= :rejected readiness-status)
+      :rejected
+
+      (= :stale readiness-status)
+      :stale
 
       (= :aligned readiness-status)
       :sufficient

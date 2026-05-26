@@ -33,14 +33,24 @@
     :missing-vault-address
     :missing-vault-history
     :missing-native-risk-history
-    :identity-ambiguous
-    :validation-failed})
+    :identity-ambiguous})
 
 (def ^:private insufficient-history-warning-codes
   #{:insufficient-candle-history
     :insufficient-return-history
     :insufficient-vault-history
     :insufficient-common-history})
+
+(def ^:private stale-history-warning-codes
+  #{:stale-history
+    :source-fetch-failed})
+
+(def ^:private rejected-history-warning-codes
+  #{:instrument-kind-mismatch
+    :proxy-mapping-unapproved
+    :proxy-validation-failed
+    :rejected
+    :validation-failed})
 
 (defn- current-as-of-ms
   [state]
@@ -207,6 +217,9 @@
       :validation-failed
       (str label ": backend validation rejected optimizer history.")
 
+      :rejected
+      (str label ": backend rejected optimizer history.")
+
       :proxy-history-used
       (str label ": approved proxy history is included.")
 
@@ -218,6 +231,9 @@
 
       :stale-history
       (str label ": optimizer history may be stale.")
+
+      :source-fetch-failed
+      (str label ": source refresh failed; cached optimizer history may be stale.")
 
       (or (some-> (:code warning) name)
           "Optimizer warning."))))
@@ -248,12 +264,11 @@
     (contains? insufficient-history-warning-codes (:code warning))
     :insufficient
 
-    (contains? #{:validation-failed
-                 :instrument-kind-mismatch
-                 :proxy-mapping-unapproved
-                 :proxy-validation-failed}
-               (:code warning))
-    :missing
+    (contains? stale-history-warning-codes (:code warning))
+    :stale
+
+    (contains? rejected-history-warning-codes (:code warning))
+    :rejected
 
     :else
     nil))
@@ -276,9 +291,9 @@
     (into {}
           (map (fn [instrument-id]
                  [instrument-id
-                  (or (when (contains? aligned-ids instrument-id)
+                  (or (get warning-status-by-id instrument-id)
+                      (when (contains? aligned-ids instrument-id)
                         :aligned)
-                      (get warning-status-by-id instrument-id)
                       (when common-gap?
                         :loaded-but-misaligned)
                       :missing)]))

@@ -17,6 +17,14 @@
    :market-type :perp
    :coin "HYPE"})
 
+(def xyz-gold-instrument
+  {:instrument-id "perp:xyz:GOLD"
+   :market-type :perp
+   :coin "xyz:GOLD"
+   :base "GOLD"
+   :dex "xyz"
+   :hip3? true})
+
 (def queued-status
   {:status :queued
    :started-at-ms nil
@@ -94,6 +102,39 @@
     (is (= "hl:perp:BTC"
            (:optimizer-history/instrument-id request-instrument)))
     (is (= :hl-perp
+           (:optimizer-history/instrument-kind request-instrument)))))
+
+(deftest begin-selection-prefetch-enriches-hip3-instrument-from-discovery-alias-test
+  (let [state (assoc-in
+               (prefetch-state)
+               [:portfolio :optimizer]
+               {:draft {:universe [xyz-gold-instrument]}
+                :history-prefetch {:queue [xyz-gold-instrument]
+                                   :active-instrument-id nil
+                                   :by-instrument-id {"perp:xyz:GOLD" queued-status}}
+                :runtime {:as-of-ms 3000
+                          :stale-after-ms 60000}
+                :history-discovery
+                {:status :partial
+                 :backend-id-by-local-id {"hip3:xyz:GOLD" "hl:hip3:xyz:GOLD"}
+                 :instruments-by-backend-id
+                 {"hl:hip3:xyz:GOLD"
+                  {:instrument-id "hl:hip3:xyz:GOLD"
+                   :display-symbol "xyz:GOLD"
+                   :instrument-kind :hl-hip3
+                   :history {:status :stale
+                             :quality-status :passed}}}}})
+        result (workflow/begin-selection-prefetch
+                {:state state
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}
+                 :now-ms 1000})
+        request-instrument (get-in result [:commands 0 :request :universe 0])]
+    (is (= "perp:xyz:GOLD" (:instrument-id request-instrument)))
+    (is (= "hl:hip3:xyz:GOLD"
+           (:optimizer-history/instrument-id request-instrument)))
+    (is (= :hl-hip3
            (:optimizer-history/instrument-kind request-instrument)))))
 
 (deftest begin-history-load-carries-current-portfolio-universe-separately-test

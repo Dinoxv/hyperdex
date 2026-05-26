@@ -73,6 +73,33 @@
                                       :proxy-mapping-id "proxy-review:btc"}}
            candidate))))
 
+(deftest with-discovery-metadata-resolves-hip3-alias-keys-test
+  (let [discovery (api-v2/normalize-discovery
+                   {:contract_version "optimizer-history-api-v2"
+                    :status "ok"
+                    :instruments
+                    [{:instrument_id "hl:hip3:xyz:GOLD"
+                      :display_symbol "xyz:GOLD"
+                      :kind "hip3"
+                      :instrument_kind "hl_hip3"
+                      :aliases {:hyperopen_market_key "hip3:xyz:GOLD"}
+                      :history {:status "stale"
+                                :quality_status "passed"}}]
+                    :warnings []})
+        candidate (api-v2/with-discovery-metadata
+                    {:key "perp:xyz:GOLD"
+                     :instrument-id "perp:xyz:GOLD"
+                     :market-type :perp
+                     :coin "xyz:GOLD" :base "GOLD"
+                     :dex "xyz"
+                     :hip3? true}
+                    discovery)]
+    (is (= {:optimizer-history/instrument-id "hl:hip3:xyz:GOLD"
+            :optimizer-history/display-symbol "xyz:GOLD"
+            :optimizer-history/instrument-kind :hl-hip3
+            :optimizer-history/history-status :stale}
+           (select-keys candidate [:optimizer-history/instrument-id :optimizer-history/display-symbol :optimizer-history/instrument-kind :optimizer-history/history-status])))))
+
 (deftest align-api-v2-history-uses-api-aligned-returns-and-funding-policy-test
   (let [universe [{:instrument-id "perp:BTC"
                    :market-type :perp

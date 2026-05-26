@@ -200,8 +200,11 @@
                                                   {:instrument-id "vault:missing"}
                                                   {:instrument-id "perp:short"}
                                                   {:instrument-id "perp:return-missing"}
-                                                  {:instrument-id "perp:return-short"}]
-                             :universe [{:instrument-id "vault:aligned"}]
+                                                  {:instrument-id "perp:return-short"}
+                                                  {:instrument-id "perp:stale"}
+                                                  {:instrument-id "perp:rejected"}]
+                             :universe [{:instrument-id "vault:aligned"}
+                                        {:instrument-id "perp:stale"}]
                              :warnings [{:code :insufficient-common-history
                                          :observations 1
                                          :required 2}
@@ -216,13 +219,19 @@
                                         {:code :insufficient-return-history
                                          :instrument-id "perp:return-short"
                                          :observations 1
-                                         :required 2}]}}]
+                                         :required 2}
+                                        {:code :stale-history
+                                         :instrument-id "perp:stale"}
+                                        {:code :validation-failed
+                                         :instrument-id "perp:rejected"}]}}]
     (is (= {"vault:aligned" :aligned
             "vault:misaligned" :loaded-but-misaligned
             "vault:missing" :missing
             "perp:short" :insufficient
             "perp:return-missing" :missing
-            "perp:return-short" :insufficient}
+            "perp:return-short" :insufficient
+            "perp:stale" :stale
+            "perp:rejected" :rejected}
            (setup-readiness/history-status-by-instrument readiness)))))
 
 (deftest warning-display-message-describes-api-v2-return-history-test

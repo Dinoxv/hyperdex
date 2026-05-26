@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.api-v2.discovery
-  (:require [hyperopen.portfolio.optimizer.application.history-loader.api-v2.codec :as codec]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2.codec :as codec]))
 
 (defn- normalize-history-coverage
   [history]
@@ -51,11 +52,59 @@
      :warnings (codec/normalize-warnings (:warnings body))
      :error (:error body)}))
 
+(defn- strip-market-prefix
+  [value]
+  (let [text (codec/non-blank-text value)]
+    (cond
+      (nil? text)
+      nil
+
+      (str/starts-with? text "perp:")
+      (subs text 5)
+
+      (str/starts-with? text "hip3:")
+      (subs text 5)
+
+      :else
+      text)))
+
+(defn- namespaced-perp-parts
+  [value]
+  (let [text (strip-market-prefix value)]
+    (when (and text
+               (str/includes? text ":")
+               (not (str/includes? text "/")))
+      (let [[dex base] (str/split text #":" 2)
+            dex* (codec/non-blank-text dex)
+            base* (codec/non-blank-text base)]
+        (when (and dex* base*)
+          {:dex dex*
+           :base base*})))))
+
+(defn- hip3-alias-key
+  [local-market]
+  (let [parts (or (namespaced-perp-parts (:coin local-market))
+                  (namespaced-perp-parts (:instrument-id local-market))
+                  (namespaced-perp-parts (:key local-market)))
+        dex (or (codec/non-blank-text (:dex local-market))
+                (:dex parts))
+        base (or (codec/non-blank-text (:base local-market))
+                 (:base parts))]
+    (when (and dex base)
+      (str "hip3:" dex ":" base))))
+
+(defn- discovery-local-id-candidates
+  [local-market]
+  (vec (distinct
+        (keep codec/non-blank-text
+              [(:key local-market)
+               (:instrument-id local-market)
+               (hip3-alias-key local-market)]))))
+
 (defn with-discovery-metadata
   [local-market discovery]
-  (let [local-id (codec/non-blank-text (or (:key local-market)
-                                           (:instrument-id local-market)))
-        backend-id (get-in discovery [:backend-id-by-local-id local-id])
+  (let [backend-id (some #(get-in discovery [:backend-id-by-local-id %])
+                         (discovery-local-id-candidates local-market))
         instrument (get-in discovery [:instruments-by-backend-id backend-id])
         history (:history instrument)]
     (cond-> local-market

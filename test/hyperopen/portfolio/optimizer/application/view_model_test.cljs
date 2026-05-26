@@ -282,7 +282,9 @@
             {:status :succeeded
              :request-signature {:universe [btc-instrument]}}
             {"perp:BTC" :insufficient}
-            btc-instrument)))))
+            btc-instrument)))
+    (is (= "stale" (view-model/selected-history-label {} {:request {:universe [btc-instrument]}} {:status :succeeded :request-signature {:universe [btc-instrument]}} {"perp:BTC" :stale} btc-instrument)))
+    (is (= "rejected" (view-model/selected-history-label {} {:blocking-warnings [{:code :validation-failed :instrument-id "perp:BTC"}]} {:status :succeeded :request-signature {:universe [btc-instrument]}} {"perp:BTC" :rejected} btc-instrument)))))
 
 (deftest selected-history-label-projects-api-v2-return-history-warning-state-test
   (is (= "missing"
