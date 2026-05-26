@@ -1,0 +1,365 @@
+(ns hyperopen.portfolio.optimizer.application.history-loader.api-v2.alignment
+  (:require [hyperopen.portfolio.optimizer.application.history-loader.api-v2.codec :as codec]
+            [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
+            [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
+
+(def default-min-observations
+  2)
+
+(defn- usable-series?
+  [series]
+  (and (map? series)
+       (not (contains? #{:missing :rejected}
+                       (:lineage-kind series)))
+       (seq (:points series))))
+
+(defn- missing-series-warning
+  [instrument series]
+  (let [local-id (instruments/normalize-instrument-id instrument)
+        series-warning (first (:warnings series))]
+    (or series-warning
+        {:code (if (= :rejected (:lineage-kind series))
+                 :validation-failed
+                 :missing-candle-history)
+         :instrument-id local-id
+         :market-type (instruments/market-type instrument)})))
+
+(defn- funding-summary
+  [instrument series]
+  (let [funding (:funding series)
+        status (:status funding)
+        carry (or (:annualized-carry funding) 0)
+        perp? (instruments/perp-instrument? instrument)]
+    (case status
+      :available
+      {:source :history-api-v2
+       :annualized-carry carry
+       :status :available}
+
+      :not-applicable
+      {:source :not-applicable
+       :annualized-carry 0
+       :status :not-applicable}
+
+      (:missing :rejected)
+      (if perp?
+        {:source :missing-market-funding-history
+         :annualized-carry 0
+         :status status}
+        {:source :not-applicable
+         :annualized-carry 0
+         :status :not-applicable
+         :diagnostic-status status})
+
+      (if perp?
+        {:source :missing-market-funding-history
+         :annualized-carry 0
+         :status :missing}
+        {:source :not-applicable
+         :annualized-carry 0
+         :status :not-applicable}))))
+
+(defn- funding-warning
+  [instrument series]
+  (when (and (instruments/perp-instrument? instrument)
+             (= :missing (get-in series [:funding :status])))
+    {:code :funding-history-missing
+     :instrument-id (instruments/normalize-instrument-id instrument)}))
+
+(defn- prices-for-calendar
+  [points calendar]
+  (let [by-time (calendar/row-by-time points)]
+    (mapv #(get by-time %) calendar)))
+
+(defn- point-return-map
+  [series]
+  (into {}
+        (keep (fn [{:keys [time-ms return]}]
+                (when (and (number? time-ms)
+                           (codec/finite-number? return))
+                  [time-ms return])))
+        (:points series)))
+
+(defn- point-level-return-calendar
+  [series-by-local-id calendar]
+  (let [return-maps (map point-return-map (vals series-by-local-id))]
+    (->> calendar
+         (filter (fn [time-ms]
+                   (every? #(codec/finite-number? (get % time-ms)) return-maps)))
+         vec)))
+
+(defn- returns-from-point-level
+  [series-by-local-id return-calendar]
+  (into {}
+        (map (fn [[local-id series]]
+               (let [returns (point-return-map series)]
+                 [local-id (mapv #(get returns %) return-calendar)])))
+        series-by-local-id))
+
+(defn- point-return-count
+  [series]
+  (count (point-return-map series)))
+
+(def ^:private api-v2-hard-warning-codes
+  #{:identity-ambiguous
+    :instrument-kind-mismatch
+    :proxy-mapping-unapproved
+    :proxy-validation-failed
+    :validation-failed})
+
+(def ^:private api-v2-display-data-warning-codes
+  #{:missing-candle-history
+    :insufficient-candle-history})
+
+(defn- aligned-return-entry
+  [api-v2-history local-id]
+  (get-in api-v2-history [:aligned-returns-by-instrument local-id]))
+
+(defn- aligned-return-values
+  [api-v2-history local-id]
+  (vec (:returns (aligned-return-entry api-v2-history local-id))))
+
+(defn- usable-aligned-returns?
+  [api-v2-history local-id min-return-observations]
+  (let [return-calendar (vec (:return-calendar api-v2-history))
+        returns (aligned-return-values api-v2-history local-id)]
+    (and (seq return-calendar)
+         (= (count return-calendar) (count returns))
+         (>= (count returns) min-return-observations)
+         (every? codec/finite-number? returns))))
+
+(defn- all-selected-aligned-returns-usable?
+  [api-v2-history local-ids min-return-observations]
+  (and (seq local-ids)
+       (every? #(usable-aligned-returns?
+                 api-v2-history
+                 %
+                 min-return-observations)
+               local-ids)))
+
+(defn- api-v2-blocking-warning?
+  [warning]
+  (contains? api-v2-hard-warning-codes (:code warning)))
+
+(defn- display-data-warning?
+  [warning]
+  (contains? api-v2-display-data-warning-codes (:code warning)))
+
+(defn- warning-id-map
+  [rows]
+  (into {}
+        (mapcat (fn [{:keys [instrument-id backend-id]}]
+                  (cond-> [[instrument-id instrument-id]]
+                    backend-id
+                    (conj [backend-id instrument-id]))))
+        rows))
+
+(defn- canonical-warning
+  [id-map warning]
+  (let [warning-id (:instrument-id warning)]
+    (cond-> warning
+      (contains? id-map warning-id)
+      (assoc :instrument-id (get id-map warning-id)))))
+
+(defn- warning-local-id
+  [id-map warning]
+  (or (get id-map (:instrument-id warning))
+      (:instrument-id warning)))
+
+(defn- return-history-warning
+  [instrument api-v2-history min-return-observations]
+  (let [local-id (instruments/normalize-instrument-id instrument)
+        returns (aligned-return-values api-v2-history local-id)
+        observations (count (filter codec/finite-number? returns))
+        missing? (empty? returns)]
+    (cond-> {:code (if missing?
+                     :missing-return-history
+                     :insufficient-return-history)
+             :instrument-id local-id
+             :observations observations
+             :required min-return-observations
+             :market-type (instruments/market-type instrument)}
+      missing?
+      (dissoc :observations :required))))
+
+(defn align-api-v2-history-inputs
+  [{:keys [universe
+           api-v2-history
+           as-of-ms
+           stale-after-ms
+           min-observations]}]
+  (let [min-observations* (or min-observations default-min-observations)
+        min-return-observations (max 1 (dec min-observations*))
+        series-by-instrument (:series-by-instrument api-v2-history)
+        rows (mapv (fn [instrument]
+                     (let [local-id (instruments/normalize-instrument-id instrument)
+                           backend-id (codec/non-blank-text
+                                       (:optimizer-history/instrument-id instrument))]
+                       {:instrument instrument
+                        :instrument-id local-id
+                        :backend-id backend-id
+                        :series (get series-by-instrument local-id)}))
+                   (or universe []))
+        id-map (warning-id-map rows)
+        api-warnings (mapv #(canonical-warning id-map %)
+                           (concat (:warnings api-v2-history)
+                                   (mapcat (fn [{:keys [series]}]
+                                             (:warnings series))
+                                           rows)))
+        hard-warning-by-local-id (into {}
+                                       (keep (fn [warning]
+                                               (when (api-v2-blocking-warning? warning)
+                                                 [(warning-local-id id-map warning)
+                                                  warning])))
+                                       api-warnings)
+        base-candidates (filterv (fn [{:keys [instrument-id backend-id series]}]
+                                   (and instrument-id
+                                        (or backend-id series)
+                                        (not (contains? hard-warning-by-local-id
+                                                        instrument-id))
+                                        (not= :rejected (:lineage-kind series))))
+                                 rows)
+        use-aligned? (all-selected-aligned-returns-usable?
+                      api-v2-history
+                      (mapv :instrument-id base-candidates)
+                      min-return-observations)
+        prepared (mapv (fn [{:keys [instrument instrument-id backend-id series]
+                             :as row}]
+                         (let [hard-warning (get hard-warning-by-local-id
+                                                 instrument-id)]
+                           (cond
+                             (or (not instrument-id)
+                                 (and (not backend-id)
+                                      (nil? series)))
+                             (assoc row
+                                    :excluded? true
+                                    :warning {:code :identity-ambiguous
+                                              :instrument-id instrument-id
+                                              :market-type (instruments/market-type
+                                                            instrument)})
+
+                             hard-warning
+                             (assoc row
+                                    :excluded? true
+                                    :warning hard-warning)
+
+                             (= :rejected (:lineage-kind series))
+                             (assoc row
+                                    :excluded? true
+                                    :warning (missing-series-warning instrument
+                                                                    series))
+
+                             use-aligned?
+                             (assoc row :excluded? false)
+
+                             (not (usable-series? series))
+                             (assoc row
+                                    :excluded? true
+                                    :warning (return-history-warning
+                                              instrument
+                                              api-v2-history
+                                              min-return-observations))
+
+                             (< (point-return-count series)
+                                min-return-observations)
+                             (assoc row
+                                    :excluded? true
+                                    :warning {:code :insufficient-return-history
+                                              :instrument-id instrument-id
+                                              :observations (point-return-count
+                                                             series)
+                                              :required min-return-observations
+                                              :market-type (instruments/market-type
+                                                            instrument)})
+
+                             :else
+                             (assoc row :excluded? false))))
+                       rows)
+        eligible (filterv (complement :excluded?) prepared)
+        eligible-local-ids (mapv :instrument-id eligible)
+        series-by-local-id (into {}
+                                 (map (fn [{:keys [instrument-id series]}]
+                                        [instrument-id series]))
+                                 eligible)
+        effective-calendar (if (seq (:common-calendar api-v2-history))
+                             (vec (:common-calendar api-v2-history))
+                             (if use-aligned?
+                               (vec (:return-calendar api-v2-history))
+                               (calendar/common-calendar (map :points
+                                                             (vals series-by-local-id)))))
+        effective-return-calendar (if use-aligned?
+                                    (vec (:return-calendar api-v2-history))
+                                    (point-level-return-calendar series-by-local-id
+                                                                 effective-calendar))
+        return-series-by-instrument (if use-aligned?
+                                      (into {}
+                                            (map (fn [local-id]
+                                                   [local-id
+                                                    (get-in api-v2-history
+                                                            [:aligned-returns-by-instrument
+                                                             local-id
+                                                             :returns])]))
+                                            eligible-local-ids)
+                                      (returns-from-point-level series-by-local-id
+                                                                effective-return-calendar))
+        common-gap? (< (count effective-return-calendar)
+                       min-return-observations)
+        history-warning (when (and (seq eligible)
+                                   common-gap?)
+                          {:code :insufficient-common-history
+                           :observations (count effective-return-calendar)
+                           :required min-return-observations})
+        effective-eligible (if common-gap? [] eligible)
+        excluded-instruments (vec (concat (map :instrument (filter :excluded? prepared))
+                                          (when common-gap?
+                                            (map :instrument eligible))))
+        warnings (codec/distinct-warnings
+                  (concat (remove (fn [warning]
+                                    (and (display-data-warning? warning)
+                                         (or use-aligned?
+                                             (some #(= (warning-local-id
+                                                       id-map
+                                                       warning)
+                                                       (:instrument-id %))
+                                                   prepared))))
+                                  api-warnings)
+                          (keep :warning prepared)
+                          (keep (fn [{:keys [instrument series]}]
+                                  (funding-warning instrument series))
+                                eligible)
+                          (when history-warning [history-warning])))
+        price-series-by-instrument (into {}
+                                         (keep (fn [{:keys [instrument-id series]}]
+                                                 (when (seq (:points series))
+                                                   [instrument-id
+                                                    (prices-for-calendar (:points series)
+                                                                         effective-calendar)])))
+                                         effective-eligible)
+        native-history (history-series/native-history-metadata-for-series effective-eligible)
+        funding-by-instrument (into {}
+                                    (map (fn [instrument]
+                                           (let [local-id (instruments/normalize-instrument-id
+                                                           instrument)
+                                                 series (get series-by-instrument local-id)]
+                                             [local-id (funding-summary instrument series)])))
+                                    (or universe []))]
+    {:calendar effective-calendar
+     :return-calendar effective-return-calendar
+     :eligible-instruments (mapv :instrument effective-eligible)
+     :excluded-instruments excluded-instruments
+     :price-series-by-instrument price-series-by-instrument
+     :return-series-by-instrument (select-keys return-series-by-instrument (map :instrument-id effective-eligible))
+     :return-intervals (calendar/return-intervals-for-calendar effective-calendar effective-return-calendar)
+     :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
+     :cadence-by-instrument (:cadence-by-instrument native-history)
+     :expected-return-series-by-instrument (:expected-return-series-by-instrument native-history)
+     :expected-return-intervals-by-instrument (:expected-return-intervals-by-instrument native-history)
+     :risk-estimation (:risk-estimation native-history)
+     :funding-by-instrument funding-by-instrument
+     :warnings warnings
+     :freshness (calendar/freshness effective-calendar as-of-ms stale-after-ms)
+     :alignment-source {:kind (if use-aligned? :api-v2-aligned-returns :api-v2-point-returns)
+                        :status (:status api-v2-history)
+                        :dataset-version (:dataset-version api-v2-history)
+                        :observations (count effective-calendar)}}))

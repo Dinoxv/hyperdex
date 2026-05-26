@@ -1,9 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.alignment
-  (:require [clojure.set :as set]
-            [hyperopen.portfolio.metrics.history :as metrics-history]
-            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]
+  (:require [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
-            [hyperopen.portfolio.optimizer.application.history-loader.normalization :as normalization]))
+            [hyperopen.portfolio.optimizer.application.history-loader.normalization :as normalization]
+            [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
 
 (def default-min-observations
   2)
@@ -14,34 +13,19 @@
 (def ^:private common-vault-window-preference
   [:one-year :six-month :three-month :month :week :day :all-time])
 
-(defn- row-by-time
-  [rows]
-  (into {}
-        (map (juxt :time-ms identity))
-        rows))
-
-(defn- common-calendar
-  [histories]
-  (let [sets (map #(set (map :time-ms %)) histories)]
-    (if (seq sets)
-      (->> (apply set/intersection sets)
-           sort
-           vec)
-      [])))
-
 (defn- day-aligned-eligible
   [eligible]
   (mapv #(update % :history normalization/daily-price-history) eligible))
 
 (defn- effective-history-alignment
   [eligible min-observations]
-  (let [exact-calendar (common-calendar (map :history eligible))]
+  (let [exact-calendar (calendar/common-calendar (map :history eligible))]
     (if (>= (count exact-calendar) min-observations)
       {:calendar exact-calendar
        :eligible eligible
        :observations (count exact-calendar)}
       (let [daily-eligible (day-aligned-eligible eligible)
-            daily-calendar (common-calendar (map :history daily-eligible))
+            daily-calendar (calendar/common-calendar (map :history daily-eligible))
             daily-observations (count daily-calendar)]
         (if (>= daily-observations min-observations)
           {:calendar daily-calendar
@@ -140,7 +124,7 @@
 
 (defn- prices-for-calendar
   [history calendar]
-  (let [by-time (row-by-time history)]
+  (let [by-time (calendar/row-by-time history)]
     (mapv (fn [time-ms]
             (get by-time time-ms))
           calendar)))
@@ -152,17 +136,6 @@
                (- (/ (:close current)
                      (:close previous))
                   1)))))
-
-(defn- return-intervals
-  [calendar]
-  (mapv (fn [[start-ms end-ms]]
-          (let [dt-ms (- end-ms start-ms)
-                dt-days (/ dt-ms metrics-history/day-ms)]
-            {:start-ms start-ms
-             :end-ms end-ms
-             :dt-days dt-days
-             :dt-years (/ dt-days 365.2425)}))
-        (partition 2 1 calendar)))
 
 (defn- funding-summary
   [instrument funding-history-by-coin funding-periods-per-year]
@@ -188,24 +161,6 @@
   (if (seq expected-return-history)
     (vec expected-return-history)
     history))
-
-(defn- freshness
-  [calendar as-of-ms stale-after-ms]
-  (let [latest-common-ms (last calendar)
-        oldest-common-ms (first calendar)
-        age-ms (when (and (number? as-of-ms)
-                          (number? latest-common-ms))
-                 (- as-of-ms latest-common-ms))
-        stale? (if (number? latest-common-ms)
-                 (and (number? stale-after-ms)
-                      (number? age-ms)
-                      (> age-ms stale-after-ms))
-                 true)]
-    {:as-of-ms as-of-ms
-     :latest-common-ms latest-common-ms
-     :oldest-common-ms oldest-common-ms
-     :age-ms age-ms
-     :stale? (boolean stale?)}))
 
 (defn align-history-inputs
   [{:keys [universe
@@ -355,7 +310,7 @@
      :excluded-instruments excluded-instruments
      :price-series-by-instrument price-series-by-instrument
      :return-series-by-instrument return-series-by-instrument
-     :return-intervals (return-intervals effective-calendar)
+     :return-intervals (calendar/return-intervals effective-calendar)
      :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
      :cadence-by-instrument (:cadence-by-instrument native-history)
      :expected-return-series-by-instrument
@@ -365,5 +320,5 @@
      :risk-estimation (:risk-estimation native-history)
      :funding-by-instrument funding-by-instrument
      :warnings warnings
-     :freshness (freshness effective-calendar as-of-ms stale-after-ms)
+     :freshness (calendar/freshness effective-calendar as-of-ms stale-after-ms)
      :alignment-source (:alignment-source alignment)}))
