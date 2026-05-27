@@ -257,10 +257,12 @@
                         (assoc-in contracts/last-successful-run-path
                                   (solved-run-for-state state))
                         (assoc-in dirty-path true))
-        request-signature (-> (setup-readiness/build-readiness stale-state)
-                              :request
-                              action-common/build-request-signature)
+        request (-> (setup-readiness/build-readiness stale-state)
+                    :request)
+        request-signature (action-common/build-request-signature request)
+        input-signature (contracts/optimizer-input-signature request)
         expected-auto-state {:request-signature request-signature
+                             :input-signature input-signature
                              :scenario-id "draft-current"}]
     (is (= [[:effects/save
              contracts/ui-stale-auto-recompute-path
@@ -274,6 +276,14 @@
                       contracts/ui-stale-auto-recompute-path
                       expected-auto-state)))
         "The render hook may fire repeatedly, so a stale signature is requested at most once.")
+    (is (= []
+           (actions/auto-recompute-stale-portfolio-optimizer-scenario
+            (-> stale-state
+                (assoc-in contracts/ui-stale-auto-recompute-path
+                          expected-auto-state)
+                (assoc-in [:portfolio :optimizer :runtime :as-of-ms]
+                          9000))))
+        "Render-time request metadata must not defeat the one-shot auto recompute guard.")
     (is (= []
            (actions/auto-recompute-stale-portfolio-optimizer-scenario
             (assoc-in stale-state

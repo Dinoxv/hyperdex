@@ -113,5 +113,6 @@
           :frontier-overlay-mode :standalone
           :constrain-frontier? false
           :stale-auto-recompute {:request-signature nil
+                                 :input-signature nil
                                  :scenario-id nil}}
          (defaults/default-optimizer-ui-state))))

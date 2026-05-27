@@ -74,3 +74,30 @@
         "The completed worker run should remain current when its own request signature matches the retained solved result.")
     (is (false? (run-identity/stale-run? ctx))
         "The detail route should not block a just-completed solved run because live inputs refreshed after completion.")))
+
+(deftest completed-run-stays-current-after-rebalance-snapshot-enriches-last-run-test
+  (let [run-request (request {})
+        request-signature (run-identity/build-request-signature run-request)
+        enriched-last-run {:request-signature
+                           (assoc-in request-signature
+                                     [:request
+                                      :execution-assumptions
+                                      :cost-contexts-by-id
+                                      "perp:BTC"]
+                                     {:source :snapshot
+                                      :best-bid {:px "100" :sz "1"}
+                                      :best-ask {:px "101" :sz "2"}
+                                      :stale? false})
+                           :result {:status :solved}}
+        render-request (assoc-in run-request
+                                 [:current-portfolio :capital :nav-usdc]
+                                 2000)
+        ctx {:draft {:metadata {:dirty? false}}
+             :readiness {:request render-request}
+             :run-state {:status :succeeded
+                         :request-signature request-signature}
+             :running? false
+             :last-successful-run enriched-last-run}]
+    (is (run-identity/current-solved-run? ctx)
+        "Snapshot-enriched rebalance previews must not make a just-completed run stale when live portfolio marks drift.")
+    (is (false? (run-identity/stale-run? ctx)))))

@@ -99,18 +99,23 @@
         request (:request readiness)
         request-signature (when request
                             (action-common/build-request-signature request))
-        last-requested-signature (get-in state
-                                         (conj contracts/ui-stale-auto-recompute-path
-                                               :request-signature))]
+        input-signature (when request
+                          (contracts/optimizer-input-signature request))
+        last-requested-input-signature
+        (get-in state
+                (conj contracts/ui-stale-auto-recompute-path
+                      :input-signature))]
     (if (and request-signature
+             input-signature
              (not (optimizer-running? state))
              (seq (get-in state contracts/draft-universe-path))
              (runnable-black-litterman-draft? state)
              (stale-solved-run? state readiness)
-             (not= request-signature last-requested-signature))
+             (not= input-signature last-requested-input-signature))
       [[:effects/save
         contracts/ui-stale-auto-recompute-path
         {:request-signature request-signature
+         :input-signature input-signature
          :scenario-id (:scenario-id request)}]
        (run-pipeline-effect)]
       [])))
