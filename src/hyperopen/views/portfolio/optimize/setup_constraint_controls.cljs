@@ -75,24 +75,27 @@
   (let [enabled? (some? (:max-turnover constraints))
         tooltip-id "portfolio-optimizer-constraint-max-turnover-input-tooltip"
         help-copy (:max-turnover constraint-help)]
-    [:div {:class ["group" "relative" "grid" "grid-cols-[minmax(0,1fr)_92px]"
-                   "items-center" "gap-2" "border" "border-base-300"
-                   "bg-base-200/20" "px-2" "py-1.5"]}
-     [:span {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+    [:div {:class (cond-> ["group" "relative" "grid"
+                           "grid-cols-[minmax(0,1fr)_auto]" "items-center"
+                           "gap-2" "border" "border-base-300" "bg-base-200/20"
+                           "px-2" "py-1.5"]
+                    (not enabled?) (conj "text-trading-muted"))}
+     [:span {:class ["min-w-0"]}
       [:span {:class ["min-w-0"]}
        (constraint-label "Turnover cap" tooltip-id help-copy)
        [:span {:class ["ml-2" "font-mono" "text-[0.59375rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted"]}
-        (if enabled? "edit" "no cap")]]
+        (if enabled? "edit" "no cap")]]]
+     [:span {:class ["optimizer-turnover-cap-control" "inline-flex" "items-center" "gap-1.5"]}
       (toggle/toggle {:on? enabled?
                       :aria-label "Toggle turnover cap"
                       :data-role "portfolio-optimizer-constraint-max-turnover-toggle"
                       :on-change [[:actions/set-portfolio-optimizer-constraint
                                    :max-turnover
-                                   (if enabled? nil default-turnover-cap)]]})]
+                                   (if enabled? nil default-turnover-cap)]]})
      [:input (cond-> {:type "text"
                       :inputmode "decimal"
-                      :class (cond-> controls/input-class
+                      :class (cond-> (conj controls/input-class "w-[92px]")
                                (not enabled?) (conj "opacity-50" "cursor-not-allowed"))
                       :data-role "portfolio-optimizer-constraint-max-turnover-input"
                       :aria-describedby tooltip-id
@@ -100,7 +103,7 @@
                       :disabled (not enabled?)}
                enabled? (assoc :on {:input [[:actions/set-portfolio-optimizer-constraint
                                              :max-turnover
-                                             [:event.target/value]]]}))]]))
+                                             [:event.target/value]]]}))]]]))
 
 (defn constraints-section
   [draft highlighted-controls]
