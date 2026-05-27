@@ -1,5 +1,9 @@
 (ns hyperopen.views.portfolio.optimize.setup-constraint-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
+  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]
+            [hyperopen.views.ui.toggle :as toggle]))
+
+(def ^:private default-turnover-cap
+  1.0)
 
 (def ^:private constraint-help
   {:long-only? "Restricts target weights to zero or positive values. Turn this off when short or hedged perp exposure is allowed."
@@ -8,7 +12,7 @@
    :net-min "Minimum signed net exposure allowed after optimization. Leave blank when only the maximum net exposure matters."
    :net-max "Maximum signed net exposure allowed after optimization. 1 means the portfolio can be net long up to 100% of capital."
    :dust-usdc "Small rebalance trades below this USDC notional are ignored so the output avoids noisy dust orders."
-   :max-turnover "Maximum total portfolio turnover allowed for the rebalance. 1 means trades can sum to 100% of capital."
+   :max-turnover "Maximum total portfolio turnover allowed for the rebalance. Turn this off when current exposure is too far from the target constraints."
    :rebalance-tolerance "Minimum target-vs-current weight difference before a rebalance row is considered actionable. 0.03 means 3 percentage points."})
 
 (defn- constraint-tooltip
@@ -66,6 +70,38 @@
                              constraint-key
                              [:event.target/value]]]}}]])))
 
+(defn- turnover-cap-row
+  [constraints]
+  (let [enabled? (some? (:max-turnover constraints))
+        tooltip-id "portfolio-optimizer-constraint-max-turnover-input-tooltip"
+        help-copy (:max-turnover constraint-help)]
+    [:div {:class ["group" "relative" "grid" "grid-cols-[minmax(0,1fr)_92px]"
+                   "items-center" "gap-2" "border" "border-base-300"
+                   "bg-base-200/20" "px-2" "py-1.5"]}
+     [:span {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
+      [:span {:class ["min-w-0"]}
+       (constraint-label "Turnover cap" tooltip-id help-copy)
+       [:span {:class ["ml-2" "font-mono" "text-[0.59375rem]" "uppercase"
+                       "tracking-[0.08em]" "text-trading-muted"]}
+        (if enabled? "edit" "no cap")]]
+      (toggle/toggle {:on? enabled?
+                      :aria-label "Toggle turnover cap"
+                      :data-role "portfolio-optimizer-constraint-max-turnover-toggle"
+                      :on-change [[:actions/set-portfolio-optimizer-constraint
+                                   :max-turnover
+                                   (if enabled? nil default-turnover-cap)]]})]
+     [:input (cond-> {:type "text"
+                      :inputmode "decimal"
+                      :class (cond-> controls/input-class
+                               (not enabled?) (conj "opacity-50" "cursor-not-allowed"))
+                      :data-role "portfolio-optimizer-constraint-max-turnover-input"
+                      :aria-describedby tooltip-id
+                      :value (if enabled? (str (:max-turnover constraints)) "")
+                      :disabled (not enabled?)}
+               enabled? (assoc :on {:input [[:actions/set-portfolio-optimizer-constraint
+                                             :max-turnover
+                                             [:event.target/value]]]}))]]))
+
 (defn constraints-section
   [draft highlighted-controls]
   (let [constraints (:constraints draft)]
@@ -102,8 +138,7 @@
                       "portfolio-optimizer-constraint-net-max-input" false)
       (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
                       "portfolio-optimizer-constraint-dust-usdc-input" false)
-      (constraint-row "Turnover cap" :max-turnover (:max-turnover constraints)
-                      "portfolio-optimizer-constraint-max-turnover-input" false)
+      (turnover-cap-row constraints)
       (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
                       :rebalance-tolerance (:rebalance-tolerance constraints)
                       "portfolio-optimizer-constraint-rebalance-tolerance-input" false)])))

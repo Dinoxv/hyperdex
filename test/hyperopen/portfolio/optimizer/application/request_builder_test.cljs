@@ -245,9 +245,30 @@
     (is (= ["perp:BTC"] (:held-position-locks constraints)))
     (is (= {"perp:BTC" {:max-weight 0.4}}
            (:per-perp-leverage-caps constraints)))
+    (is (= 0.25 (:max-turnover constraints)))
     (is (not (contains? constraints :gross-max)))
     (is (not (contains? constraints :net-min)))
     (is (not (contains? constraints :asset-overrides)))))
+
+(deftest build-engine-request-preserves-disabled-turnover-cap-test
+  (let [draft (-> (defaults/default-draft)
+                  (assoc :id "draft-no-turnover-cap"
+                         :universe [{:instrument-id "perp:BTC"
+                                     :market-type :perp
+                                     :coin "BTC"}])
+                  (assoc-in [:constraints :max-turnover] nil))
+        request (request-builder/build-engine-request
+                 {:draft draft
+                  :current-portfolio {:by-instrument {"perp:BTC" {:weight 1}}}
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" [{:time 1000 :close "100"}
+                                         {:time 2000 :close "110"}]}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms 2500})
+        constraints (:constraints request)]
+    (is (contains? constraints :max-turnover))
+    (is (nil? (:max-turnover constraints)))))
 
 (deftest build-engine-request-treats-empty-allowlist-as-unbounded-test
   (let [draft (assoc (defaults/default-draft)

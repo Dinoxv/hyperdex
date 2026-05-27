@@ -209,3 +209,20 @@
              :current-weights [0.3 -0.1]
              :requires-split-variables? true}]
            (get-in plan [:problems 0 :l1-constraints])))))
+
+(deftest solver-plan-omits-turnover-l1-constraint-when-cap-disabled-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A"}
+                             {:instrument-id "B"}]
+                  :current-weights {"A" 0.3
+                                    "B" -0.1}
+                  :constraints {:long-only? false
+                                :max-turnover nil}})
+        plan (objectives/build-solver-plan
+              {:objective {:kind :minimum-variance}
+               :instrument-ids ["A" "B"]
+               :expected-returns [0.1 0.2]
+               :covariance [[1 0]
+                            [0 1]]
+               :encoded-constraints encoded})]
+    (is (= [] (get-in plan [:problems 0 :l1-constraints])))))

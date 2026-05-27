@@ -367,6 +367,14 @@
           {}
           :long-only?
           true)))
+  (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :max-turnover]
+                                nil]
+                               [[:portfolio :optimizer :draft :metadata :dirty?]
+                                true]]]]
+         (actions/set-portfolio-optimizer-constraint
+          {}
+          :max-turnover
+          nil)))
   (is (= []
          (actions/set-portfolio-optimizer-constraint
           {}

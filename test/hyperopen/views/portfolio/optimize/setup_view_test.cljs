@@ -106,6 +106,14 @@
            (input-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-max-turnover-input"))))
+    (is (= "true"
+           (get-in (node-by-role view-node
+                                 "portfolio-optimizer-constraint-max-turnover-toggle")
+                   [1 :aria-checked])))
+    (is (= [[:actions/set-portfolio-optimizer-constraint :max-turnover nil]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-constraint-max-turnover-toggle"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :rebalance-tolerance
              [:event.target/value]]]
@@ -140,6 +148,23 @@
       (is (not (contains? strings "Manual Capital Base")))
       (is (not (contains? strings "Default Order: Market")))
       (is (not (contains? strings "Fee Mode: Taker"))))))
+
+(deftest portfolio-optimizer-turnover-cap-toggle-disables-cap-input-test
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer {:draft {:constraints {:max-turnover nil}}}}})
+        toggle (node-by-role view-node
+                             "portfolio-optimizer-constraint-max-turnover-toggle")
+        input (node-by-role view-node
+                            "portfolio-optimizer-constraint-max-turnover-input")
+        strings (set (collect-strings view-node))]
+    (is (= "false" (get-in toggle [1 :aria-checked])))
+    (is (= [[:actions/set-portfolio-optimizer-constraint :max-turnover 1.0]]
+           (click-actions toggle)))
+    (is (= true (get-in input [1 :disabled])))
+    (is (= "" (get-in input [1 :value])))
+    (is (nil? (input-actions input)))
+    (is (contains? strings "no cap"))))
 
 (deftest portfolio-optimizer-objective-parameter-inputs-follow-selected-objective-test
   (let [return-role "portfolio-optimizer-objective-target-return-input"

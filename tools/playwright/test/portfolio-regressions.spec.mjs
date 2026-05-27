@@ -1270,6 +1270,39 @@ test("portfolio optimizer setup orders objective before return risk model @regre
     ]);
 });
 
+test("portfolio optimizer setup turnover cap switch disables and restores cap @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio/optimize/new");
+
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
+  const constraintsPanel = page.locator("[data-role='portfolio-optimizer-constraints-panel']");
+  const turnoverToggle = page.locator(
+    "[data-role='portfolio-optimizer-constraint-max-turnover-toggle']"
+  );
+  const turnoverInput = page.locator(
+    "[data-role='portfolio-optimizer-constraint-max-turnover-input']"
+  );
+
+  await constraintsPanel.locator("summary").click();
+  await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
+  await expect(turnoverToggle).toHaveAttribute("role", "switch");
+  await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
+  await expect(turnoverInput).toBeEnabled();
+  await expect(turnoverInput).toHaveValue(/1(?:\.0)?/);
+
+  await turnoverToggle.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(turnoverToggle).toHaveAttribute("aria-checked", "false");
+  await expect(turnoverInput).toBeDisabled();
+  await expect(turnoverInput).toHaveValue("");
+  await expect(constraintsPanel).toContainText("no cap");
+
+  await turnoverToggle.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
+  await expect(turnoverInput).toBeEnabled();
+  await expect(turnoverInput).toHaveValue(/1(?:\.0)?/);
+});
+
 test("portfolio optimizer setup exposes separate model layers @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize/new");
 

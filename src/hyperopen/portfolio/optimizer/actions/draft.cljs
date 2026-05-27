@@ -56,6 +56,9 @@
     :max-turnover
     :rebalance-tolerance})
 
+(def clearable-numeric-constraint-keys
+  #{:max-turnover})
+
 (def boolean-constraint-keys
   #{:long-only?})
 
@@ -407,7 +410,12 @@
 (defn set-portfolio-optimizer-constraint
   [_state constraint-key value]
   (let [constraint-key* (common/normalize-keyword-like constraint-key)
+        clear? (and (nil? value)
+                    (contains? clearable-numeric-constraint-keys constraint-key*))
         value* (cond
+                 clear?
+                 nil
+
                  (contains? numeric-constraint-keys constraint-key*)
                  (common/parse-number-value value)
 
@@ -415,7 +423,7 @@
                  (common/parse-boolean-value value)
 
                  :else nil)]
-    (if (some? value*)
+    (if (or clear? (some? value*))
       (common/save-draft-path-values
        [[(conj contracts/draft-constraints-path constraint-key*) value*]])
       [])))
