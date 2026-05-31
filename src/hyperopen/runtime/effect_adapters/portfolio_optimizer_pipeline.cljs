@@ -13,15 +13,120 @@
   [store run-id step-id attrs]
   (swap! store workflow/update-progress run-id progress/mark-step step-id attrs))
 
+(defn- count-value
+  [value]
+  (if (number? value) value 0))
+
+(defn- percent-value
+  [value]
+  (if (number? value) value 0))
+
+(defn- plural
+  [n singular plural-label]
+  (if (= 1 n) singular plural-label))
+
+(defn- backend-progress-detail
+  [backend]
+  (let [requested-count (count-value (:requested-count backend))
+        usable-count (count-value (:usable-count backend))]
+    (case (:status backend)
+      :started
+      (str "backend API: loading "
+           requested-count
+           " "
+           (plural requested-count "asset" "assets"))
+
+      :failed
+      (str "backend API: failed ("
+           requested-count
+           " "
+           (plural requested-count "asset" "assets")
+           ")")
+
+      :skipped
+      "backend API: 0/0 assets"
+
+      :succeeded
+      (str "backend API: "
+           usable-count
+           "/"
+           requested-count
+           " "
+           (plural requested-count "asset" "assets"))
+
+      "backend API: not used")))
+
+(defn- info-progress-detail
+  [info]
+  (let [completed (count-value (:completed info))
+        total (count-value (:total info))]
+    (str "/info: "
+         completed
+         "/"
+         total
+         " "
+         (plural total "request" "requests"))))
+
+(defn- source-progress-detail
+  [source-state]
+  (str (backend-progress-detail (:backend source-state))
+       ", "
+       (info-progress-detail (:info source-state))))
+
+(defn- source-progress-percent
+  [source-state payload]
+  (let [backend (:backend source-state)
+        info (:info source-state)
+        info-total (count-value (:total info))
+        info-percent (percent-value (:percent info))]
+    (cond
+      (and backend (pos? info-total))
+      (+ 50 (/ info-percent 2))
+
+      (= :started (:status backend))
+      5
+
+      backend
+      50
+
+      (pos? info-total)
+      info-percent
+
+      :else
+      (percent-value (:percent payload)))))
+
+(defn- source-key
+  [source]
+  (case source
+    :backend-api :backend
+    :info-endpoint :info
+    source))
+
+(defn- source-progress-attrs
+  [source-state payload]
+  (let [source (source-key (:source payload))
+        source-state* (if source
+                        (update source-state source merge payload)
+                        source-state)]
+    [source-state*
+     {:status :running
+      :percent (source-progress-percent source-state* payload)
+      :detail (source-progress-detail source-state*)}]))
+
 (defn- fetch-progress-callback
   [store run-id]
-  (fn [{:keys [percent completed total]}]
-    (mark-progress-step! store
-                         run-id
-                         :fetch-returns
-                         {:status :running
-                          :percent percent
-                          :detail (str completed "/" total " requests")})))
+  (let [source-state (atom {})]
+    (fn [{:keys [percent completed total source] :as payload}]
+      (if source
+        (let [[source-state* attrs] (source-progress-attrs @source-state payload)]
+          (reset! source-state source-state*)
+          (mark-progress-step! store run-id :fetch-returns attrs))
+        (mark-progress-step! store
+                             run-id
+                             :fetch-returns
+                             {:status :running
+                              :percent percent
+                              :detail (str completed "/" total " requests")})))))
 
 (defn- wait-for-history-load-idle!
   [store {:keys [poll-ms timeout-ms]

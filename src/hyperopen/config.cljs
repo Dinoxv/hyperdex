@@ -28,7 +28,8 @@
                            :base-url "https://price-history.hyperopen.xyz"
                            :proxy-policy :approved-proxy-allowed
                            :include-aligned-returns? true
-                           :fallback-to-legacy? true}
+                           :fallback-to-legacy? true
+                           :legacy-fallback-request-spacing-ms 200}
    :diagnostics {:timeline-limit 50}
    :messages {:agent-storage-mode-reset "Trading persistence updated. Enable Trading again."
               :agent-protection-mode-reset "Trading session protection updated. Enable Trading again."}})

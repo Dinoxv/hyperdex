@@ -199,6 +199,7 @@
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
@@ -248,6 +249,7 @@
             [hyperopen.portfolio.optimizer.frontier-actions-test]
             [hyperopen.portfolio.optimizer.ids-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test]
+            [hyperopen.portfolio.optimizer.infrastructure.history-client-fallback-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
@@ -262,6 +264,7 @@
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
             [hyperopen.portfolio.optimizer.universe-exclusion-actions-test]
+            [hyperopen.portfolio.optimizer.universe-from-holdings-actions-test]
             [hyperopen.portfolio.optimizer.universe-keyboard-test]
             [hyperopen.portfolio.optimizer.worker-test]
             [hyperopen.portfolio.query-state-test]
@@ -291,6 +294,7 @@
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-progress-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-resave-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test]
@@ -861,6 +865,7 @@
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
+             'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
@@ -910,6 +915,7 @@
              'hyperopen.portfolio.optimizer.frontier-actions-test
              'hyperopen.portfolio.optimizer.ids-test
              'hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test
+             'hyperopen.portfolio.optimizer.infrastructure.history-client-fallback-test
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test
@@ -924,6 +930,7 @@
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
              'hyperopen.portfolio.optimizer.universe-exclusion-actions-test
+             'hyperopen.portfolio.optimizer.universe-from-holdings-actions-test
              'hyperopen.portfolio.optimizer.universe-keyboard-test
              'hyperopen.portfolio.optimizer.worker-test
              'hyperopen.portfolio.query-state-test
@@ -953,6 +960,7 @@
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-progress-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-resave-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test

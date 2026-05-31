@@ -47,7 +47,9 @@
                    (-> (request-history-bundle-raw!
                         env
                         on-progress
-                        (assoc selected-request :universe current-universe))
+                        (assoc selected-request
+                               :universe current-universe
+                               :allow-legacy-fallback? false))
                        (.catch (fn [err]
                                  (js/Promise.resolve
                                   (current-history-error-bundle err))))

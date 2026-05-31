@@ -1,0 +1,69 @@
+(ns hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as api-v2]))
+
+(defn- near?
+  [expected actual]
+  (< (js/Math.abs (- expected actual)) 0.000001))
+
+(deftest align-api-v2-history-uses-legacy-fallback-series-for-api-gaps-test
+  (let [universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id "perp:DOGE"
+                   :market-type :perp
+                   :coin "DOGE"}]
+        api-v2-history
+        (api-v2/normalize-history-bundle
+         {:universe universe}
+         {:contract_version "optimizer-history-api-v2"
+          :request_id "rid-api-plus-legacy"
+          :dataset_version "dv-api-plus-legacy"
+          :status "partial"
+          :series_by_instrument
+          {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                          :lineage_kind "native"
+                          :series_kind "market_price"
+                          :points [{:time_ms 1000
+                                    :close 100
+                                    :return nil}
+                                   {:time_ms 2000
+                                    :close 110
+                                    :return 0.1}]
+                          :funding {:status "available"
+                                    :annualized_carry 0.01}
+                          :warnings []}}
+          :warnings []})
+        aligned (history-loader/align-history-inputs
+                 {:universe universe
+                  :api-v2-history api-v2-history
+                  :candle-history-by-coin
+                  {"DOGE" [{:time 1000 :close "10"}
+                           {:time 2000 :close "12"}]}
+                  :funding-history-by-coin
+                  {"DOGE" [{:time-ms 1000
+                            :funding-rate-raw "0.001"}
+                           {:time-ms 2000
+                            :funding-rate-raw "0.003"}]}
+                  :funding-periods-per-year 1000
+                  :min-observations 2})]
+    (is (= ["perp:BTC" "perp:DOGE"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (= [1000 2000] (:calendar aligned)))
+    (is (near? 0.1
+               (get-in aligned [:return-series-by-instrument "perp:BTC" 0])))
+    (is (near? 0.2
+               (get-in aligned [:return-series-by-instrument "perp:DOGE" 0])))
+    (is (= :api-v2-point-returns
+           (get-in aligned [:alignment-source :kind])))
+    (is (= :history-api-v2
+           (get-in aligned [:funding-by-instrument "perp:BTC" :source])))
+    (is (= :legacy-fallback
+           (get-in aligned [:funding-by-instrument "perp:DOGE" :source])))
+    (is (near? 2
+               (get-in aligned
+                       [:funding-by-instrument "perp:DOGE" :annualized-carry])))
+    (is (= #{:optimizer-history-api-legacy-fallback}
+           (set (map :code (:warnings aligned)))))))

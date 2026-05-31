@@ -70,6 +70,68 @@
      (get-in state contracts/history-discovery-path))
     market))
 
+(def ^:private from-current-universe-cap
+  25)
+
+(def ^:private unusable-history-statuses
+  #{:missing :rejected :unavailable :unsupported :disabled})
+
+(def ^:private unusable-quality-statuses
+  #{:failed :rejected :missing})
+
+(defn- exposure-abs-notional-usdc
+  [exposure]
+  (or (some-> (:abs-notional-usdc exposure)
+              common/parse-number-value
+              js/Math.abs)
+      (some-> (:signed-notional-usdc exposure)
+              common/parse-number-value
+              js/Math.abs)
+      0))
+
+(defn- optimizer-history-status
+  [instrument key]
+  (common/normalize-keyword-like (get instrument key)))
+
+(defn- known-unusable-history?
+  [instrument]
+  (or (contains? unusable-history-statuses
+                 (optimizer-history-status instrument
+                                           :optimizer-history/history-status))
+      (contains? unusable-quality-statuses
+                 (optimizer-history-status instrument
+                                           :optimizer-history/quality-status))))
+
+(defn- known-usable-history?
+  [instrument]
+  (and (:optimizer-history/instrument-id instrument)
+       (not (known-unusable-history? instrument))))
+
+(defn- from-current-candidate
+  [state idx exposure]
+  (when-let [instrument (common/exposure->universe-instrument exposure)]
+    {:idx idx
+     :abs-notional-usdc (exposure-abs-notional-usdc exposure)
+     :instrument (with-history-discovery state instrument)}))
+
+(defn- from-current-sort-key
+  [{:keys [instrument abs-notional-usdc idx]}]
+  [(if (known-usable-history? instrument) 0 1)
+   (- abs-notional-usdc)
+   idx])
+
+(defn- usable-universe-from-current-exposures
+  [state exposures]
+  (->> exposures
+       (map-indexed #(from-current-candidate state %1 %2))
+       (keep identity)
+       (remove #(known-unusable-history? (:instrument %)))
+       (sort-by from-current-sort-key)
+       (map :instrument)
+       common/dedupe-instruments
+       (take from-current-universe-cap)
+       vec))
+
 (defn add-portfolio-optimizer-universe-instrument
   [state market-key]
   (let [market-key* (common/non-blank-text market-key)
@@ -235,9 +297,9 @@
 (defn set-portfolio-optimizer-universe-from-current
   [state]
   (let [snapshot (current-portfolio/current-portfolio-snapshot state)
-        universe (->> (:exposures snapshot)
-                      (keep common/exposure->universe-instrument)
-                      common/dedupe-instruments)]
+        universe (usable-universe-from-current-exposures
+                  state
+                  (:exposures snapshot))]
     (if (seq universe)
       (let [prefetch-state (history-prefetch/cleanup-to-instrument-ids
                             (history-prefetch/prefetch-state state)

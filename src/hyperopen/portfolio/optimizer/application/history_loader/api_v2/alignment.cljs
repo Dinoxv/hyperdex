@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.history-loader.api-v2.alignment
   (:require [hyperopen.portfolio.optimizer.application.history-loader.api-v2.codec :as codec]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2.legacy-fallback :as legacy-fallback]
             [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
             [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
@@ -33,7 +34,9 @@
         perp? (instruments/perp-instrument? instrument)]
     (case status
       :available
-      {:source :history-api-v2
+      {:source (if (= :legacy-fallback (:lineage-kind series))
+                 :legacy-fallback
+                 :history-api-v2)
        :annualized-carry carry
        :status :available}
 
@@ -186,27 +189,59 @@
 (defn align-api-v2-history-inputs
   [{:keys [universe
            api-v2-history
+           candle-history-by-coin
+           funding-history-by-coin
+           vault-details-by-address
            as-of-ms
            stale-after-ms
+           funding-periods-per-year
            min-observations]}]
   (let [min-observations* (or min-observations default-min-observations)
+        funding-periods-per-year* (or funding-periods-per-year
+                                      legacy-fallback/default-funding-periods-per-year)
         min-return-observations (max 1 (dec min-observations*))
         series-by-instrument (:series-by-instrument api-v2-history)
         rows (mapv (fn [instrument]
                      (let [local-id (instruments/normalize-instrument-id instrument)
                            backend-id (codec/non-blank-text
-                                       (:optimizer-history/instrument-id instrument))]
+                                       (:optimizer-history/instrument-id instrument))
+                           api-series (get series-by-instrument local-id)
+                           legacy-series* (legacy-fallback/series
+                                           instrument
+                                           candle-history-by-coin
+                                           funding-history-by-coin
+                                           vault-details-by-address
+                                           funding-periods-per-year*)
+                           legacy-fallback? (and (legacy-fallback/series-fallback-needed?
+                                                  api-series)
+                                                 (usable-series? legacy-series*))
+                           series (if legacy-fallback?
+                                    legacy-series*
+                                    api-series)]
                        {:instrument instrument
                         :instrument-id local-id
                         :backend-id backend-id
-                        :series (get series-by-instrument local-id)}))
+                        :legacy-fallback? legacy-fallback?
+                        :series series}))
                    (or universe []))
         id-map (warning-id-map rows)
-        api-warnings (mapv #(canonical-warning id-map %)
-                           (concat (:warnings api-v2-history)
-                                   (mapcat (fn [{:keys [series]}]
-                                             (:warnings series))
-                                           rows)))
+        fallback-local-ids (set (keep (fn [{:keys [instrument-id
+                                                   legacy-fallback?]}]
+                                        (when legacy-fallback?
+                                          instrument-id))
+                                      rows))
+        api-warnings (->> (concat (:warnings api-v2-history)
+                                  (mapcat (fn [{:keys [series
+                                                       legacy-fallback?]}]
+                                            (when-not legacy-fallback?
+                                              (:warnings series)))
+                                          rows))
+                          (mapv #(canonical-warning id-map %))
+                          (remove #(legacy-fallback/suppress-warning?
+                                    fallback-local-ids
+                                    (warning-local-id id-map %)
+                                    %))
+                          vec)
         hard-warning-by-local-id (into {}
                                        (keep (fn [warning]
                                                (when (api-v2-blocking-warning? warning)
@@ -282,7 +317,9 @@
                                  (map (fn [{:keys [instrument-id series]}]
                                         [instrument-id series]))
                                  eligible)
-        effective-calendar (if (seq (:common-calendar api-v2-history))
+        legacy-fallback-used? (seq fallback-local-ids)
+        effective-calendar (if (and (seq (:common-calendar api-v2-history))
+                                    (not legacy-fallback-used?))
                              (vec (:common-calendar api-v2-history))
                              (if use-aligned?
                                (vec (:return-calendar api-v2-history))
@@ -314,6 +351,11 @@
         excluded-instruments (vec (concat (map :instrument (filter :excluded? prepared))
                                           (when common-gap?
                                             (map :instrument eligible))))
+        legacy-fallback-warnings (keep (fn [{:keys [instrument-id
+                                                    legacy-fallback?]}]
+                                         (when legacy-fallback?
+                                           (legacy-fallback/warning instrument-id)))
+                                       rows)
         warnings (codec/distinct-warnings
                   (concat (remove (fn [warning]
                                     (and (display-data-warning? warning)
@@ -324,6 +366,7 @@
                                                        (:instrument-id %))
                                                    prepared))))
                                   api-warnings)
+                          legacy-fallback-warnings
                           (keep :warning prepared)
                           (keep (fn [{:keys [instrument series]}]
                                   (funding-warning instrument series))
@@ -341,7 +384,7 @@
                                     (map (fn [instrument]
                                            (let [local-id (instruments/normalize-instrument-id
                                                            instrument)
-                                                 series (get series-by-instrument local-id)]
+                                                 series (get series-by-local-id local-id)]
                                              [local-id (funding-summary instrument series)])))
                                     (or universe []))]
     {:calendar effective-calendar

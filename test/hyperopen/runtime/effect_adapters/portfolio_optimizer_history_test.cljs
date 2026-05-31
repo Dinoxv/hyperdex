@@ -147,6 +147,7 @@
                       (mapv (fn [request]
                               (mapv :instrument-id (:universe request)))
                             @calls)))
+               (is (false? (get-in @calls [1 :allow-legacy-fallback?])))
                (is (= #{"perp:BTC"}
                       (set (keys (get-in @store
                                          [:portfolio

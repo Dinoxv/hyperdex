@@ -21,6 +21,7 @@
             :base-url "https://price-history.hyperopen.xyz"
             :proxy-policy :approved-proxy-allowed
             :include-aligned-returns? true
-            :fallback-to-legacy? true}
+            :fallback-to-legacy? true
+            :legacy-fallback-request-spacing-ms 200}
            (:optimizer-history-api cfg)))
     (is (= 50 (get-in cfg [:diagnostics :timeline-limit])))))

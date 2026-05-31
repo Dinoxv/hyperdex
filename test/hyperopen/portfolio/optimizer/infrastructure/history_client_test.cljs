@@ -248,7 +248,7 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
-(deftest request-history-bundle-does-not-fallback-on-api-v2-partial-success-test
+(deftest request-history-bundle-does-not-fallback-on-usable-api-v2-partial-success-test
   (async done
     (let [legacy-called? (atom false)
           deps {:optimizer-history-api {:enabled? true
@@ -264,10 +264,16 @@
                                :status "partial"
                                :series_by_instrument
                                {"perp:BTC" {:instrument_id "hl:perp:BTC"
-                                            :lineage_kind "missing"
-                                            :points []
-                                            :warnings [{:code "missing-candle-history"}]}}
-                               :warnings []})))
+                                            :lineage_kind "native"
+                                            :points [{:time_ms 1000
+                                                      :close 100
+                                                      :return nil}
+                                                     {:time_ms 2000
+                                                      :close 110
+                                                      :return 0.1}]
+                                            :warnings []}}
+                               :warnings [{:code "stale-history"
+                                           :instrument_id "hl:perp:BTC"}]})))
                 :request-id (fn [] "rid-partial")
                 :request-candle-snapshot! (fn [& _]
                                             (reset! legacy-called? true)
@@ -285,13 +291,7 @@
            (fn [bundle]
              (is (false? @legacy-called?))
              (is (= :partial (get-in bundle [:api-v2-history :status])))
-             (is (= :missing-candle-history
-                    (get-in bundle
-                            [:api-v2-history
-                             :series-by-instrument
-                             "perp:BTC"
-                             :warnings
-                             0
-                             :code])))
+             (is (= :stale-history
+                    (get-in bundle [:warnings 0 :code])))
              (done)))
           (.catch (async-support/unexpected-error done))))))
