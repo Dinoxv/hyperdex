@@ -64,6 +64,40 @@
     (is (contains? strings "252 returns · 365 days"))
     (is (some #(str/includes? % "S&P 500 Proxy") strings))))
 
+(deftest results-panel-target-exposure-renders-namespaced-market-icons-test
+  (let [result (assoc solved-result
+                      :instrument-ids ["hl:hip3:xyz:GOLD"
+                                       "hl:hip3:xyz:AAPL"
+                                       "hl:hip3:xyz:SILVER"]
+                      :target-weights [0.25 0.5 0.25]
+                      :current-weights [0.4 0.3 0.3]
+                      :target-weights-by-instrument {"hl:hip3:xyz:GOLD" 0.25
+                                                     "hl:hip3:xyz:AAPL" 0.5
+                                                     "hl:hip3:xyz:SILVER" 0.25}
+                      :current-weights-by-instrument {"hl:hip3:xyz:GOLD" 0.4
+                                                      "hl:hip3:xyz:AAPL" 0.3
+                                                      "hl:hip3:xyz:SILVER" 0.3}
+                      :labels-by-instrument {"hl:hip3:xyz:GOLD" "GOLD"
+                                             "hl:hip3:xyz:AAPL" "AAPL"
+                                             "hl:hip3:xyz:SILVER" "SILVER"})
+        view-node (results-panel/results-panel
+                   {:result result
+                    :computed-at-ms 2600}
+                   {:objective {:kind :maximum-sharpe}}
+                   {:frontier-overlay-mode :standalone})
+        gold-icon (node-by-role view-node
+                                "portfolio-optimizer-target-exposure-asset-icon-img-GOLD")
+        aapl-icon (node-by-role view-node
+                                "portfolio-optimizer-target-exposure-asset-icon-img-AAPL")
+        silver-icon (node-by-role view-node
+                                  "portfolio-optimizer-target-exposure-asset-icon-img-SILVER")]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg"
+           (node-attr gold-icon :src)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
+           (node-attr aapl-icon :src)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:SILVER.svg"
+           (node-attr silver-icon :src)))))
+
 (deftest results-panel-renders-use-my-views-editor-in-right-rail-test
   (let [draft {:universe [{:instrument-id "perp:BTC"
                            :market-type :perp

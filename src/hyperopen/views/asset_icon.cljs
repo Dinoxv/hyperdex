@@ -33,14 +33,27 @@
       (spot-icon-key symbol)
       (some-> base non-blank-text (str "_spot"))))
 
+(def ^:private icon-instrument-prefixes
+  #{"hip3" "hl" "perp" "spot"})
+
+(defn- strip-icon-instrument-prefixes
+  [icon-key]
+  (loop [icon-key* icon-key]
+    (let [[prefix suffix] (str/split icon-key* #":" 2)]
+      (if (and suffix
+               (contains? icon-instrument-prefixes prefix))
+        (recur suffix)
+        icon-key*))))
+
 (defn- normalize-icon-key
   [icon-key]
   (let [icon-key* (non-blank-text icon-key)]
     (when icon-key*
-      (if (and (str/starts-with? icon-key* "k")
-               (not (str/starts-with? icon-key* "km:")))
-        (subs icon-key* 1)
-        icon-key*))))
+      (let [icon-key* (strip-icon-instrument-prefixes icon-key*)]
+        (if (and (str/starts-with? icon-key* "k")
+                 (not (str/starts-with? icon-key* "km:")))
+          (subs icon-key* 1)
+          icon-key*)))))
 
 (def ^:private icon-key-aliases
   {"abcd:USA500" "cash:USA500"

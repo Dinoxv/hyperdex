@@ -24,7 +24,16 @@
     (is (= "ADA" (asset-icon/market-icon-key {:coin "hyna:ADA" :base "ADA"}))))
 
   (testing "retains namespaced keys when no alias is needed"
-    (is (= "xyz:XYZ100" (asset-icon/market-icon-key {:coin "xyz:XYZ100" :base "XYZ100"})))))
+    (is (= "xyz:XYZ100" (asset-icon/market-icon-key {:coin "xyz:XYZ100" :base "XYZ100"}))))
+
+  (testing "normalizes local and backend instrument prefixes before building icon keys"
+    (is (= "BTC" (asset-icon/market-icon-key {:coin "perp:BTC"})))
+    (is (= "BTC" (asset-icon/market-icon-key {:coin "hl:perp:BTC"})))
+    (is (= "xyz:AAPL" (asset-icon/market-icon-key {:coin "perp:xyz:AAPL"})))
+    (is (= "xyz:AAPL" (asset-icon/market-icon-key {:coin "hip3:xyz:AAPL"})))
+    (is (= "xyz:AAPL" (asset-icon/market-icon-key {:coin "hl:hip3:xyz:AAPL"})))
+    (is (= "PURR_spot" (asset-icon/market-icon-key {:coin "spot:PURR/USDC"})))
+    (is (= "PURR_spot" (asset-icon/market-icon-key {:coin "hl:spot:PURR/USDC"})))))
 
 (deftest outcome-market-icon-key-prefers-underlying-asset-test
   (testing "recurring outcome markets use the underlying asset icon instead of the outcome side coin"
@@ -45,6 +54,8 @@
          (asset-icon/market-icon-url {:coin "xyz:COPPER" :base "COPPER"})))
   (is (= "https://app.hyperliquid.xyz/coins/PURR_spot.svg"
          (asset-icon/market-icon-url {:coin "PURR/USDC" :base "PURR"})))
+  (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
+         (asset-icon/market-icon-url {:coin "hl:hip3:xyz:AAPL" :base "AAPL"})))
   (is (= "https://app.hyperliquid.xyz/coins/MEOW_spot.svg"
          (asset-icon/market-icon-url {:coin "@123"
                                       :symbol "MEOW/USDC"

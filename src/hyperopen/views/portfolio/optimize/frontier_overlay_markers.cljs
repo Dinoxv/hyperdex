@@ -89,6 +89,10 @@
                                      "portfolio-optimizer-frontier-vault-code")}
       code]]))
 
+(defn- asset-clip-id
+  [data-role]
+  (str (str/replace data-role #"[^A-Za-z0-9_-]" "-") "-clip"))
+
 (defn- asset-marker
   [data-role x y point color]
   (let [label (overlay-model/overlay-label point)]
@@ -96,22 +100,31 @@
       (vault-marker data-role x y point)
       (let [icon-url (asset-icon/market-icon-url (overlay-model/point-market point))]
         (if (seq icon-url)
-          [:g {:data-role data-role
-               :class "portfolio-frontier-asset-icon-marker"}
-           [:circle {:cx x
-                     :cy y
-                     :r 9
-                     :fill "var(--optimizer-surface)"
-                     :stroke color
-                     :strokeWidth 1
-                     :opacity 0.9}]
-           [:image {:x (- x 7)
-                    :y (- y 7)
-                    :width 14
-                    :height 14
-                    :href icon-url
-                    :preserveAspectRatio "xMidYMid meet"
-                    :aria-hidden true}]]
+          (let [icon-half 7
+                clip-id (asset-clip-id data-role)]
+            [:g {:data-role data-role
+                 :class "portfolio-frontier-asset-icon-marker"}
+             [:defs
+              [:clipPath {:id clip-id
+                          :clipPathUnits "userSpaceOnUse"}
+               [:circle {:cx x
+                         :cy y
+                         :r icon-half}]]]
+             [:circle {:cx x
+                       :cy y
+                       :r 9
+                       :fill "var(--optimizer-surface)"
+                       :stroke color
+                       :strokeWidth 1
+                       :opacity 0.9}]
+             [:image {:x (- x icon-half)
+                      :y (- y icon-half)
+                      :width (* icon-half 2)
+                      :height (* icon-half 2)
+                      :href icon-url
+                      :clip-path (str "url(#" clip-id ")")
+                      :preserveAspectRatio "xMidYMid slice"
+                      :aria-hidden true}]])
           (symbol-marker data-role x y label color))))))
 
 (defn- overlay-hitbox

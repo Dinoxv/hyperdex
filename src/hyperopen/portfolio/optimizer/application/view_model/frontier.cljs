@@ -82,19 +82,19 @@
         label (non-blank-text (:label point))
         [kind raw-coin] (when instrument-id
                           (str/split instrument-id #":" 2))
-        coin (or (non-blank-text raw-coin)
-                 label)
-        base (or (base-symbol coin)
-                 (base-symbol label))
         market-type (case kind
                       "spot" :spot
                       "perp" :perp
-                      nil)]
+                      nil)
+        coin (or (when market-type
+                   (non-blank-text raw-coin))
+                 instrument-id
+                 label)
+        base (or (base-symbol coin)
+                 (base-symbol label))]
     {:key instrument-id
      :coin coin
      :symbol (or (when (= :spot market-type) coin)
-                 (when (and base (not= coin base))
-                   (str base "-USDC"))
                  base)
      :base base
      :market-type market-type}))

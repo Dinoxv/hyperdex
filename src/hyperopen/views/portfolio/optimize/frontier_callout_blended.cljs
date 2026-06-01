@@ -70,7 +70,9 @@
                       "spot" :spot
                       "perp" :perp
                       nil)
-        coin (or (non-blank-text raw-coin)
+        coin (or (when market-type
+                   (non-blank-text raw-coin))
+                 instrument-id*
                  (base-symbol label))
         base (or (base-symbol coin)
                  (base-symbol label))]

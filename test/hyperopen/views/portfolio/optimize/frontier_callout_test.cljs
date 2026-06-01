@@ -106,6 +106,36 @@
     (is (some? vault-diamond))
     (is (nil? first-dot))))
 
+(deftest blended-portfolio-callout-renders-namespaced-market-icons-test
+  (let [callout (frontier-callout/callout
+                 {:bounds {:width 560 :height 340}
+                  :data-role "portfolio-optimizer-frontier-callout-target"
+                  :label "Target"
+                  :variant :blended
+                  :point {:x 120 :y 70}
+                  :rows (frontier-callout/point-rows
+                         {:expected-return 0.146
+                          :volatility 0.12
+                          :sharpe 0.84})
+                  :allocations {:rows [{:label "GOLD"
+                                         :instrument-id "hl:hip3:xyz:GOLD"
+                                         :weight 0.54
+                                         :value "54.0%"}
+                                        {:label "AAPL"
+                                         :instrument-id "hl:hip3:xyz:AAPL"
+                                         :weight 0.46
+                                         :value "46.0%"}]}})
+        gold-symbol (node-by-role
+                     callout
+                     "portfolio-optimizer-frontier-callout-allocation-symbol-0")
+        aapl-symbol (node-by-role
+                     callout
+                     "portfolio-optimizer-frontier-callout-allocation-symbol-1")]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg"
+           (node-attr gold-symbol :href)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
+           (node-attr aapl-symbol :href)))))
+
 (deftest blended-portfolio-callout-compacts-long-allocation-label-test
   (let [callout (frontier-callout/callout
                  {:bounds {:width 560 :height 340}

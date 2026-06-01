@@ -64,6 +64,53 @@
       (sequential? classes) (some #{class-name} classes)
       :else false)))
 
+(deftest frontier-overlays-render-namespaced-market-icons-test
+  (let [result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id "hl:hip3:xyz:GOLD"
+                                     :label "GOLD"
+                                     :target-weight 0.5
+                                     :expected-return 0.2
+                                     :volatility 0.16}]
+                       :contribution [{:instrument-id "hl:hip3:xyz:AAPL"
+                                       :label "AAPL"
+                                       :target-weight 0.5
+                                       :expected-return 0.05
+                                       :volatility 0.08}]})
+        standalone-node (results-panel/results-panel
+                         {:result result
+                          :computed-at-ms 2600}
+                         {:objective {:kind :minimum-variance}}
+                         {:frontier-overlay-mode :standalone})
+        contribution-node (results-panel/results-panel
+                           {:result result
+                            :computed-at-ms 2600}
+                           {:objective {:kind :minimum-variance}}
+                           {:frontier-overlay-mode :contribution})
+        gold-symbol (node-by-role
+                     standalone-node
+                     "portfolio-optimizer-frontier-overlay-symbol-standalone-hl:hip3:xyz:GOLD")
+        aapl-symbol (node-by-role
+                     contribution-node
+                     "portfolio-optimizer-frontier-overlay-symbol-contribution-hl:hip3:xyz:AAPL")
+        gold-image (first (nodes-by-tag gold-symbol :image))
+        aapl-image (first (nodes-by-tag aapl-symbol :image))
+        gold-clip (first (nodes-by-tag gold-symbol :clipPath))
+        gold-clip-circle (first (nodes-by-tag gold-clip :circle))]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg"
+           (node-attr gold-image :href)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
+           (node-attr aapl-image :href)))
+    (is (= "url(#portfolio-optimizer-frontier-overlay-symbol-standalone-hl-hip3-xyz-GOLD-clip)"
+           (node-attr gold-image :clip-path)))
+    (is (= "userSpaceOnUse"
+           (node-attr gold-clip :clipPathUnits)))
+    (is (= 7 (node-attr gold-clip-circle :r)))
+    (is (= (node-attr gold-image :x)
+           (- (node-attr gold-clip-circle :cx) 7)))
+    (is (= (node-attr gold-image :y)
+           (- (node-attr gold-clip-circle :cy) 7)))))
+
 (deftest results-panel-renders-vault-frontier-overlays-with-inline-marker-and-name-test
   (let [vault-address "0x1111111111111111111111111111111111111111"
         vault-id (str "vault:" vault-address)

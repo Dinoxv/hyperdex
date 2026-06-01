@@ -3,10 +3,12 @@ import { dispatch, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 import {
   keyword as optimizerKeyword,
   optimizerPath,
+  optimizerUiPath,
   readOptimizerState,
-  seedOptimizerMarkets,
   seedOptimizerState,
-  seedPatch
+  seedPatch,
+  seedOptimizerMarkets,
+  stringMap
 } from "../support/optimizer_state.mjs";
 
 async function seedRetainedDraftScenario(page) {
@@ -485,6 +487,208 @@ test("portfolio optimizer setup explains rejected solver output @smoke @regressi
     .toHaveAttribute("data-infeasible", "true");
   await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']"))
     .toHaveAttribute("data-infeasible", "true");
+});
+
+test("portfolio optimizer draft results render namespaced market icons on frontier and exposure rows @smoke @regression", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  const draft = {
+    id: "draft-current",
+    name: "Namespaced Icon Draft",
+    universe: [
+      {
+        "instrument-id": "hl:hip3:xyz:GOLD",
+        "market-type": optimizerKeyword("perp"),
+        coin: "hl:hip3:xyz:GOLD",
+        symbol: "GOLD",
+        base: "GOLD"
+      },
+      {
+        "instrument-id": "hl:hip3:xyz:AAPL",
+        "market-type": optimizerKeyword("perp"),
+        coin: "hl:hip3:xyz:AAPL",
+        symbol: "AAPL",
+        base: "AAPL"
+      },
+      {
+        "instrument-id": "hl:hip3:xyz:SILVER",
+        "market-type": optimizerKeyword("perp"),
+        coin: "hl:hip3:xyz:SILVER",
+        symbol: "SILVER",
+        base: "SILVER"
+      }
+    ],
+    objective: { kind: optimizerKeyword("max-sharpe") },
+    "return-model": { kind: optimizerKeyword("historical-mean") },
+    "risk-model": { kind: optimizerKeyword("sample-covariance") },
+    constraints: { "long-only?": true, "max-asset-weight": 1, "gross-max": 1 },
+    metadata: { "dirty?": false }
+  };
+  const result = {
+    status: optimizerKeyword("solved"),
+    "scenario-id": "draft",
+    "instrument-ids": ["hl:hip3:xyz:GOLD", "hl:hip3:xyz:AAPL", "hl:hip3:xyz:SILVER"],
+    "target-weights": [0.25, 0.5, 0.25],
+    "current-weights": [0.4, 0.3, 0.3],
+    "target-weights-by-instrument": stringMap([
+      ["hl:hip3:xyz:GOLD", 0.25],
+      ["hl:hip3:xyz:AAPL", 0.5],
+      ["hl:hip3:xyz:SILVER", 0.25]
+    ]),
+    "current-weights-by-instrument": stringMap([
+      ["hl:hip3:xyz:GOLD", 0.4],
+      ["hl:hip3:xyz:AAPL", 0.3],
+      ["hl:hip3:xyz:SILVER", 0.3]
+    ]),
+    "labels-by-instrument": stringMap([
+      ["hl:hip3:xyz:GOLD", "GOLD"],
+      ["hl:hip3:xyz:AAPL", "AAPL"],
+      ["hl:hip3:xyz:SILVER", "SILVER"]
+    ]),
+    "current-expected-return": -1.0293,
+    "current-volatility": 6.1769,
+    "expected-return": 0.1873,
+    volatility: 0.4921,
+    "return-model": optimizerKeyword("historical-mean"),
+    "risk-model": optimizerKeyword("sample-covariance"),
+    "as-of-ms": 1777046100000,
+    frontier: [
+      {
+        id: 0,
+        "expected-return": 0.16,
+        volatility: 0.42,
+        sharpe: 0.38
+      }
+    ],
+    "frontier-overlays": {
+      standalone: [
+        {
+          "instrument-id": "hl:hip3:xyz:GOLD",
+          label: "GOLD",
+          "target-weight": 0.25,
+          "expected-return": 0.18,
+          volatility: 0.36
+        },
+        {
+          "instrument-id": "hl:hip3:xyz:AAPL",
+          label: "AAPL",
+          "target-weight": 0.5,
+          "expected-return": 0.2,
+          volatility: 0.49
+        }
+      ],
+      contribution: [
+        {
+          "instrument-id": "hl:hip3:xyz:AAPL",
+          label: "AAPL",
+          "target-weight": 0.5,
+          "expected-return": 0.1,
+          volatility: 0.24
+        }
+      ]
+    },
+    "current-performance": {
+      "in-sample-sharpe": -0.16,
+      "shrunk-sharpe": -0.08
+    },
+    performance: {
+      "in-sample-sharpe": 0.38,
+      "shrunk-sharpe": 0.19
+    },
+    diagnostics: {
+      "gross-exposure": 1,
+      "net-exposure": 1,
+      "effective-n": 2.6,
+      turnover: 0.45,
+      "binding-constraints": [],
+      "covariance-conditioning": { status: optimizerKeyword("ok") }
+    },
+    "rebalance-preview": {
+      status: optimizerKeyword("ready"),
+      "capital-usd": 10000,
+      summary: {
+        "ready-count": 3,
+        "blocked-count": 0,
+        "gross-trade-notional-usd": 4500,
+        "estimated-fees-usd": 2.5,
+        "estimated-slippage-usd": 8
+      },
+      rows: []
+    }
+  };
+  const requestSignature = { seed: "namespaced-icon-smoke" };
+  await seedOptimizerState(page, [
+    seedPatch(optimizerPath("draft"), draft),
+    seedPatch(optimizerPath("active-scenario"), {
+      "loaded-id": null,
+      status: optimizerKeyword("computed")
+    }),
+    seedPatch(optimizerPath("last-successful-run"), {
+      "request-signature": requestSignature,
+      "computed-at-ms": 1777046100000,
+      result
+    }),
+    seedPatch(optimizerPath("run-state"), {
+      status: optimizerKeyword("succeeded"),
+      "request-signature": requestSignature
+    }),
+    seedPatch(optimizerPath("scenario-load-state"), {
+      status: optimizerKeyword("loading"),
+      "scenario-id": "draft"
+    }),
+    seedPatch(optimizerUiPath("results-tab"), optimizerKeyword("recommendation"))
+  ]);
+  await dispatch(page, [
+    ":actions/navigate",
+    "/portfolio/optimize/draft",
+    { "replace?": true }
+  ]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 8_000, pollMs: 50 });
+
+  for (const width of [375, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
+      .toBeVisible();
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-icon-img-GOLD']"))
+      .toHaveAttribute("src", "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-icon-img-AAPL']"))
+      .toHaveAttribute("src", "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-icon-img-SILVER']"))
+      .toHaveAttribute("src", "https://app.hyperliquid.xyz/coins/xyz:SILVER.svg");
+    const standaloneGoldMarker = page.locator(
+      "[data-role='portfolio-optimizer-frontier-overlay-symbol-standalone-hl:hip3:xyz:GOLD']"
+    );
+    await expect(standaloneGoldMarker.locator("image"))
+      .toHaveAttribute("href", "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg");
+    await expect(standaloneGoldMarker.locator("image"))
+      .toHaveAttribute(
+        "clip-path",
+        "url(#portfolio-optimizer-frontier-overlay-symbol-standalone-hl-hip3-xyz-GOLD-clip)"
+      );
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await page.locator("[data-role='portfolio-optimizer-frontier-overlay-mode-contribution']").click();
+  for (const width of [375, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    const contributionAaplMarker = page.locator(
+      "[data-role='portfolio-optimizer-frontier-overlay-symbol-contribution-hl:hip3:xyz:AAPL']"
+    );
+    await expect(contributionAaplMarker.locator("image"))
+      .toHaveAttribute("href", "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg");
+    await expect(contributionAaplMarker.locator("image"))
+      .toHaveAttribute(
+        "clip-path",
+        "url(#portfolio-optimizer-frontier-overlay-symbol-contribution-hl-hip3-xyz-AAPL-clip)"
+      );
+  }
 });
 
 test("portfolio optimizer draft allocation add asset selector updates draft and starts recompute @smoke @regression", async ({ page }) => {
