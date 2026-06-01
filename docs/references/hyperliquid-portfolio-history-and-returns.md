@@ -1,7 +1,7 @@
 ---
 owner: api-runtime
 status: canonical
-last_reviewed: 2026-02-26
+last_reviewed: 2026-05-31
 review_cycle_days: 90
 source_of_truth: true
 ---

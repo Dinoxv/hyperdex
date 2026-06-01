@@ -1,89 +1,11 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.actions.draft-options :as draft-options]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
-
-(def objective-models
-  {:minimum-variance {:kind :minimum-variance}
-   :max-sharpe {:kind :max-sharpe}
-   :target-volatility {:kind :target-volatility
-                       :target-volatility 0.2}
-   :target-return {:kind :target-return
-                   :target-return 0.15}})
-
-(def return-models
-  {:historical-mean {:kind :historical-mean}
-   :ew-mean {:kind :ew-mean
-             :alpha 0.015159678336035098}
-   :black-litterman {:kind :black-litterman
-                     :views []}})
-
-(def risk-models
-  {:diagonal-shrink {:kind :diagonal-shrink}
-   :ledoit-wolf {:kind :diagonal-shrink}
-   :ledoit-wolf-dense {:kind :ledoit-wolf-dense}
-   :sample-covariance {:kind :sample-covariance}
-   :mixed-frequency {:kind :mixed-frequency}})
-
-(def setup-presets
-  {:conservative {:objective {:kind :minimum-variance}
-                  :return-model {:kind :historical-mean}}
-   :risk-adjusted {:objective {:kind :max-sharpe}
-                   :return-model {:kind :historical-mean}}
-   :use-my-views {:objective {:kind :max-sharpe}
-                  :return-model {:kind :black-litterman
-                                 :views []}}})
-
-(def objective-menu-options
-  {:minimum-volatility {:objective {:kind :minimum-variance}}
-   :max-sharpe {:objective {:kind :max-sharpe}}
-   :target-volatility {:objective {:kind :target-volatility
-                                   :target-volatility 0.12}}
-   :maximum-return {:objective {:kind :target-return
-                                :target-return 0.3}}
-   :use-my-views {:objective {:kind :max-sharpe}
-                  :return-model-kind :black-litterman}})
-
-(def numeric-constraint-keys
-  #{:max-asset-weight
-    :gross-max
-    :net-min
-    :net-max
-    :dust-usdc
-    :max-turnover
-    :rebalance-tolerance})
-
-(def clearable-numeric-constraint-keys
-  #{:max-turnover})
-
-(def boolean-constraint-keys
-  #{:long-only?})
-
-(def numeric-objective-parameter-keys
-  #{:target-return
-    :target-volatility})
-
-(def numeric-execution-assumption-keys
-  #{:fallback-slippage-bps
-    :manual-capital-usdc})
-
-(def keyword-execution-assumption-keys
-  #{:default-order-type
-    :fee-mode})
-
-(def instrument-filter-keys
-  #{:allowlist
-    :blocklist})
-
-(def numeric-asset-override-keys
-  #{:max-weight
-    :perp-max-weight})
-
-(def boolean-asset-override-keys
-  #{:held-lock?})
 
 (defn- set-draft-model
   [path models value]
@@ -104,7 +26,7 @@
 
 (defn- objective-menu-model
   [value]
-  (get objective-menu-options (common/normalize-keyword-like value)))
+  (get draft-options/objective-menu-options (common/normalize-keyword-like value)))
 
 (defn- black-litterman-view-confidence-level
   [view]
@@ -383,24 +305,24 @@
 (defn set-portfolio-optimizer-objective-kind
   [_state kind]
   (set-draft-model contracts/draft-objective-path
-                   objective-models
+                   draft-options/objective-models
                    kind))
 
 (defn set-portfolio-optimizer-return-model-kind
   [_state kind]
   (set-draft-model contracts/draft-return-model-path
-                   return-models
+                   draft-options/return-models
                    kind))
 
 (defn set-portfolio-optimizer-risk-model-kind
   [_state kind]
   (set-draft-model contracts/draft-risk-model-path
-                   risk-models
+                   draft-options/risk-models
                    kind))
 
 (defn apply-portfolio-optimizer-setup-preset
   [_state preset]
-  (if-let [{:keys [objective return-model]} (get setup-presets
+  (if-let [{:keys [objective return-model]} (get draft-options/setup-presets
                                                  (common/normalize-keyword-like preset))]
     (common/save-draft-path-values
      [[contracts/draft-objective-path objective]
@@ -411,15 +333,16 @@
   [_state constraint-key value]
   (let [constraint-key* (common/normalize-keyword-like constraint-key)
         clear? (and (nil? value)
-                    (contains? clearable-numeric-constraint-keys constraint-key*))
+                    (contains? draft-options/clearable-numeric-constraint-keys
+                               constraint-key*))
         value* (cond
                  clear?
                  nil
 
-                 (contains? numeric-constraint-keys constraint-key*)
+                 (contains? draft-options/numeric-constraint-keys constraint-key*)
                  (common/parse-number-value value)
 
-                 (contains? boolean-constraint-keys constraint-key*)
+                 (contains? draft-options/boolean-constraint-keys constraint-key*)
                  (common/parse-boolean-value value)
 
                  :else nil)]
@@ -431,7 +354,8 @@
 (defn set-portfolio-optimizer-objective-parameter
   [_state parameter-key value]
   (let [parameter-key* (common/normalize-keyword-like parameter-key)
-        value* (when (contains? numeric-objective-parameter-keys parameter-key*)
+        value* (when (contains? draft-options/numeric-objective-parameter-keys
+                                parameter-key*)
                  (common/parse-number-value value))]
     (if (some? value*)
       (common/save-draft-path-values
@@ -447,10 +371,12 @@
                  manual-capital-clear?
                  nil
 
-                 (contains? numeric-execution-assumption-keys assumption-key*)
+                 (contains? draft-options/numeric-execution-assumption-keys
+                            assumption-key*)
                  (common/parse-number-value value)
 
-                 (contains? keyword-execution-assumption-keys assumption-key*)
+                 (contains? draft-options/keyword-execution-assumption-keys
+                            assumption-key*)
                  (common/normalize-keyword-like value)
 
                  :else nil)]
@@ -465,7 +391,7 @@
   (let [filter-key* (common/normalize-keyword-like filter-key)
         instrument-id* (common/non-blank-text instrument-id)
         enabled?* (common/parse-boolean-value enabled?)]
-    (if (and (contains? instrument-filter-keys filter-key*)
+    (if (and (contains? draft-options/instrument-filter-keys filter-key*)
              instrument-id*
              (some? enabled?*))
       (common/save-draft-path-values
@@ -480,9 +406,11 @@
   [state override-key instrument-id value]
   (let [override-key* (common/normalize-keyword-like override-key)
         instrument-id* (common/non-blank-text instrument-id)
-        numeric-value (when (contains? numeric-asset-override-keys override-key*)
+        numeric-value (when (contains? draft-options/numeric-asset-override-keys
+                                       override-key*)
                         (common/parse-number-value value))
-        boolean-value (when (contains? boolean-asset-override-keys override-key*)
+        boolean-value (when (contains? draft-options/boolean-asset-override-keys
+                                       override-key*)
                         (common/parse-boolean-value value))]
     (cond
       (and instrument-id*

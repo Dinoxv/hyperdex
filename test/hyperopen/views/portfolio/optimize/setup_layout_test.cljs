@@ -265,7 +265,7 @@
                             "portfolio-optimizer-constraint-max-asset-weight-input-tooltip")
         long-only (node-by-role
                    view-node
-                   "portfolio-optimizer-constraint-long-only-toggle")
+                   "portfolio-optimizer-constraint-long-only-input")
         long-only-tooltip (node-by-role
                            view-node
                            "portfolio-optimizer-constraint-long-only-tooltip")]

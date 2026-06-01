@@ -245,6 +245,7 @@
             [hyperopen.portfolio.optimizer.domain.risk-test]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
             [hyperopen.portfolio.optimizer.draft-actions-test]
+            [hyperopen.portfolio.optimizer.draft-model-actions-test]
             [hyperopen.portfolio.optimizer.execution-actions-test]
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
@@ -912,6 +913,7 @@
              'hyperopen.portfolio.optimizer.domain.risk-test
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
              'hyperopen.portfolio.optimizer.draft-actions-test
+             'hyperopen.portfolio.optimizer.draft-model-actions-test
              'hyperopen.portfolio.optimizer.execution-actions-test
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test

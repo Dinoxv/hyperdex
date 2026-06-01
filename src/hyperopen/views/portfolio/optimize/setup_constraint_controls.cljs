@@ -123,7 +123,7 @@
       (toggle/toggle {:on? enabled?
                       :aria-label "Toggle long only"
                       :aria-describedby tooltip-id
-                      :data-role "portfolio-optimizer-constraint-long-only-toggle"
+                      :data-role "portfolio-optimizer-constraint-long-only-input"
                       :on-change [[:actions/set-portfolio-optimizer-constraint
                                    :long-only?
                                    (not enabled?)]]})]]))

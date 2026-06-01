@@ -1,7 +1,7 @@
 ---
 owner: product
 status: supporting
-last_reviewed: 2026-03-02
+last_reviewed: 2026-05-31
 review_cycle_days: 90
 source_of_truth: false
 ---
@@ -85,4 +85,3 @@ When a user opens the funding tooltip for a perp asset, they can see:
 3. Existing `ACF Lag 1d/5d/15d` rows remain present and consistent with plotted lags.
 4. Undefined lags render safely without NaN text or runtime errors.
 5. `npm run check`, `npm test`, and `npm run test:websocket` pass.
-

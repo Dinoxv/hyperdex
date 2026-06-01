@@ -61,10 +61,10 @@
              true]]
            (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-constraint-long-only-toggle"))))
+                          "portfolio-optimizer-constraint-long-only-input"))))
     (is (= "false"
            (get-in (node-by-role view-node
-                                 "portfolio-optimizer-constraint-long-only-toggle")
+                                 "portfolio-optimizer-constraint-long-only-input")
                    [1 :aria-checked])))
     (is (= "0.5"
            (get-in (node-by-role view-node

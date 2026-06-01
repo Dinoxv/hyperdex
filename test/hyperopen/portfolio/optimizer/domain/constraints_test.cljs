@@ -88,6 +88,24 @@
     (is (= [-0.8] (:lower-bounds encoded)))
     (is (= [0.8] (:upper-bounds encoded)))))
 
+(deftest signed-default-request-constraints-leave-room-for-short-legs-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp}
+                             {:instrument-id "perp:ETH"
+                              :market-type :perp}
+                             {:instrument-id "perp:SOL"
+                              :market-type :perp}]
+                  :constraints {:long-only? false
+                                :gross-leverage 2.0
+                                :net-exposure {:min 1.0 :max 1.0}
+                                :max-asset-weight 0.5}})]
+    (is (= :ok (:status encoded)))
+    (is (= false (:long-only? encoded)))
+    (is (nil? (:net-target encoded)))
+    (is (= [-0.5 -0.5 -0.5] (:lower-bounds encoded)))
+    (is (= [0.5 0.5 0.5] (:upper-bounds encoded)))))
+
 (deftest encode-constraints-applies-runtime-sparse-cap-tiers-test
   (let [encoded (constraints/encode-constraints
                  {:universe [{:instrument-id "A"}

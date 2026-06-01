@@ -1451,7 +1451,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await sampleCovariance.click();
   await expect(sampleCovariance).toHaveAttribute("aria-pressed", "true");
 
-  const longOnly = page.locator("[data-role='portfolio-optimizer-constraint-long-only-toggle']");
+  const longOnly = page.locator("[data-role='portfolio-optimizer-constraint-long-only-input']");
   await expect(longOnly).toHaveAttribute("aria-checked", "false");
   await longOnly.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
