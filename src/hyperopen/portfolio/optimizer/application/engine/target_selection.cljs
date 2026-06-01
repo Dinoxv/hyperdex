@@ -19,6 +19,18 @@
   (= (count (:instrument-ids problem))
      (count weights)))
 
+(defn- format-number
+  [value]
+  (if (math/finite-number? value)
+    (.toFixed value 4)
+    "N/A"))
+
+(defn- constraint-label
+  [constraint fallback]
+  (if-let [code (:code constraint)]
+    (name code)
+    fallback))
+
 (defn- within-lower?
   [value lower]
   (or (not (math/finite-number? lower))
@@ -29,19 +41,6 @@
   (or (not (math/finite-number? upper))
       (<= value (+ upper solution-tolerance))))
 
-(defn- bounds-satisfied?
-  [problem weights]
-  (let [lower-bounds (:lower-bounds problem)
-        upper-bounds (:upper-bounds problem)]
-    (and (= (count weights) (count lower-bounds) (count upper-bounds))
-         (every? true?
-                 (map (fn [weight lower upper]
-                        (and (within-lower? weight lower)
-                             (within-upper? weight upper)))
-                      weights
-                      lower-bounds
-                      upper-bounds)))))
-
 (defn- linear-constraint-value
   [weights constraint]
   (let [coefficients (:coefficients constraint)]
@@ -50,64 +49,167 @@
                (every? math/finite-number? coefficients))
       (math/dot coefficients weights))))
 
-(defn- equality-satisfied?
-  [weights equality]
-  (let [target (:target equality)
-        value (linear-constraint-value weights equality)]
-    (and (math/finite-number? target)
-         (math/finite-number? value)
-         (<= (js/Math.abs (- value target))
-             solution-tolerance))))
-
-(defn- inequality-satisfied?
-  [weights inequality]
-  (let [value (linear-constraint-value weights inequality)]
-    (and (math/finite-number? value)
-         (within-lower? value (:lower inequality))
-         (within-upper? value (:upper inequality)))))
-
 (defn- abs-sum
   [values]
   (reduce + 0 (map js/Math.abs values)))
 
-(defn- gross-exposure-satisfied?
-  [weights constraint]
-  (within-upper? (abs-sum weights) (:max constraint)))
+(defn- bounds-violations
+  [problem weights]
+  (let [lower-bounds (:lower-bounds problem)
+        upper-bounds (:upper-bounds problem)]
+    (cond
+      (not= (count weights) (count lower-bounds) (count upper-bounds))
+      [{:code :solver-result-bounds-shape-violation
+        :message "Solver result bounds did not match the returned weight count."}]
 
-(defn- turnover-satisfied?
-  [weights constraint]
-  (let [current-weights (:current-weights constraint)]
-    (and (finite-weights? current-weights)
-         (= (count weights) (count current-weights))
-         (within-upper? (abs-sum (map - weights current-weights))
-                        (:max constraint)))))
+      :else
+      (->> (map-indexed (fn [idx [weight lower upper]]
+                          (cond
+                            (not (within-lower? weight lower))
+                            {:code :solver-result-bound-violation
+                             :bound :lower
+                             :instrument-id (get-in problem [:instrument-ids idx])
+                             :index idx
+                             :target lower
+                             :value weight
+                             :message (str "weight " idx " lower bound "
+                                           (format-number lower)
+                                           " but solver returned "
+                                           (format-number weight)
+                                           ".")}
 
-(defn- l1-constraint-satisfied?
+                            (not (within-upper? weight upper))
+                            {:code :solver-result-bound-violation
+                             :bound :upper
+                             :instrument-id (get-in problem [:instrument-ids idx])
+                             :index idx
+                             :target upper
+                             :value weight
+                             :message (str "weight " idx " upper bound "
+                                           (format-number upper)
+                                           " but solver returned "
+                                           (format-number weight)
+                                           ".")}))
+                        (map vector weights lower-bounds upper-bounds))
+           (remove nil?)
+           vec))))
+
+(defn- equality-violations
+  [problem weights]
+  (->> (or (:equalities problem) [])
+       (keep (fn [equality]
+               (let [target (:target equality)
+                     value (linear-constraint-value weights equality)]
+                 (when-not (and (math/finite-number? target)
+                                (math/finite-number? value)
+                                (<= (js/Math.abs (- value target))
+                                    solution-tolerance))
+                   {:code :solver-result-equality-violation
+                    :constraint-code (:code equality)
+                    :target target
+                    :value value
+                    :difference (when (and (math/finite-number? target)
+                                           (math/finite-number? value))
+                                  (- value target))
+                    :message (str (constraint-label equality "equality")
+                                  " expected "
+                                  (format-number target)
+                                  " but solver returned "
+                                  (format-number value)
+                                  ".")}))))
+       vec))
+
+(defn- inequality-violations
+  [problem weights]
+  (->> (or (:inequalities problem) [])
+       (keep (fn [inequality]
+               (let [value (linear-constraint-value weights inequality)
+                     lower (:lower inequality)
+                     upper (:upper inequality)]
+                 (when-not (and (math/finite-number? value)
+                                (within-lower? value lower)
+                                (within-upper? value upper))
+                   {:code :solver-result-inequality-violation
+                    :constraint-code (:code inequality)
+                    :lower lower
+                    :upper upper
+                    :value value
+                    :message (str (constraint-label inequality "inequality")
+                                  " expected between "
+                                  (format-number lower)
+                                  " and "
+                                  (format-number upper)
+                                  " but solver returned "
+                                  (format-number value)
+                                  ".")}))))
+       vec))
+
+(defn- l1-constraint-value
   [weights constraint]
   (case (:code constraint)
-    :gross-exposure (gross-exposure-satisfied? weights constraint)
-    :turnover (turnover-satisfied? weights constraint)
-    false))
+    :gross-exposure (abs-sum weights)
+    :turnover (let [current-weights (:current-weights constraint)]
+                (when (and (finite-weights? current-weights)
+                           (= (count weights) (count current-weights)))
+                  (abs-sum (map - weights current-weights))))
+    nil))
 
-(defn- feasible-solution?
+(defn- l1-constraint-violation-code
+  [constraint]
+  (case (:code constraint)
+    :gross-exposure :solver-result-gross-exposure-violation
+    :turnover :solver-result-turnover-violation
+    :solver-result-l1-constraint-violation))
+
+(defn- l1-violations
   [problem weights]
-  (and (bounds-satisfied? problem weights)
-       (every? (partial equality-satisfied? weights)
-               (or (:equalities problem) []))
-       (every? (partial inequality-satisfied? weights)
-               (or (:inequalities problem) []))
-       (every? (partial l1-constraint-satisfied? weights)
-               (or (:l1-constraints problem) []))))
+  (->> (or (:l1-constraints problem) [])
+       (keep (fn [constraint]
+               (let [value (l1-constraint-value weights constraint)
+                     max-value (:max constraint)]
+                 (when-not (and (math/finite-number? value)
+                                (within-upper? value max-value))
+                   {:code (l1-constraint-violation-code constraint)
+                    :constraint-code (:code constraint)
+                    :max max-value
+                    :value value
+                    :message (str (constraint-label constraint "L1 constraint")
+                                  " limit "
+                                  (format-number max-value)
+                                  " but solver returned "
+                                  (format-number value)
+                                  ".")}))))
+       vec))
 
-(defn- solved?
+(defn- solver-result-violations
   [result]
   (let [problem (:problem result)
         weights (:weights result)]
-    (and (= :solved (:status result))
-         (map? problem)
-         (finite-weights? weights)
-         (expected-weight-count? problem weights)
-         (feasible-solution? problem weights))))
+    (cond
+      (not= :solved (:status result)) []
+      (not (map? problem)) [{:code :solver-result-missing-problem
+                             :message "Solver result did not include the optimization problem metadata."}]
+      (not (finite-weights? weights)) [{:code :solver-result-invalid-weights
+                                        :message "Solver result did not include a finite weight vector."}]
+      (not (expected-weight-count? problem weights))
+      [{:code :solver-result-weight-count-mismatch
+        :expected (count (:instrument-ids problem))
+        :actual (count weights)
+        :message (str "Solver returned "
+                      (count weights)
+                      " weights for "
+                      (count (:instrument-ids problem))
+                      " instruments.")}]
+      :else
+      (vec (concat (bounds-violations problem weights)
+                   (equality-violations problem weights)
+                   (inequality-violations problem weights)
+                   (l1-violations problem weights))))))
+
+(defn- solved?
+  [result]
+  (and (= :solved (:status result))
+       (empty? (solver-result-violations result))))
 
 (defn- portfolio-point
   [expected-returns covariance risk-free-rate idx result]
@@ -128,12 +230,36 @@
      :iterations (:iterations result)
      :elapsed-ms (:elapsed-ms result)}))
 
+(defn- rejected-results
+  [solver-results]
+  (->> solver-results
+       (keep-indexed (fn [idx result]
+                       (when-not (solved? result)
+                         {:index idx
+                          :status (:status result)
+                          :solver (:solver result)
+                          :objective-value (:objective-value result)
+                          :violations (solver-result-violations result)})))
+       vec))
+
 (defn- solver-failure
   [solver-plan solver-results]
-  {:status :infeasible
-   :reason :solver-returned-no-solution
-   :solver {:strategy (:strategy solver-plan)}
-   :solver-results solver-results})
+  (let [rejections (rejected-results solver-results)
+        violations (vec (mapcat :violations rejections))
+        invalid-solution? (seq violations)]
+    {:status :infeasible
+     :reason (if invalid-solution?
+               :solver-returned-invalid-solution
+               :solver-returned-no-solution)
+     :message (if invalid-solution?
+                "The solver reported a solution, but it violated optimizer constraints."
+                "The solver did not return any feasible solution.")
+     :solver {:strategy (:strategy solver-plan)}
+     :details {:solver-result-count (count solver-results)
+               :rejected-result-count (count rejections)
+               :violations violations
+               :rejected-results rejections}
+     :solver-results solver-results}))
 
 (defn solved-points
   [request solver-results expected-returns covariance]

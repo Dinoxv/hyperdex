@@ -5,11 +5,22 @@
 (def ^:private violation-control-keys
   {:sum-upper-below-target #{:max-asset-weight}
    :sum-lower-above-target #{:held-locks}
-   :target-return-above-feasible-maximum #{:target-return}})
+   :target-return-above-feasible-maximum #{:target-return}
+   :solver-result-gross-exposure-violation #{:gross-max}
+   :solver-result-turnover-violation #{:max-turnover}})
+
+(def ^:private violation-constraint-control-keys
+  {:gross-exposure #{:gross-max}
+   :net-exposure #{:net-min :net-max}
+   :turnover #{:max-turnover}})
 
 (def ^:private control-labels
   {:max-asset-weight "Max Asset Weight"
+   :gross-max "Gross Exposure"
    :held-locks "Held Position Locks"
+   :max-turnover "Turnover Cap"
+   :net-max "Net Exposure Max"
+   :net-min "Net Exposure Min"
    :target-return "Target Return"})
 
 (defn infeasible-result
@@ -22,18 +33,38 @@
   [result]
   (let [violations (get-in result [:details :violations])]
     (cond
-      (seq violations) (mapv :code violations)
+      (seq violations) (->> violations
+                            (keep :code)
+                            distinct
+                            vec)
       (:reason result) [(:reason result)]
       :else [])))
 
+(defn- violation-messages
+  [result]
+  (->> (get-in result [:details :violations])
+       (keep :message)
+       (remove str/blank?)
+       distinct
+       vec))
+
+(defn- violation->control-keys
+  [violation]
+  (concat (get violation-control-keys (:code violation))
+          (get violation-constraint-control-keys (:constraint-code violation))))
+
 (defn highlighted-control-keys
   [result]
-  (set (mapcat violation-control-keys (violation-codes result))))
+  (let [violations (get-in result [:details :violations])]
+    (if (seq violations)
+      (set (mapcat violation->control-keys violations))
+      (set (mapcat violation-control-keys (violation-codes result))))))
 
 (defn infeasible-banner
   [result highlighted-controls]
   (when result
     (let [codes (violation-codes result)
+          messages (violation-messages result)
           labels (keep control-labels highlighted-controls)]
       [:section {:class ["rounded-xl"
                          "border"
@@ -49,6 +80,14 @@
         "Infeasible Optimization"]
        [:p {:class ["mt-2" "text-sm"]}
         (str "Reason: " (opt-format/keyword-label (:reason result) "unknown"))]
+       (when-not (str/blank? (:message result))
+         [:p {:class ["mt-2" "text-sm" "text-warning"]}
+          (:message result)])
+       (when (seq messages)
+         (into [:ul {:class ["mt-3" "space-y-1" "text-xs"]}]
+               (map (fn [message]
+                      [:li message])
+                    messages)))
        (when (seq codes)
          (into [:div {:class ["mt-3" "flex" "flex-wrap" "gap-2"]}]
                (map (fn [code]

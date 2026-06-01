@@ -78,6 +78,16 @@
              :target-net 1}]
            (:violations encoded)))))
 
+(deftest encode-constraints-defaults-to-signed-perp-bounds-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp}]
+                  :constraints {:max-asset-weight 0.8}})]
+    (is (= false (:long-only? encoded)))
+    (is (nil? (:net-target encoded)))
+    (is (= [-0.8] (:lower-bounds encoded)))
+    (is (= [0.8] (:upper-bounds encoded)))))
+
 (deftest encode-constraints-applies-runtime-sparse-cap-tiers-test
   (let [encoded (constraints/encode-constraints
                  {:universe [{:instrument-id "A"}

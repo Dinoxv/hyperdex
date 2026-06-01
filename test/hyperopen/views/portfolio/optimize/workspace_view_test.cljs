@@ -339,6 +339,47 @@
                                  "portfolio-optimizer-constraint-max-asset-weight-input")
                    [1 :aria-invalid])))))
 
+(deftest portfolio-optimizer-workspace-renders-solver-rejection-diagnostics-test
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}
+                                                    {:instrument-id "perp:ETH"
+                                                     :market-type :perp
+                                                     :coin "ETH"}]
+                                         :objective {:kind :minimum-variance}
+                                         :constraints {:long-only? true}}
+                                 :run-state {:status :infeasible
+                                             :completed-at-ms 3000
+                                             :result {:status :infeasible
+                                                      :reason :solver-returned-invalid-solution
+                                                      :message "The solver reported a solution, but it violated optimizer constraints."
+                                                      :details
+                                                      {:violations
+                                                       [{:code :solver-result-equality-violation
+                                                         :message "net-exposure expected 1.0000 but solver returned 0.0000."}
+                                                        {:code :solver-result-turnover-violation
+                                                         :message "turnover limit 2.0000 but solver returned 31.3133."}
+                                                        {:code :solver-result-equality-violation
+                                                         :message "net-exposure expected 1.0000 but solver returned 0.0000."}
+                                                        {:code :solver-result-turnover-violation
+                                                         :message "turnover limit 2.0000 but solver returned 31.3133."}]}}}}}})
+        strings (collect-strings view-node)
+        string-set (set strings)
+        string-count (fn [value]
+                       (count (filter #{value} strings)))]
+    (is (some? (node-by-role view-node "portfolio-optimizer-infeasible-banner")))
+    (is (contains? string-set
+                   "The solver reported a solution, but it violated optimizer constraints."))
+    (is (contains? string-set
+                   "net-exposure expected 1.0000 but solver returned 0.0000."))
+    (is (contains? string-set
+                   "turnover limit 2.0000 but solver returned 31.3133."))
+    (is (= 1 (string-count "solver-result-equality-violation")))
+    (is (= 1 (string-count "solver-result-turnover-violation")))))
+
 (deftest portfolio-optimizer-workspace-allows-one-click-run-when-history-is-missing-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}

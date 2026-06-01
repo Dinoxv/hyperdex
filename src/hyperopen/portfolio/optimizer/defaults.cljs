@@ -11,7 +11,7 @@
    :objective {:kind :minimum-variance}
    :return-model {:kind :historical-mean}
    :risk-model {:kind :diagonal-shrink}
-   :constraints {:long-only? true
+   :constraints {:long-only? false
                  :gross-max 1.0
                  :net-min 1.0
                  :net-max 1.0

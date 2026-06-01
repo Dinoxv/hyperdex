@@ -423,7 +423,7 @@
 
 (defn encode-constraints
   [{:keys [universe current-weights constraints history]}]
-  (let [base-constraints (merge {:long-only? true}
+  (let [base-constraints (merge {:long-only? false}
                                 (or constraints {}))
         universe* (normalize-universe (or universe []) base-constraints)
         current-weights* (or current-weights {})

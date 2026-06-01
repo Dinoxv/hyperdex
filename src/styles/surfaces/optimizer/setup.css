@@ -184,9 +184,16 @@
     min-width: 130px;
   }
 
+  .portfolio-optimizer .optimizer-long-only-control {
+    justify-self: end;
+  }
+
   .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-toggle"].hx-toggle {
+    :is(
+      .optimizer-turnover-cap-control,
+      .optimizer-long-only-control
+    )
+    .hx-toggle {
     display: inline-flex;
     align-items: center;
     width: 30px;
@@ -199,15 +206,21 @@
   }
 
   .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-toggle"].hx-toggle.on {
+    :is(
+      .optimizer-turnover-cap-control,
+      .optimizer-long-only-control
+    )
+    .hx-toggle.on {
     border-color: color-mix(in srgb, var(--optimizer-accent) 58%, transparent);
     background-color: color-mix(in srgb, var(--optimizer-accent) 18%, var(--optimizer-bg));
   }
 
   .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-toggle"]
+    :is(
+      .optimizer-turnover-cap-control,
+      .optimizer-long-only-control
+    )
+    .hx-toggle
     .hx-toggle-knob {
     top: 1px;
     left: 1px;
@@ -217,8 +230,11 @@
   }
 
   .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-toggle"].hx-toggle.on
+    :is(
+      .optimizer-turnover-cap-control,
+      .optimizer-long-only-control
+    )
+    .hx-toggle.on
     .hx-toggle-knob {
     background-color: var(--optimizer-accent);
     box-shadow: 0 0 8px color-mix(in srgb, var(--optimizer-accent) 42%, transparent);
@@ -226,14 +242,11 @@
   }
 
   .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-input"] {
-    width: 92px;
-  }
-
-  .portfolio-optimizer
-    .optimizer-turnover-cap-control
-    [data-role="portfolio-optimizer-constraint-max-turnover-toggle"].hx-toggle:focus-visible {
+    :is(
+      .optimizer-turnover-cap-control,
+      .optimizer-long-only-control
+    )
+    .hx-toggle:focus-visible {
     outline: 1px solid color-mix(in srgb, var(--optimizer-accent) 72%, transparent);
     outline-offset: 2px;
   }

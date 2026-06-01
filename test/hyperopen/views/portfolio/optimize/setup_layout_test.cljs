@@ -249,7 +249,7 @@
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
-                                {:draft {:constraints {:long-only? true
+                                {:draft {:constraints {:long-only? false
                                                        :max-asset-weight 0.25
                                                        :gross-max 3
                                                        :net-max 1.5
@@ -265,7 +265,7 @@
                             "portfolio-optimizer-constraint-max-asset-weight-input-tooltip")
         long-only (node-by-role
                    view-node
-                   "portfolio-optimizer-constraint-long-only-input")
+                   "portfolio-optimizer-constraint-long-only-toggle")
         long-only-tooltip (node-by-role
                            view-node
                            "portfolio-optimizer-constraint-long-only-tooltip")]
@@ -274,6 +274,14 @@
     (is (= "tooltip" (get-in max-weight-tooltip [1 :role])))
     (is (= "portfolio-optimizer-constraint-long-only-tooltip"
            (get-in long-only [1 :aria-describedby])))
+    (is (= :button (first long-only)))
+    (is (= "switch" (get-in long-only [1 :role])))
+    (is (= "false" (get-in long-only [1 :aria-checked])))
+    (is (contains? (class-token-set long-only) "hx-toggle"))
+    (is (= [[:actions/set-portfolio-optimizer-constraint
+             :long-only?
+             true]]
+           (click-actions long-only)))
     (is (= "tooltip" (get-in long-only-tooltip [1 :role])))
     (is (contains? strings
                    "Maximum target portfolio weight any single asset can receive. 0.5 means no asset can exceed 50%."))

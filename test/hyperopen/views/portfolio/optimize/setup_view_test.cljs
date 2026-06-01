@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [change-actions click-actions collect-strings input-actions node-by-role]]))
+             :refer [click-actions collect-strings input-actions node-by-role]]))
 
 (defn- portfolio-optimizer-setup-view
   [objective]
@@ -58,14 +58,14 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-execution-assumptions-panel")))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :long-only?
-             :event.target/checked]]
-           (change-actions
+             true]]
+           (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-constraint-long-only-input"))))
-    (is (= true
+                          "portfolio-optimizer-constraint-long-only-toggle"))))
+    (is (= "false"
            (get-in (node-by-role view-node
-                                 "portfolio-optimizer-constraint-long-only-input")
-                   [1 :checked])))
+                                 "portfolio-optimizer-constraint-long-only-toggle")
+                   [1 :aria-checked])))
     (is (= "0.5"
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-constraint-max-asset-weight-input")

@@ -2,8 +2,11 @@ import { expect, test } from "@playwright/test";
 import { dispatch, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 import {
   keyword as optimizerKeyword,
+  optimizerPath,
   readOptimizerState,
-  seedOptimizerMarkets
+  seedOptimizerMarkets,
+  seedOptimizerState,
+  seedPatch
 } from "../support/optimizer_state.mjs";
 
 async function seedRetainedDraftScenario(page) {
@@ -389,6 +392,99 @@ test("portfolio optimizer setup and retained draft detail routes render through 
     performance.getEntriesByType("navigation").length
   );
   expect(navigationEntriesAfterRebalanceClick).toBe(navigationEntriesBeforeRebalanceClick);
+});
+
+test("portfolio optimizer setup explains rejected solver output @smoke @regression", async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await visitRoute(page, "/portfolio/optimize/new", {
+    routeModuleTimeoutMs: 30_000,
+    idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+  });
+
+  await seedOptimizerState(page, [
+    seedPatch(optimizerPath("draft"), {
+      id: "draft-current",
+      universe: [
+        {
+          "instrument-id": "perp:BTC",
+          "market-type": optimizerKeyword("perp"),
+          coin: "BTC",
+          symbol: "BTC-USDC",
+          name: "Bitcoin"
+        },
+        {
+          "instrument-id": "perp:ETH",
+          "market-type": optimizerKeyword("perp"),
+          coin: "ETH",
+          symbol: "ETH-USDC",
+          name: "Ethereum"
+        }
+      ],
+      objective: { kind: optimizerKeyword("minimum-variance") },
+      constraints: {
+        "long-only?": true,
+        "max-asset-weight": 0.5,
+        "gross-max": 1,
+        "net-min": 1,
+        "net-max": 1,
+        "max-turnover": 2
+      }
+    }),
+    seedPatch(optimizerPath("run-state"), {
+      status: optimizerKeyword("infeasible"),
+      "completed-at-ms": 1777046100000,
+      result: {
+        status: optimizerKeyword("infeasible"),
+        reason: optimizerKeyword("solver-returned-invalid-solution"),
+        message: "The solver reported a solution, but it violated optimizer constraints.",
+        details: {
+          violations: [
+            {
+              code: optimizerKeyword("solver-result-equality-violation"),
+              "constraint-code": optimizerKeyword("net-exposure"),
+              message: "net-exposure expected 1.0000 but solver returned 0.0000."
+            },
+            {
+              code: optimizerKeyword("solver-result-turnover-violation"),
+              "constraint-code": optimizerKeyword("turnover"),
+              message: "turnover limit 2.0000 but solver returned 31.3133."
+            },
+            {
+              code: optimizerKeyword("solver-result-equality-violation"),
+              "constraint-code": optimizerKeyword("net-exposure"),
+              message: "net-exposure expected 1.0000 but solver returned 0.0000."
+            },
+            {
+              code: optimizerKeyword("solver-result-turnover-violation"),
+              "constraint-code": optimizerKeyword("turnover"),
+              message: "turnover limit 2.0000 but solver returned 31.3133."
+            }
+          ]
+        }
+      }
+    })
+  ]);
+
+  const banner = page.locator("[data-role='portfolio-optimizer-infeasible-banner']");
+  await expect(banner).toBeVisible();
+  await expect(banner)
+    .toContainText("The solver reported a solution, but it violated optimizer constraints.");
+  await expect(banner)
+    .toContainText("net-exposure expected 1.0000 but solver returned 0.0000.");
+  await expect(banner)
+    .toContainText("turnover limit 2.0000 but solver returned 31.3133.");
+  await expect(banner.locator("span", { hasText: "solver-result-equality-violation" }))
+    .toHaveCount(1);
+  await expect(banner.locator("span", { hasText: "solver-result-turnover-violation" }))
+    .toHaveCount(1);
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-turnover-input']"))
+    .toHaveAttribute("data-infeasible", "true");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']"))
+    .toHaveAttribute("data-infeasible", "true");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']"))
+    .toHaveAttribute("data-infeasible", "true");
 });
 
 test("portfolio optimizer draft allocation add asset selector updates draft and starts recompute @smoke @regression", async ({ page }) => {

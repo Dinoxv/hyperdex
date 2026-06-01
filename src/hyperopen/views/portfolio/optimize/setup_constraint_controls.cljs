@@ -71,7 +71,7 @@
                              [:event.target/value]]]}}]])))
 
 (defn- turnover-cap-row
-  [constraints]
+  [constraints highlighted?]
   (let [enabled? (some? (:max-turnover constraints))
         tooltip-id "portfolio-optimizer-constraint-max-turnover-input-tooltip"
         help-copy (:max-turnover constraint-help)]
@@ -79,6 +79,7 @@
                            "grid-cols-[minmax(0,1fr)_auto]" "items-center"
                            "gap-2" "border" "border-base-300" "bg-base-200/20"
                            "px-2" "py-1.5"]
+                    highlighted? (conj "border-warning/70" "bg-warning/10")
                     (not enabled?) (conj "text-trading-muted"))}
      [:span {:class ["min-w-0"]}
       [:span {:class ["min-w-0"]}
@@ -98,12 +99,34 @@
                       :class (cond-> (conj controls/input-class "w-[92px]")
                                (not enabled?) (conj "opacity-50" "cursor-not-allowed"))
                       :data-role "portfolio-optimizer-constraint-max-turnover-input"
+                      :data-infeasible (when highlighted? "true")
+                      :aria-invalid (when highlighted? "true")
                       :aria-describedby tooltip-id
                       :value (if enabled? (str (:max-turnover constraints)) "")
                       :disabled (not enabled?)}
                enabled? (assoc :on {:input [[:actions/set-portfolio-optimizer-constraint
                                              :max-turnover
                                              [:event.target/value]]]}))]]]))
+
+(defn- long-only-row
+  [constraints]
+  (let [enabled? (true? (:long-only? constraints))
+        tooltip-id "portfolio-optimizer-constraint-long-only-tooltip"]
+    [:div {:class ["group" "relative" "grid" "grid-cols-[minmax(0,1fr)_auto]"
+                   "items-center" "gap-2" "border" "border-base-300"
+                   "bg-base-200/20" "px-2" "py-1.5"]}
+     [:span {:class ["min-w-0"]}
+      (constraint-label "Long Only"
+                        tooltip-id
+                        (:long-only? constraint-help))]
+     [:span {:class ["optimizer-long-only-control" "inline-flex" "items-center"]}
+      (toggle/toggle {:on? enabled?
+                      :aria-label "Toggle long only"
+                      :aria-describedby tooltip-id
+                      :data-role "portfolio-optimizer-constraint-long-only-toggle"
+                      :on-change [[:actions/set-portfolio-optimizer-constraint
+                                   :long-only?
+                                   (not enabled?)]]})]]))
 
 (defn constraints-section
   [draft highlighted-controls]
@@ -112,36 +135,25 @@
      "portfolio-optimizer-constraints-panel"
      (controls/disclosure-heading "04" "Constraints" "mandatory")
      [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
-      [:label {:class ["group" "relative" "flex" "items-center" "justify-between" "gap-3" "border"
-                       "border-base-300" "bg-base-200/20" "p-2"]}
-       [:span {:class ["min-w-0"]}
-        (constraint-label "Long Only"
-                          "portfolio-optimizer-constraint-long-only-tooltip"
-                          (:long-only? constraint-help))]
-       [:input {:type "checkbox"
-                :class ["h-4" "w-4" "accent-warning" "outline-none"
-                        "transition-shadow"
-                        "focus:shadow-[0_0_0_2px_rgba(212,181,88,0.75)]"]
-                :data-role "portfolio-optimizer-constraint-long-only-input"
-                :aria-describedby "portfolio-optimizer-constraint-long-only-tooltip"
-                :checked (true? (:long-only? constraints))
-                :on {:change [[:actions/set-portfolio-optimizer-constraint
-                               :long-only?
-                               :event.target/checked]]}}]]
+      (long-only-row constraints)
       (constraint-row "Per-asset cap" "Max Asset Weight"
                       :max-asset-weight (:max-asset-weight constraints)
                       "portfolio-optimizer-constraint-max-asset-weight-input"
                       (contains? highlighted-controls :max-asset-weight))
       (constraint-row "Gross exposure" "Gross Leverage"
                       :gross-max (:gross-max constraints)
-                      "portfolio-optimizer-constraint-gross-max-input" false)
+                      "portfolio-optimizer-constraint-gross-max-input"
+                      (contains? highlighted-controls :gross-max))
       (constraint-row "Net exposure min" :net-min (:net-min constraints)
-                      "portfolio-optimizer-constraint-net-min-input" false)
+                      "portfolio-optimizer-constraint-net-min-input"
+                      (contains? highlighted-controls :net-min))
       (constraint-row "Net exposure max" :net-max (:net-max constraints)
-                      "portfolio-optimizer-constraint-net-max-input" false)
+                      "portfolio-optimizer-constraint-net-max-input"
+                      (contains? highlighted-controls :net-max))
       (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
                       "portfolio-optimizer-constraint-dust-usdc-input" false)
-      (turnover-cap-row constraints)
+      (turnover-cap-row constraints
+                        (contains? highlighted-controls :max-turnover))
       (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
                       :rebalance-tolerance (:rebalance-tolerance constraints)
                       "portfolio-optimizer-constraint-rebalance-tolerance-input" false)])))
