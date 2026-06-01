@@ -169,6 +169,71 @@
       {:instrument-id instrument-id
        :span (row-span row)})))
 
+(defn- pluralize
+  [count singular plural]
+  (if (= 1 count) singular plural))
+
+(defn- rounded-count
+  [value]
+  (when (opt-format/finite-number? value)
+    (js/Math.round value)))
+
+(defn- history-window-value
+  [history-summary]
+  (let [observations (rounded-count (:return-observations history-summary))
+        return-days (rounded-count (:return-days history-summary))]
+    (cond
+      (and observations return-days)
+      (str (opt-format/format-decimal observations {:maximum-fraction-digits 0})
+           " "
+           (pluralize observations "return" "returns")
+           " · "
+           (opt-format/format-decimal return-days {:maximum-fraction-digits 0})
+           " "
+           (pluralize return-days "day" "days"))
+
+      observations
+      (str (opt-format/format-decimal observations {:maximum-fraction-digits 0})
+           " "
+           (pluralize observations "return" "returns"))
+
+      :else
+      "Loaded history")))
+
+(defn- history-window-status
+  [history-summary]
+  (let [observations (:return-observations history-summary)]
+    (if (and (opt-format/finite-number? observations)
+             (< observations 30))
+      :caution
+      :ok)))
+
+(defn- limiter-reason-copy
+  [reason]
+  (case reason
+    :starts-later "starts later than the rest"
+    :ends-earlier "ends earlier than the rest"
+    :fewest-return-observations "has the fewest usable return observations"
+    "sets the shared return window"))
+
+(defn- history-window-subtext
+  [result history-summary]
+  (let [instrument-id (:limiting-instrument-id history-summary)
+        reason (:limiting-reason history-summary)]
+    (cond
+      instrument-id
+      (str (results-model/instrument-label (:labels-by-instrument result)
+                                           instrument-id)
+           " "
+           (limiter-reason-copy reason)
+           ".")
+
+      (= :source-coverage-unavailable reason)
+      "Limiter unavailable from aligned returns."
+
+      :else
+      "Shared return calendar from aligned optimizer history.")))
+
 (defn- trust-row
   [{:keys [label status value subtext]}]
   (let [{status-label :label status-class :class} (status-token status)]
@@ -205,6 +270,11 @@
                   :status conditioning-status
                   :value (if (= :ok conditioning-status) "Healthy" (opt-format/keyword-label conditioning-status))
                   :subtext "Correlation matrix is checked before weights are accepted."})
+      (trust-row {:label "History Used"
+                  :status (history-window-status (:history-summary result))
+                  :value (history-window-value (:history-summary result))
+                  :subtext (history-window-subtext result
+                                                   (:history-summary result))})
       (trust-row {:label "Diversification"
                   :status :ok
                   :value (str "Effective N · " (opt-format/format-effective-n effective-n universe-size) " of " universe-size)

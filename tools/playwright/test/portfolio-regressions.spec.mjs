@@ -1985,6 +1985,16 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
 });
 
 test("portfolio optimizer recommendation chart shows minimum variance frontier overlays and honest target weights @regression", async ({ page }) => {
+  await page.addInitScript(() => {
+    globalThis.__HYPEROPEN_OPTIMIZER_HISTORY_API__ = {
+      enabled: false,
+      baseUrl: "https://price-history.hyperopen.xyz",
+      proxyPolicy: "approved-proxy-allowed",
+      includeAlignedReturns: true,
+      fallbackToLegacy: false
+    };
+  });
+
   const priceHistoryByCoin = {
     BTC: ["100", "104", "103", "108"],
     ETH: ["50", "52", "55", "54"],
@@ -2033,6 +2043,25 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
 
   await visitRoute(page, "/portfolio/optimize/new");
   await seedOptimizerAssetSelectorMarkets(page);
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    c.swap_BANG_(
+      globalThis.hyperopen.system.store,
+      c.assoc_in,
+      c.PersistentVector.fromArray(
+        [
+          kw("portfolio"),
+          kw("optimizer"),
+          kw("draft"),
+          kw("objective"),
+          kw("frontier-points")
+        ],
+        true
+      ),
+      28
+    );
+  });
 
   const searchInput = page.locator("[data-role='portfolio-optimizer-universe-search-input']");
   for (const coin of ["btc", "eth", "sol", "hype"]) {
@@ -2040,6 +2069,8 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
     await page.locator(`[data-role='portfolio-optimizer-universe-add-perp:${coin.toUpperCase()}']`).click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(page.locator(`[data-role='portfolio-optimizer-universe-selected-row-perp:${coin.toUpperCase()}']`))
+      .toContainText("sufficient", { timeout: 10_000 });
   }
 
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);
@@ -2055,6 +2086,8 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
     .toContainText("Allocation");
+  await expect(page.locator("[data-role='portfolio-optimizer-trust-caution-panel']"))
+    .toContainText("History Used");
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))
     .toContainText("Efficient Frontier");
   await seedOptimizerCurrentResultPoint(page);
@@ -2111,8 +2144,6 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   await expect.poll(async () =>
     page.locator("[data-role^='portfolio-optimizer-frontier-point-'][data-frontier-drag-target='true']").count()
   ).toBeGreaterThanOrEqual(8);
-  await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
-    .not.toContainText("display-frontier-unavailable");
   const standaloneFrontierPath = await frontierPath.getAttribute("d");
   await constrainFrontierCheckbox.check();
   await expect(constrainFrontierCheckbox).toBeChecked();

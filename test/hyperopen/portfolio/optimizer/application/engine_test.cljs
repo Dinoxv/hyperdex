@@ -84,7 +84,7 @@
             :latest-common-ms 300
             :age-ms 700
             :stale? false}
-           (:history-summary result)))
+           (select-keys (:history-summary result) [:return-observations :oldest-common-ms :latest-common-ms :age-ms :stale?])))
     (is (seq (:frontier result)))))
 
 (deftest run-optimization-labels-vault-frontier-overlays-by-human-name-test

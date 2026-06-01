@@ -3,6 +3,7 @@
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2.legacy-fallback :as legacy-fallback]
             [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
+            [hyperopen.portfolio.optimizer.application.history-loader.window :as history-window]
             [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
 
 (def default-min-observations
@@ -379,6 +380,17 @@
                                                     (prices-for-calendar (:points series)
                                                                          effective-calendar)])))
                                          effective-eligible)
+        return-intervals (calendar/return-intervals-for-calendar effective-calendar
+                                                                  effective-return-calendar)
+        source-series-by-instrument (into {}
+                                          (map (fn [{:keys [instrument-id series]}]
+                                                 [instrument-id (:points series)]))
+                                          effective-eligible)
+        history-window (history-window/history-window
+                        {:calendar effective-calendar
+                         :return-calendar effective-return-calendar
+                         :return-intervals return-intervals
+                         :source-series-by-instrument source-series-by-instrument})
         native-history (history-series/native-history-metadata-for-series effective-eligible)
         funding-by-instrument (into {}
                                     (map (fn [instrument]
@@ -393,7 +405,8 @@
      :excluded-instruments excluded-instruments
      :price-series-by-instrument price-series-by-instrument
      :return-series-by-instrument (select-keys return-series-by-instrument (map :instrument-id effective-eligible))
-     :return-intervals (calendar/return-intervals-for-calendar effective-calendar effective-return-calendar)
+     :return-intervals return-intervals
+     :history-window history-window
      :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
      :cadence-by-instrument (:cadence-by-instrument native-history)
      :expected-return-series-by-instrument (:expected-return-series-by-instrument native-history)

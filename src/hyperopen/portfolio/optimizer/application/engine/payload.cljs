@@ -196,11 +196,12 @@
   [request]
   (let [history (:history request)
         freshness (:freshness history)]
-    {:return-observations (count (:return-calendar history))
-     :oldest-common-ms (:oldest-common-ms freshness)
-     :latest-common-ms (:latest-common-ms freshness)
-     :age-ms (:age-ms freshness)
-     :stale? (:stale? freshness)}))
+    (merge (:history-window history)
+           {:return-observations (count (:return-calendar history))
+            :oldest-common-ms (:oldest-common-ms freshness)
+            :latest-common-ms (:latest-common-ms freshness)
+            :age-ms (:age-ms freshness)
+            :stale? (:stale? freshness)})))
 
 (defn- portfolio-allocation?
   [weights]

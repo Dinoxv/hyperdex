@@ -194,6 +194,7 @@
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.engine-history-window-test]
             [hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test]
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
@@ -205,6 +206,7 @@
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
+            [hyperopen.portfolio.optimizer.application.history-window-test]
             [hyperopen.portfolio.optimizer.application.history-workflow-test]
             [hyperopen.portfolio.optimizer.application.instrument-labels-test]
             [hyperopen.portfolio.optimizer.application.orderbook-loader-test]
@@ -862,6 +864,7 @@
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.engine-history-window-test
              'hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
@@ -873,6 +876,7 @@
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
+             'hyperopen.portfolio.optimizer.application.history-window-test
              'hyperopen.portfolio.optimizer.application.history-workflow-test
              'hyperopen.portfolio.optimizer.application.instrument-labels-test
              'hyperopen.portfolio.optimizer.application.orderbook-loader-test

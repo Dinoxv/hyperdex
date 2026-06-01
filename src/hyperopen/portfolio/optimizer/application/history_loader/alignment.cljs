@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.application.history-loader.instruments :as instruments]
             [hyperopen.portfolio.optimizer.application.history-loader.normalization :as normalization]
+            [hyperopen.portfolio.optimizer.application.history-loader.window :as history-window]
             [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
 
 (def default-min-observations
@@ -294,6 +295,16 @@
                                           (map (fn [[instrument-id prices]]
                                                  [instrument-id (return-series prices)]))
                                           price-series-by-instrument)
+        return-intervals (calendar/return-intervals effective-calendar)
+        source-series-by-instrument (into {}
+                                          (map (fn [{:keys [instrument-id history]}]
+                                                 [instrument-id history]))
+                                          effective-eligible)
+        history-window (history-window/history-window
+                        {:calendar effective-calendar
+                         :return-calendar (vec (rest effective-calendar))
+                         :return-intervals return-intervals
+                         :source-series-by-instrument source-series-by-instrument})
         native-history (history-series/native-history-metadata
                         raw-price-series-by-instrument
                         expected-return-rows-by-instrument)
@@ -310,7 +321,8 @@
      :excluded-instruments excluded-instruments
      :price-series-by-instrument price-series-by-instrument
      :return-series-by-instrument return-series-by-instrument
-     :return-intervals (calendar/return-intervals effective-calendar)
+     :return-intervals return-intervals
+     :history-window history-window
      :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
      :cadence-by-instrument (:cadence-by-instrument native-history)
      :expected-return-series-by-instrument

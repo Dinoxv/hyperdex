@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-panel-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
              :refer [click-actions collect-strings node-attr node-by-role solved-result]]))
@@ -42,6 +43,26 @@
     (is (contains? strings "How much to trust this"))
     (is (contains? strings "low-invested-exposure"))
     (is (contains? strings "partially-blocked"))))
+
+(deftest results-panel-renders-history-window-limiter-in-trust-rail-test
+  (let [result (-> solved-result
+                   (assoc :instrument-ids ["perp:BTC" "external:SP500"])
+                   (assoc :labels-by-instrument {"external:SP500" "S&P 500 Proxy"})
+                   (assoc :history-summary
+                          {:return-observations 252
+                           :return-days 365
+                           :calendar-window-days 365
+                           :limiting-instrument-id "external:SP500"
+                           :limiting-reason :fewest-return-observations}))
+        view-node (results-panel/results-panel
+                   {:result result
+                    :computed-at-ms 2600}
+                   {:objective {:kind :max-sharpe}}
+                   {:frontier-overlay-mode :standalone})
+        strings (set (collect-strings view-node))]
+    (is (contains? strings "History Used"))
+    (is (contains? strings "252 returns · 365 days"))
+    (is (some #(str/includes? % "S&P 500 Proxy") strings))))
 
 (deftest results-panel-renders-use-my-views-editor-in-right-rail-test
   (let [draft {:universe [{:instrument-id "perp:BTC"
