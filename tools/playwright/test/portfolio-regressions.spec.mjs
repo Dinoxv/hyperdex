@@ -1985,6 +1985,8 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
 });
 
 test("portfolio optimizer recommendation chart shows minimum variance frontier overlays and honest target weights @regression", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+
   await page.addInitScript(() => {
     globalThis.__HYPEROPEN_OPTIMIZER_HISTORY_API__ = {
       enabled: false,
@@ -2090,6 +2092,31 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     .toContainText("History Used");
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-panel']"))
     .toContainText("Efficient Frontier");
+  const resultsGrid = page.locator("[data-role='portfolio-optimizer-results-grid']");
+  const centerPanel = page.locator("[data-role='portfolio-optimizer-results-center-panel']");
+  const rightPanel = page.locator("[data-role='portfolio-optimizer-results-right-panel']");
+  const readingLabel = page
+    .locator("[data-role='portfolio-optimizer-frontier-panel']")
+    .getByText("Reading this", { exact: true });
+  const [resultsGridBox, centerPanelBox, readingLabelBox] = await Promise.all([
+    resultsGrid.boundingBox(),
+    centerPanel.boundingBox(),
+    readingLabel.boundingBox()
+  ]);
+  expect(resultsGridBox).not.toBeNull();
+  expect(centerPanelBox).not.toBeNull();
+  expect(readingLabelBox).not.toBeNull();
+  expect(centerPanelBox.width / resultsGridBox.width).toBeGreaterThanOrEqual(0.44);
+  expect(readingLabelBox.height).toBeLessThanOrEqual(20);
+  await page.setViewportSize({ width: 1536, height: 900 });
+  const [wideCenterPanelBox, wideRightPanelBox] = await Promise.all([
+    centerPanel.boundingBox(),
+    rightPanel.boundingBox()
+  ]);
+  expect(wideCenterPanelBox).not.toBeNull();
+  expect(wideRightPanelBox).not.toBeNull();
+  expect(wideRightPanelBox.x).toBeGreaterThan(wideCenterPanelBox.x);
+  expect(Math.abs(wideRightPanelBox.y - wideCenterPanelBox.y)).toBeLessThanOrEqual(4);
   await seedOptimizerCurrentResultPoint(page);
   await expect(page.locator("[data-role='portfolio-optimizer-frontier-current-marker']"))
     .toBeVisible();

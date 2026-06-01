@@ -37,7 +37,9 @@
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
                   :data-role "portfolio-optimizer-results-surface"}
         (summary/stale-result-banner stale?)
-        [:div {:class ["optimizer-results-grid" "grid" "grid-cols-1" "xl:grid-cols-[500px_minmax(0,1fr)_320px]"]
+        [:div {:class ["optimizer-results-grid" "grid" "grid-cols-1"
+                       "xl:grid-cols-[420px_minmax(0,1fr)]"
+                       "2xl:grid-cols-[500px_minmax(0,1fr)_320px]"]
                :data-role "portfolio-optimizer-results-grid"}
          [:div {:class ["optimizer-results-left-panel" "min-h-0" "space-y-0"]
                 :data-role "portfolio-optimizer-results-left-panel"}
@@ -51,7 +53,8 @@
            result
            frontier-overlay-mode
            constrain-frontier?)]
-         [:div {:class ["optimizer-results-right-panel" "min-h-0"]
+         [:div {:class ["optimizer-results-right-panel" "min-h-0"
+                        "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
           (active-views-editor state draft result readiness)
           (diagnostics-rail/trust-diagnostics-rail result)]]

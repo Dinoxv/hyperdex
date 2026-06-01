@@ -24,11 +24,16 @@
                        "relative" "mt-4" "overflow-hidden" "border" "border-base-300" "bg-base-100" "p-4"]
                :data-role "portfolio-optimizer-frontier-chart-box"}
          (frontier-layers/chart-svg draft result model)]
-        [:div {:class ["mt-4" "flex" "gap-3" "text-[0.7rem]" "text-trading-muted"]}
-         [:span {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+        [:div {:class ["mt-4" "grid" "grid-cols-[auto_auto_minmax(0,1fr)]"
+                       "items-start" "gap-3" "text-[0.7rem]" "text-trading-muted"]
+               :data-role "portfolio-optimizer-frontier-reading"}
+         [:span {:class ["whitespace-nowrap" "font-mono" "text-[0.62rem]"
+                         "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]
+                 :data-role "portfolio-optimizer-frontier-reading-label"}
           "Reading this"]
-         [:span "·"]
-         [:span
+         [:span {:aria-hidden "true"} "·"]
+         [:span {:class ["min-w-0"]
+                 :data-role "portfolio-optimizer-frontier-reading-copy"}
           (str reading-text
                " Click or drag a point to set "
                (:label target)
