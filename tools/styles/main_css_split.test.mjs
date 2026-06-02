@@ -24,6 +24,7 @@ const expectedImports = [
   "./surfaces/trading-layout.css",
   "./surfaces/utilities.css",
   "./surfaces/vaults.css",
+  "./surfaces/montecarlo.css",
 ];
 
 const importPattern = /^@import\s+"([^"]+)";$/;

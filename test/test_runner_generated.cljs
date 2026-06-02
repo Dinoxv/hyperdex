@@ -187,6 +187,8 @@
             [hyperopen.portfolio.metrics.history-test]
             [hyperopen.portfolio.metrics.parsing-test]
             [hyperopen.portfolio.metrics.quantstats-parity-test]
+            [hyperopen.portfolio.montecarlo.actions-test]
+            [hyperopen.portfolio.montecarlo.engine-test]
             [hyperopen.portfolio.optimizer.actions-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-calibration-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
@@ -857,6 +859,8 @@
              'hyperopen.portfolio.metrics.history-test
              'hyperopen.portfolio.metrics.parsing-test
              'hyperopen.portfolio.metrics.quantstats-parity-test
+             'hyperopen.portfolio.montecarlo.actions-test
+             'hyperopen.portfolio.montecarlo.engine-test
              'hyperopen.portfolio.optimizer.actions-test
              'hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test

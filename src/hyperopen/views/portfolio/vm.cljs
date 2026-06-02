@@ -6,6 +6,7 @@
             [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
             [hyperopen.views.portfolio.vm.chart :as vm-chart]
             [hyperopen.views.portfolio.vm.equity :as vm-equity]
+            [hyperopen.views.portfolio.vm.montecarlo :as vm-montecarlo]
             [hyperopen.views.portfolio.vm.performance :as vm-performance]
             [hyperopen.views.portfolio.vm.summary :as vm-summary]
             [hyperopen.views.portfolio.vm.volume :as vm-volume]
@@ -173,7 +174,8 @@
   (vm-benchmarks/reset-portfolio-vm-cache!)
   (reset! benchmark-computation-context-cache nil)
   (reset! performance-metrics-model-cache nil)
-  (reset! chart-model-cache nil))
+  (reset! chart-model-cache nil)
+  (vm-montecarlo/reset-cache!))
 
 (defn- returns-benchmark-selector-model [state]
   (binding [vm-benchmarks/*build-benchmark-selector-options* *build-benchmark-selector-options*]
@@ -416,6 +418,11 @@
                                                 performance-metrics)
      :performance-metrics performance-metrics
      :chart chart
+     :monte-carlo {:strategy-cumulative-rows (:strategy-cumulative-rows benchmark-context)
+                   :strategy-source-version (:strategy-source-version benchmark-context)
+                   :start-equity total-equity
+                   :summary-scope summary-scope
+                   :summary-time-range summary-time-range}
      :selectors {:summary-scope {:value summary-scope
                                  :label (selector-option-label summary-scope-options summary-scope)
                                  :open? (boolean (get-in state [:portfolio-ui :summary-scope-dropdown-open?]))

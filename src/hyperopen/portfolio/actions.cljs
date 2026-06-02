@@ -89,7 +89,9 @@
     :twap
     :trade-history
     :funding-history
-    :order-history})
+    :order-history
+    :outcomes
+    :monte-carlo})
 
 (def ^:private account-info-tab-aliases
   {:performancemetrics :performance-metrics
@@ -99,7 +101,9 @@
    :openorders :open-orders
    :tradehistory :trade-history
    :fundinghistory :funding-history
-   :orderhistory :order-history})
+   :orderhistory :order-history
+   :montecarlo :monte-carlo
+   :monte :monte-carlo})
 
 (defn- normalize-keyword-like
   [value]
