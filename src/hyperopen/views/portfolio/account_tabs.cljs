@@ -2,8 +2,10 @@
   (:require [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.portfolio.header :as portfolio-header]
+            [hyperopen.views.portfolio.montecarlo.panel :as montecarlo-panel]
             [hyperopen.views.portfolio.performance-metrics-view :as performance-metrics-view]
-            [hyperopen.views.portfolio.summary-cards :as summary-cards]))
+            [hyperopen.views.portfolio.summary-cards :as summary-cards]
+            [hyperopen.views.portfolio.vm.montecarlo :as montecarlo-vm]))
 
 (def ^:private performance-metrics-panel-height
   "min(44rem, calc(100dvh - 24rem))")
@@ -15,7 +17,8 @@
 (def ^:private portfolio-account-tab-click-actions-by-tab
   (into
    {:deposits-withdrawals [[:actions/set-portfolio-account-info-tab :deposits-withdrawals]]
-    :performance-metrics [[:actions/set-portfolio-account-info-tab :performance-metrics]]}
+    :performance-metrics [[:actions/set-portfolio-account-info-tab :performance-metrics]]
+    :monte-carlo [[:actions/set-portfolio-account-info-tab :monte-carlo]]}
    (map (fn [tab]
           [tab
            [[:actions/set-portfolio-account-info-tab tab]
@@ -31,7 +34,9 @@
    :deposits-withdrawals
    :trade-history
    :order-history
-   :twap])
+   :twap
+   :outcomes
+   :monte-carlo])
 
 (def ^:private portfolio-account-tab-label-overrides
   {:funding-history "Interest"})
@@ -84,19 +89,28 @@
       "Portfolio keeps balances and account tables in context while cash movement actions stay one tap away."]]])))
 
 (defn account-info-options [state view-model trader-portfolio-route?]
-  (let [extra-tabs (cond-> [{:id :performance-metrics
-                             :label "Performance Metrics"
-                             :panel-classes ["min-h-0"]
-                             :panel-style portfolio-account-panel-style
-                             :render (fn [_]
-                                       (performance-metrics-view/performance-metrics-card
-                                        (assoc (:performance-metrics view-model)
-                                               :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range]))))}]
-                     (not trader-portfolio-route?)
-                     (into [{:id :deposits-withdrawals
-                             :label "Deposits & Withdrawals"
-                             :render (fn [_]
-                                       (deposits-withdrawals-card state))}]))]
+  (let [extra-tabs (-> (cond-> [{:id :performance-metrics
+                                 :label "Performance Metrics"
+                                 :panel-classes ["min-h-0"]
+                                 :panel-style portfolio-account-panel-style
+                                 :render (fn [_]
+                                           (performance-metrics-view/performance-metrics-card
+                                            (assoc (:performance-metrics view-model)
+                                                   :time-range-selector (get-in view-model [:selectors :performance-metrics-time-range]))))}]
+                         (not trader-portfolio-route?)
+                         (into [{:id :deposits-withdrawals
+                                 :label "Deposits & Withdrawals"
+                                 :render (fn [_]
+                                           (deposits-withdrawals-card state))}]))
+                       (conj {:id :monte-carlo
+                              :label "Monte Carlo"
+                              :panel-classes ["min-h-0"]
+                              :panel-style {}
+                              :render (fn [_]
+                                        (montecarlo-panel/monte-carlo-card
+                                         (montecarlo-vm/montecarlo-model
+                                          state
+                                          (:monte-carlo view-model))))}))]
     {:extra-tabs extra-tabs
      :default-panel-classes ["min-h-0"]
      :default-panel-style portfolio-account-panel-style

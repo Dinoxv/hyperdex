@@ -3,6 +3,7 @@
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.montecarlo.actions :as montecarlo-actions]
             [hyperopen.trade.layout-actions :as trade-layout-actions]))
 
 (defn action-deps []
@@ -41,6 +42,8 @@
    :select-portfolio-summary-time-range portfolio-actions/select-portfolio-summary-time-range
    :select-portfolio-chart-tab portfolio-actions/select-portfolio-chart-tab
    :set-portfolio-account-info-tab portfolio-actions/set-portfolio-account-info-tab
+   :set-portfolio-monte-carlo-control montecarlo-actions/set-portfolio-monte-carlo-control
+   :rerun-portfolio-monte-carlo montecarlo-actions/rerun-portfolio-monte-carlo
    :set-portfolio-returns-benchmark-search portfolio-actions/set-portfolio-returns-benchmark-search
    :set-portfolio-returns-benchmark-suggestions-open
    portfolio-actions/set-portfolio-returns-benchmark-suggestions-open

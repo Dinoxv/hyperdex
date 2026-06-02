@@ -95,6 +95,8 @@
 (s/def ::portfolio-optimizer-universe-search-keydown-args
   (s/tuple ::common/non-empty-string
            (s/coll-of ::common/non-empty-string :kind vector?)))
+(s/def ::portfolio-monte-carlo-control-args
+  (s/tuple ::common/keyword-or-string any?))
 (s/def ::staking-action-popover-open-args
   (s/or :kind-only (s/tuple (s/or :keyword keyword?
                                    :string string?))
@@ -218,6 +220,8 @@
    :actions/select-portfolio-summary-time-range ::common/keyword-or-string-args
    :actions/select-portfolio-chart-tab ::common/keyword-or-string-args
    :actions/set-portfolio-account-info-tab ::common/tab-args
+   :actions/set-portfolio-monte-carlo-control ::portfolio-monte-carlo-control-args
+   :actions/rerun-portfolio-monte-carlo ::common/no-args
    :actions/set-portfolio-returns-benchmark-search ::common/single-input-args
    :actions/set-portfolio-returns-benchmark-suggestions-open ::common/boolean-args
    :actions/select-portfolio-returns-benchmark ::common/optional-string-args
