@@ -24,41 +24,59 @@
     method-tag]])
 
 (defn- chart-card
-  [{:keys [result run-key controls chrome]}]
-  [:div {:class ["mc-card" "mc-chart-card"]}
-   [:div {:class ["mc-chart-head"]}
-    [:h3 {:class ["mc-chart-title"]}
-     (str "Simulated equity paths · " (:horizon controls) "-day forecast")]
-    [:div {:class ["mc-legend"]}
-     [:span [:i {:class ["mc-swatch" "mc-swatch-accent"]}] "Median (P50)"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-band"]}] "P5–P95 band"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-gold"]}] "Goal"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-red"]}] "Bust"]]]
-   [:div {:class ["mc-canvas-wrap"]}
-    [:div {:class ["mc-canvas-host"]
-           :data-role (str (:data-role-prefix chrome) "-equity-canvas")
-           :replicant/on-render (chart/spaghetti-on-render
-                                 {:result result
-                                  :show-paths? true
-                                  :path-count 120
-                                  :height 420
-                                  :update-key run-key})}]]])
+  [{:keys [result run-key chrome]}]
+  (let [h (get-in result [:meta :horizon])
+        shuffle? (= (get-in result [:meta :method]) :shuffle)
+        title (if shuffle?
+                (str "Reshuffled equity paths · " h " trading days")
+                (str "Simulated equity paths · " h "-day forecast"))]
+    [:div {:class ["mc-card" "mc-chart-card"]}
+     [:div {:class ["mc-chart-head"]}
+      [:h3 {:class ["mc-chart-title"]} title]
+      [:div {:class ["mc-legend"]}
+       [:span [:i {:class ["mc-swatch" "mc-swatch-accent"]}] "Median (P50)"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-band"]}] "P5–P95 band"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-gold"]}] "Goal"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-red"]}] "Bust"]]]
+     [:div {:class ["mc-canvas-wrap"]}
+      [:div {:class ["mc-canvas-host"]
+             :data-role (str (:data-role-prefix chrome) "-equity-canvas")
+             :replicant/on-render (chart/spaghetti-on-render
+                                   {:result result
+                                    :show-paths? true
+                                    :path-count 120
+                                    :height 420
+                                    :update-key run-key})}]]]))
 
 (defn- footnote
-  [{:keys [controls sample-size chrome]}]
-  (let [{:keys [horizon bust goal]} controls]
-    [:div {:class ["mc-foot"]}
-     [:b "Method. "]
-     (str "Each path draws " horizon
-          " daily returns at random (with replacement) from " (:history-owner chrome)
-          " realized history of "
-          sample-size
-          " trading days — preserving the empirical return distribution while breaking time-ordering. ")
-     [:b "Bust "]
-     (str "counts paths whose worst peak-to-trough drawdown breaches " bust "%; ")
-     [:b "goal "]
-     (str "counts paths ending at or above " goal
-          "%. Past distribution is not a guarantee of future results — this is a range-of-outcomes tool, not a prediction.")]))
+  [{:keys [controls result sample-size chrome]}]
+  (let [{:keys [horizon bust goal]} controls
+        h (get-in result [:meta :horizon])
+        shuffle? (= (get-in result [:meta :method]) :shuffle)]
+    (if shuffle?
+      [:div {:class ["mc-foot"]}
+       [:b "Method. "]
+       (str "Each path reorders " (:history-owner chrome) " " sample-size
+            " realized daily returns into a fresh random sequence — the same returns, so "
+            "every path ends at the same realized total return. Only the order, and therefore "
+            "the drawdown along the way, changes. ")
+       [:b "Bust "]
+       (str "counts orderings whose worst peak-to-trough drawdown breaches " bust "%. ")
+       "This is a sequence-risk view (the QuantStats shuffle), not a forward prediction."]
+      [:div {:class ["mc-foot"]}
+       [:b "Method. "]
+       (str "Each path draws " h
+            " daily returns at random (with replacement) from " (:history-owner chrome)
+            " realized history of " sample-size " trading days"
+            (when (> horizon h)
+              (str " (your " horizon "-day request is clamped to " h
+                   " — a forecast cannot compound more days than were observed)"))
+            " — preserving the empirical return distribution while breaking time-ordering. ")
+       [:b "Bust "]
+       (str "counts paths whose worst peak-to-trough drawdown breaches " bust "%; ")
+       [:b "goal "]
+       (str "counts paths ending at or above " goal
+            "%. Past distribution is not a guarantee of future results — this is a range-of-outcomes tool, not a prediction.")])))
 
 (defn- notice
   [{:keys [title body data-role-prefix]}]
@@ -75,15 +93,17 @@
    (controls/controls-bar model)
    (case status
      :ready
-     (let [{:keys [result run-key controls live-equity]} model]
+     (let [{:keys [result run-key controls live-equity method]} model]
        [:div {:class ["mc-body"]}
         [:div {:class ["mc-grid"]}
-         (chart-card {:result result :run-key run-key :controls controls :chrome chrome})
+         (chart-card {:result result :run-key run-key :chrome chrome})
          [:div {:class ["mc-rail"]}
-          (summary/prob-card {:result result :controls controls :chrome chrome})
-          (summary/percentile-table {:result result :controls controls
-                                     :live-equity live-equity :chrome chrome})]]
-        (distributions/distributions {:result result :controls controls
+          (summary/prob-card {:result result :controls controls :method method :chrome chrome})
+          (if (= method :shuffle)
+            (summary/realized-card {:result result :live-equity live-equity :chrome chrome})
+            (summary/percentile-table {:result result :controls controls
+                                       :live-equity live-equity :chrome chrome}))]]
+        (distributions/distributions {:result result :controls controls :method method
                                       :run-key run-key :chrome chrome})
         (footnote model)])
 

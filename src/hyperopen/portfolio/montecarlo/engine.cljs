@@ -1,13 +1,25 @@
 (ns hyperopen.portfolio.montecarlo.engine
   "Pure, deterministic Monte Carlo engine for the portfolio forecast surface.
 
-  This is a ClojureScript port of the designer prototype `mc-engine.js`
-  (bootstrap resampling in the spirit of QuantStats): it draws the strategy's
-  realized daily returns at random *with replacement* over a future horizon,
-  thousands of times, to map the range of path-dependent outcomes the same
-  return distribution could produce. It preserves the empirical return
-  distribution while breaking time-ordering, which isolates luck from skill
-  across drawdowns, Sharpe, and terminal value.
+  Two methods share one result shape, selected by `:method`:
+
+    :shuffle   — the faithful QuantStats method (`quantstats/_montecarlo.py`).
+                 Each simulation is a random *reordering* (permutation, no
+                 replacement) of the realized returns, so the simulation length
+                 equals the history length and there is no forecast horizon.
+                 Reordering cannot change the product of (1+r), so every path
+                 ends at the *same* realized terminal value; only the path —
+                 hence the drawdown — varies. Sim 0 is the original order,
+                 matching QuantStats's unshuffled first column.
+
+    :bootstrap — draws the realized returns at random *with replacement* over a
+                 forecast horizon, thousands of times, to map the range of
+                 forward outcomes the same return distribution could produce.
+                 The horizon is clamped to the sample size so a forecast can
+                 never compound more days than were actually observed.
+
+  Both preserve the empirical return distribution while breaking time-ordering,
+  isolating luck from skill across drawdowns, Sharpe, and terminal value.
 
   Determinism: randomness comes from a seeded `mulberry32` generator, so a given
   set of inputs always produces the same result. The namespace performs no I/O
@@ -142,13 +154,38 @@
   Sharpe/CAGR use the same basis (the React prototype used 252 trading days)."
   365)
 
+(defn- identity-indices
+  "An `Int32Array` of the identity permutation `0..n-1` (the original order)."
+  [n]
+  (let [arr (js/Int32Array. n)]
+    (dotimes [i n] (aset arr i i))
+    arr))
+
+(defn- shuffled-indices
+  "A deterministic Fisher–Yates permutation of `0..n-1`, drawing from `rng` (a
+  `mulberry32` instance). Used by the QuantStats shuffle method to reorder the
+  realized returns without replacement."
+  [rng n]
+  (let [arr (identity-indices n)]
+    (loop [i (dec n)]
+      (when (pos? i)
+        (let [j (bit-or 0 (* (rng) (inc i)))   ; uniform integer in [0, i]
+              tmp (aget arr i)]
+          (aset arr i (aget arr j))
+          (aset arr j tmp)
+          (recur (dec i)))))
+    arr))
+
 (defn run
   "Run the bootstrap Monte Carlo simulation.
 
   Options:
     :returns          seq of realized daily simple returns (e.g. 0.012 = +1.2%)
+    :method           :bootstrap (default, with replacement over a horizon) or
+                      :shuffle (QuantStats permutation; length = sample size)
     :sims             number of simulated paths (default 1000)
-    :horizon          forecast length in days (default 90)
+    :horizon          forecast length in days (default 90); ignored for :shuffle
+                      and clamped to the sample size for :bootstrap
     :bust             drawdown threshold counted as a bust, negative (default -0.3)
     :goal             total-return threshold counted as a goal (default 0.5)
     :seed             RNG seed (default 42)
@@ -159,12 +196,20 @@
   Float64Arrays), `:band` (p5/p25/p50/p75/p95 at each `:times` grid point),
   `:terminal`/`:maxdd`/`:sharpe`/`:cagr`/`:vol` distribution maps, and
   `:bust-prob`/`:goal-prob`."
-  [{:keys [returns sims horizon bust goal seed start-equity periods-per-year]
+  [{:keys [returns sims horizon bust goal seed start-equity periods-per-year method]
     :or {sims 1000 horizon 90 bust -0.3 goal 0.5 seed 42 start-equity 1
-         periods-per-year default-periods-per-year}}]
+         periods-per-year default-periods-per-year method :bootstrap}}]
   (let [ret (js/Float64Array. (into-array returns))
         m (.-length ret)
-        H horizon
+        shuffle? (= method :shuffle)
+        ;; :shuffle reorders the realized history, so its length is the history
+        ;; length (no forecast horizon). :bootstrap clamps to the sample size so
+        ;; it can never compound more days than were observed — the fix for a
+        ;; short-history vault reporting a P5 "worst case" above its own reality.
+        H (cond
+            (zero? m) horizon
+            shuffle? m
+            :else (min horizon m))
         rng (mulberry32 seed)
         ppy periods-per-year
         ann (js/Math.sqrt ppy)
@@ -182,7 +227,7 @@
         goals (volatile! 0)]
     (if (zero? m)
       ;; No realized returns to resample from — return an empty/degenerate run.
-      {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed
+      {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed :method method
               :start-equity start-equity :periods-per-year ppy :sample-size 0}
        :draw-paths [] :times (vec grid-idx)
        :band {:p5 [] :p25 [] :p50 [] :p75 [] :p95 []}
@@ -192,7 +237,12 @@
       (do
         (dotimes [s sims]
           (let [keep-path? (< s draw-cap)
-                path (when keep-path? (js/Float64Array. (inc H)))]
+                path (when keep-path? (js/Float64Array. (inc H)))
+                ;; Shuffle mode: precompute this sim's permutation of the
+                ;; realized returns. Sim 0 keeps the original order (QuantStats's
+                ;; unshuffled first column); the rest are Fisher–Yates shuffles.
+                perm (when shuffle?
+                       (if (zero? s) (identity-indices m) (shuffled-indices rng m)))]
             (when keep-path? (aset path 0 start-equity))
             ;; Seed grid column 0 (always day 0) with the starting equity.
             (let [gp0 (if (== (aget grid-idx 0) 0)
@@ -205,7 +255,9 @@
                          sum-r 0.0 sum-r2 0.0 gp gp0]
                     (if (> t H)
                       [equity worst-dd sum-r sum-r2]
-                      (let [r (aget ret (bit-or 0 (* (rng) m)))
+                      (let [r (if shuffle?
+                                (aget ret (aget perm (dec t)))
+                                (aget ret (bit-or 0 (* (rng) m))))
                             equity* (* equity (+ 1 r))
                             peak* (if (> equity* peak) equity* peak)
                             dd (- (/ equity* peak*) 1)
@@ -244,7 +296,7 @@
                             (update :p95 conj (percentile sorted 95)))))
                     {:p5 [] :p25 [] :p50 [] :p75 [] :p95 []}
                     (range grid-n))]
-          {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed
+          {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed :method method
                   :start-equity start-equity :periods-per-year ppy :sample-size m}
            :draw-paths (persistent! draw-paths)
            :band band

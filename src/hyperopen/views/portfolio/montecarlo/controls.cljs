@@ -1,12 +1,20 @@
 (ns hyperopen.views.portfolio.montecarlo.controls
-  "Control strip for the Monte Carlo tab: simulation count, horizon, bust and
-  goal thresholds, RNG seed, and a Re-run button. Every control dispatches a
+  "Control strip for the Monte Carlo tab: method, simulation count, horizon, bust
+  and goal thresholds, RNG seed, and a Re-run button. Every control dispatches a
   pure action; the view-model re-runs the (cached) engine when a value changes.
+
+  The method toggle picks between `:shuffle` (the QuantStats sequence-risk
+  reordering, which has no forecast horizon) and `:bootstrap` (the forward
+  forecast). The Horizon field is therefore shown only in `:bootstrap` mode.
 
   The dispatched action ids and data-role prefix arrive via the model's
   `:chrome`, so the portfolio and vault surfaces share this strip while keeping
   independent control state."
   (:require [clojure.string :as str]))
+
+(defn- method-label
+  [m]
+  (case m :shuffle "Sequence risk" :bootstrap "Forecast" (name m)))
 
 (defn- segmented
   [{:keys [control value options fmt set-action data-role-prefix]}]
@@ -49,22 +57,30 @@
    control-node])
 
 (defn controls-bar
-  [{:keys [controls sims-options horizon-options chrome]}]
-  (let [{:keys [sims horizon bust goal seed]} controls
+  [{:keys [controls sims-options horizon-options method-options sample-size chrome]}]
+  (let [{:keys [method sims horizon bust goal seed]} controls
         {:keys [set-control-action rerun-action data-role-prefix]} chrome
-        base {:set-action set-control-action :data-role-prefix data-role-prefix}]
+        base {:set-action set-control-action :data-role-prefix data-role-prefix}
+        shuffle? (= method :shuffle)
+        eff-horizon (min horizon (max 1 sample-size))]
     [:div {:class ["mc-card" "mc-controls"]
            :data-role (str data-role-prefix "-controls")}
+     (field "Method"
+            (segmented (merge base {:control :method
+                                    :value method
+                                    :options method-options
+                                    :fmt method-label})))
      (field "Simulations"
             (segmented (merge base {:control :sims
                                     :value sims
                                     :options sims-options
                                     :fmt (fn [v] (.toLocaleString v))})))
-     (field "Horizon"
-            (segmented (merge base {:control :horizon
-                                    :value horizon
-                                    :options horizon-options
-                                    :fmt (fn [v] (str v "d"))})))
+     (when-not shuffle?
+       (field "Horizon"
+              (segmented (merge base {:control :horizon
+                                      :value horizon
+                                      :options horizon-options
+                                      :fmt (fn [v] (str v "d"))}))))
      (field "Bust threshold (drawdown)"
             (stepper (merge base {:control :bust :value bust :suffix "%" :step 5})))
      (field "Goal (total return)"
@@ -72,8 +88,11 @@
      (field "Seed"
             (stepper (merge base {:control :seed :value seed :step 1})))
      [:div {:class ["mc-run"]}
-      [:span {:class ["mc-run-status"]}
-       [:b (.toLocaleString sims)] (str " paths · " horizon "d")]
+      [:span {:class ["mc-run-status"]
+              :data-role (str data-role-prefix "-run-status")}
+       (if shuffle?
+         [:span [:b (.toLocaleString (max 0 sample-size))] " trading days · reshuffled"]
+         [:span [:b (.toLocaleString sims)] (str " paths · " eff-horizon "d")])]
       [:button {:type "button"
                 :class ["mc-run-btn"]
                 :data-role (str data-role-prefix "-rerun")

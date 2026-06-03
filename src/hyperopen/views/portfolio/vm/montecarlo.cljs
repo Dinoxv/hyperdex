@@ -82,20 +82,26 @@
   [state inputs]
   (let [{:keys [strategy-cumulative-rows strategy-source-version
                 start-equity summary-scope summary-time-range]} inputs
-        {:keys [sims horizon bust goal seed run-nonce] :as controls}
+        {:keys [method sims horizon bust goal seed run-nonce] :as controls}
         (mc-actions/controls state)
         returns (realized-returns strategy-cumulative-rows)
         sample-size (count returns)
+        ;; :shuffle uses the whole realized history (no horizon); :bootstrap is
+        ;; clamped to the sample size so it never forecasts past observed data.
+        effective-horizon (if (= method :shuffle) sample-size (min horizon sample-size))
         live-equity (if (and (number? start-equity) (pos? start-equity))
                       start-equity
                       0)
-        method-tag (str "Bootstrap · "
+        method-tag (str (if (= method :shuffle) "Shuffle · " "Bootstrap · ")
                         (get scope-labels summary-scope "Portfolio")
                         " · "
                         (get range-labels summary-time-range "")
                         " window")
         base {:controls controls
               :chrome chrome
+              :method method
+              :method-options mc-actions/method-options
+              :effective-horizon effective-horizon
               :sims-options mc-actions/sims-options
               :horizon-options mc-actions/horizon-options
               :sample-size sample-size
@@ -104,7 +110,7 @@
               :live-equity live-equity
               :bust-fraction (/ bust 100)
               :goal-fraction (/ goal 100)
-              :run-key [strategy-source-version sims horizon bust goal seed run-nonce]}]
+              :run-key [strategy-source-version method sims horizon bust goal seed run-nonce]}]
     (cond
       (zero? sample-size)
       (assoc base :status :empty)
@@ -113,11 +119,12 @@
       (assoc base :status :insufficient-history)
 
       :else
-      (let [engine-sig [strategy-source-version sims horizon bust goal seed]
+      (let [engine-sig [strategy-source-version method effective-horizon sims bust goal seed]
             result (run-cached engine-sig
                                {:returns returns
+                                :method method
                                 :sims sims
-                                :horizon horizon
+                                :horizon effective-horizon
                                 :bust (/ bust 100)
                                 :goal (/ goal 100)
                                 :seed seed

@@ -99,3 +99,55 @@
     (is (= 0 (:bust-prob res)))
     (is (= 0 (get-in res [:meta :sample-size])))
     (is (= [] (:draw-paths res)))))
+
+;; ---------------------------------------------------------------------------
+;; QuantStats shuffle method
+;; ---------------------------------------------------------------------------
+
+(deftest bootstrap-clamps-horizon-to-sample-size-test
+  ;; The forecast can never compound more days than were observed: a 365-day
+  ;; horizon over 100 days of history runs as 100 days. This removes the
+  ;; "worst case beats reality" artifact in Forecast mode.
+  (let [res (engine/run {:returns (varied-returns 100) :sims 200 :horizon 365 :seed 3})]
+    (is (= 100 (get-in res [:meta :horizon])) "horizon clamps down to the sample size")
+    (is (= 100 (peek (:times res))))
+    (is (= :bootstrap (get-in res [:meta :method])) "bootstrap is the default method"))
+  (let [res (engine/run {:returns (varied-returns 250) :sims 50 :horizon 90 :seed 3})]
+    (is (= 90 (get-in res [:meta :horizon])) "a horizon within history is left alone")))
+
+(deftest shuffle-pins-terminal-and-varies-drawdown-test
+  ;; A permutation preserves the product of (1+r), so every shuffled path ends
+  ;; at the same realized terminal value (worst case == best case == reality),
+  ;; while the *order* changes the drawdown along the way. This is the whole
+  ;; point of the QuantStats method.
+  (let [returns (varied-returns 120)
+        res (engine/run {:returns returns :sims 400 :horizon 999
+                         :method :shuffle :seed 7 :start-equity 1})
+        term (:terminal res)
+        dd (:maxdd res)]
+    (is (= :shuffle (get-in res [:meta :method])))
+    (is (= 120 (get-in res [:meta :horizon])) "shuffle length is the history length, not the horizon arg")
+    (is (= 120 (peek (:times res))))
+    (is (approx= (:p5 term) (:p95 term) 1e-9) "terminal P5 equals terminal P95")
+    (is (approx= (:min term) (:max term) 1e-9) "terminal min equals terminal max")
+    (is (< (:std term) 1e-9) "terminal value does not vary across orderings")
+    (is (> (:std dd) 0) "max drawdown genuinely varies across orderings")))
+
+(deftest shuffle-band-converges-at-the-final-day-test
+  (let [res (engine/run {:returns (varied-returns 150) :sims 500
+                         :method :shuffle :seed 11})
+        {:keys [p5 p50 p95]} (:band res)
+        last-i (dec (count p50))]
+    (is (approx= (nth p5 last-i) (nth p95 last-i) 1e-9)
+        "all paths meet at the same realized endpoint")
+    (is (approx= (nth p50 last-i) (nth p95 last-i) 1e-9))))
+
+(deftest shuffle-is-deterministic-by-seed-test
+  (let [returns (varied-returns 120)
+        opts {:returns returns :sims 300 :method :shuffle :seed 21}
+        a (engine/run opts)
+        b (engine/run opts)
+        c (engine/run (assoc opts :seed 22))]
+    (is (= (:band a) (:band b)) "same seed reshuffles identically")
+    (is (= (get-in a [:maxdd :median]) (get-in b [:maxdd :median])))
+    (is (not= (:band a) (:band c)) "a different seed yields different orderings")))

@@ -31,6 +31,15 @@
   (is (= 0 (mc/normalize-seed -5)))
   (is (= 9999 (mc/normalize-seed 100000))))
 
+(deftest normalize-method-test
+  (is (= :shuffle (mc/normalize-method :shuffle)))
+  (is (= :bootstrap (mc/normalize-method :bootstrap)))
+  (is (= :bootstrap (mc/normalize-method "bootstrap")) "string method keys are accepted")
+  (is (= :shuffle (mc/normalize-method :nonsense)) "unknown methods fall back to the default")
+  (is (= :shuffle (mc/normalize-method nil)))
+  (is (= :shuffle (mc/normalize-control :method "junk"))
+      "normalize-control routes :method through normalize-method"))
+
 (deftest set-control-returns-normalized-save-effect-test
   (is (= [[:effects/save [:portfolio-ui :monte-carlo :bust] -95]]
          (mc/set-portfolio-monte-carlo-control {} :bust -200))
@@ -49,6 +58,8 @@
 
 (deftest controls-reader-fills-defaults-test
   (is (= mc/default-controls (mc/controls {})))
-  (is (= {:run-nonce 0 :sims 2500 :horizon 90 :bust -30 :goal 200 :seed 42}
+  (is (= {:run-nonce 0 :method :shuffle :sims 2500 :horizon 90 :bust -30 :goal 200 :seed 42}
          (mc/controls {:portfolio-ui {:monte-carlo {:sims 2500 :goal 200}}}))
-      "stored values override defaults and are normalized"))
+      "stored values override defaults and are normalized")
+  (is (= :bootstrap (:method (mc/controls {:portfolio-ui {:monte-carlo {:method :bootstrap}}})))
+      "a stored method is read back"))

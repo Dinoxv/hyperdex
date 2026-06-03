@@ -25,39 +25,70 @@
     [:span (str "median " (range-fmt (:median dist)))]
     [:span (str "μ " (range-fmt (:mean dist)))]]])
 
+(defn- realized-strip
+  "Single-value chips for the metrics a shuffle leaves unchanged. Total return,
+  Sharpe, and annualized vol are functions only of the *set* of daily returns,
+  so reordering them does not move these values — their histograms would be a
+  single spike. In shuffle mode we show the fixed values as chips instead."
+  [{:keys [terminal sharpe vol pct0 pctp0 r2 data-role-prefix]}]
+  [:div {:class ["mc-card" "mc-realized-strip"]
+         :data-role (str data-role-prefix "-realized-stats")}
+   [:div {:class ["mc-realized-strip-title"]} "Realized · fixed across orderings"]
+   [:div {:class ["mc-chip-row"]}
+    (for [[k v] [["Total return" (pct0 (:p50 terminal))]
+                 ["Sharpe" (r2 (:p50 sharpe))]
+                 ["Annualized vol" (pctp0 (:p50 vol))]]]
+      ^{:key k}
+      [:div {:class ["mc-chip"]}
+       [:div {:class ["mc-chip-k"]} k]
+       [:div {:class ["mc-chip-v"]} v]])]])
+
 (defn distributions
-  [{:keys [result controls run-key chrome]}]
+  [{:keys [result controls run-key method chrome]}]
   (let [{:keys [terminal maxdd sharpe vol]} result
         prefix (:data-role-prefix chrome)
         bust-fraction (/ (:bust controls) 100)
         pct0 (fn [v] (fmt/signed-pct v 0))
         pctp0 (fn [v] (fmt/unsigned-pct v 0))
         r2 (fn [v] (fmt/ratio v 2))]
-    [:div {:class ["mc-dist-grid"]
-           :data-role (str prefix "-distributions")}
-     (dist-card {:title "Total return"
-                 :dist terminal
-                 :fmt-kind :pct
-                 :sign-by-value? true
-                 :range-fmt pct0
-                 :update-key [:total run-key]
-                 :data-role-prefix prefix})
-     (dist-card {:title "Max drawdown"
-                 :dist maxdd
-                 :fmt-kind :pct
-                 :threshold bust-fraction
-                 :range-fmt pct0
-                 :update-key [:maxdd run-key]
-                 :data-role-prefix prefix})
-     (dist-card {:title "Sharpe ratio"
-                 :dist sharpe
-                 :sign-by-value? true
-                 :range-fmt r2
-                 :update-key [:sharpe run-key]
-                 :data-role-prefix prefix})
-     (dist-card {:title "Annualized vol"
-                 :dist vol
-                 :fmt-kind :pct
-                 :range-fmt pctp0
-                 :update-key [:vol run-key]
-                 :data-role-prefix prefix})]))
+    (if (= method :shuffle)
+      ;; Shuffle: only max drawdown genuinely varies; the rest are fixed chips.
+      [:div {:class ["mc-dist-grid" "mc-dist-grid-shuffle"]
+             :data-role (str prefix "-distributions")}
+       (dist-card {:title "Max drawdown"
+                   :dist maxdd
+                   :fmt-kind :pct
+                   :threshold bust-fraction
+                   :range-fmt pct0
+                   :update-key [:maxdd run-key]
+                   :data-role-prefix prefix})
+       (realized-strip {:terminal terminal :sharpe sharpe :vol vol
+                        :pct0 pct0 :pctp0 pctp0 :r2 r2 :data-role-prefix prefix})]
+      [:div {:class ["mc-dist-grid"]
+             :data-role (str prefix "-distributions")}
+       (dist-card {:title "Total return"
+                   :dist terminal
+                   :fmt-kind :pct
+                   :sign-by-value? true
+                   :range-fmt pct0
+                   :update-key [:total run-key]
+                   :data-role-prefix prefix})
+       (dist-card {:title "Max drawdown"
+                   :dist maxdd
+                   :fmt-kind :pct
+                   :threshold bust-fraction
+                   :range-fmt pct0
+                   :update-key [:maxdd run-key]
+                   :data-role-prefix prefix})
+       (dist-card {:title "Sharpe ratio"
+                   :dist sharpe
+                   :sign-by-value? true
+                   :range-fmt r2
+                   :update-key [:sharpe run-key]
+                   :data-role-prefix prefix})
+       (dist-card {:title "Annualized vol"
+                   :dist vol
+                   :fmt-kind :pct
+                   :range-fmt pctp0
+                   :update-key [:vol run-key]
+                   :data-role-prefix prefix})])))
