@@ -155,6 +155,8 @@
                                                        (str "subaccounts-transfer-token-option-" other-subaccount-address "-MEOW:0xdef"))
         transfer-toggle (hiccup/find-by-data-role view-node
                                                   (str "subaccounts-transfer-toggle-direction-" other-subaccount-address))
+        transfer-flow-arrow (hiccup/find-by-data-role view-node
+                                                       (str "subaccounts-transfer-flow-arrow-" other-subaccount-address))
         transfer-direction (hiccup/find-by-data-role view-node
                                                      (str "subaccounts-transfer-direction-" other-subaccount-address))
         transfer-submit (hiccup/find-by-data-role view-node
@@ -185,6 +187,9 @@
     (is (contains? (set (hiccup/collect-strings transfer-source)) "Ops"))
     (is (contains? (set (hiccup/collect-strings transfer-destination)) "Master Account"))
     (is (contains? (set (hiccup/collect-strings transfer-max)) "MAX: 0.02 MEOW"))
+    (is (contains? (set (hiccup/collect-strings transfer-flow-arrow)) "->"))
+    (is (= "Reverse transfer direction"
+           (get-in transfer-toggle [1 :aria-label])))
     (is (= [[:actions/toggle-transfer-direction]]
            (get-in transfer-toggle [1 :on :click])))
     (is (contains? (set (hiccup/collect-strings transfer-token)) "MEOW"))

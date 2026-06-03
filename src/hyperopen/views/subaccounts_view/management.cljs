@@ -290,7 +290,10 @@
   (let [withdraw? (= :withdraw direction)
         from-label (if withdraw? subaccount-name "Master Account")
         to-label (if withdraw? "Master Account" subaccount-name)]
-    [:div {:class ["grid" "gap-3" "sm:grid-cols-[1fr_auto_1fr]"]}
+    [:div {:class ["grid"
+                   "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+                   "items-end"
+                   "gap-3"]}
      [:div {:data-role (str "subaccounts-transfer-source-" address)
             :class ["min-w-0"]}
       [:div {:class ["mb-2" "text-xs" "font-medium" "text-[#9aa8ab]"]} "From"]
@@ -300,26 +303,32 @@
      [:div {:class ["flex" "items-end" "justify-start" "pb-0.5" "sm:justify-center"]}
       [:button {:type "button"
                 :data-role (str "subaccounts-transfer-toggle-direction-" address)
-                :aria-label "Swap transfer direction"
+                :aria-label "Reverse transfer direction"
+                :title "Reverse transfer direction"
                 :class ["inline-flex"
-                        "h-7"
-                        "w-7"
+                        "h-8"
+                        "min-w-8"
                         "items-center"
                         "justify-center"
                         "rounded-md"
                         "border-0"
                         "bg-transparent"
-                        "text-lg"
+                        "px-2"
+                        "text-base"
+                        "font-semibold"
                         "leading-none"
                         "text-[#54d8c6]"
                         "transition-colors"
+                        "whitespace-nowrap"
                         "hover:bg-[#12312e]"
                         "hover:text-white"
                         "focus:outline-none"
                         "focus:ring-0"
                         "focus:ring-offset-0"]
                 :on {:click [[:actions/toggle-transfer-direction]]}}
-       "<->"]]
+       [:span {:data-role (str "subaccounts-transfer-flow-arrow-" address)
+               :aria-hidden true}
+        "->"]]]
      [:div {:data-role (str "subaccounts-transfer-destination-" address)
             :class ["min-w-0"]}
       [:div {:class ["mb-2" "text-xs" "font-medium" "text-[#9aa8ab]"]} "To"]

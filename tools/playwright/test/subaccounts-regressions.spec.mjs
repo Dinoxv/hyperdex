@@ -237,6 +237,8 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
       .toContainText("Master Account");
     await expect(page.locator(`[data-role="subaccounts-transfer-destination-${subaccountAddress}"]`))
       .toContainText("test");
+    await expect(page.locator(`[data-role="subaccounts-transfer-flow-arrow-${subaccountAddress}"]`))
+      .toHaveText("->");
     await expect(page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`))
       .toContainText("USDC");
     await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
@@ -262,6 +264,8 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
       .toContainText("test");
     await expect(page.locator(`[data-role="subaccounts-transfer-destination-${subaccountAddress}"]`))
       .toContainText("Master Account");
+    await expect(page.locator(`[data-role="subaccounts-transfer-flow-arrow-${subaccountAddress}"]`))
+      .toHaveText("->");
 
     await page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`)
       .selectOption("spot");
