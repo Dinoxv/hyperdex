@@ -15,6 +15,9 @@
 
 (defn- base-state []
   {:wallet {:address owner-address}
+   :webdata2 {:clearinghouseState {:marginSummary {:accountValue "999.99"}}}
+   :spot {:clearinghouse-state {:balances [{:coin "USDC"
+                                             :total "50.50"}]}}
    :account-context
    {:subaccounts
     {:status :loaded
@@ -22,7 +25,9 @@
      :rows [{:name "Desk"
              :master owner-address
              :sub-account-user subaccount-address
-             :clearinghouse-state {:marginSummary {:accountValue "123.45"}}}
+             :clearinghouse-state {:marginSummary {:accountValue "123.45"}}
+             :spot-state {:balances [{:coin "USDC"
+                                       :total "250.25"}]}}
             {:name "Ops"
              :master owner-address
              :sub-account-user other-subaccount-address
@@ -34,6 +39,8 @@
 (deftest subaccounts-view-renders-master-and-subaccount-selection-actions-test
   (let [view-node (view/subaccounts-view (base-state))
         root (shared-hiccup/find-by-parity-id view-node "subaccounts-root")
+        console (hiccup/find-by-data-role view-node "subaccounts-console")
+        create-panel (hiccup/find-by-data-role view-node "subaccounts-create-panel")
         master-row (hiccup/find-by-data-role view-node "subaccounts-master-row")
         refresh-button (hiccup/find-by-data-role view-node "subaccounts-refresh")
         selected-row (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address))
@@ -44,11 +51,18 @@
     (is (some? root))
     (is (contains? strings "Sub-Accounts"))
     (is (contains? strings "Master Account"))
+    (is (contains? strings "Perps Account Equity"))
+    (is (contains? strings "Spot Account Equity"))
     (is (contains? strings "Desk"))
     (is (contains? strings "Ops"))
+    (is (contains? strings "$999.99"))
+    (is (contains? strings "$50.50"))
     (is (contains? strings "$123.45"))
+    (is (contains? strings "$250.25"))
     (is (contains? strings "Selected"))
     (is (some? master-row))
+    (is (some? console))
+    (is (some? create-panel))
     (is (some? selected-row))
     (is (some? other-row))
     (is (= [[:actions/load-subaccounts-route "/subAccounts"]]
