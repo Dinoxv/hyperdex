@@ -48,9 +48,14 @@
   (let [cancel-entries (cancel-guard/cancel-request-guard-entries request)]
     (cancel-guard/prune-open-order-sources state cancel-entries)))
 
+(defn- current-order-account-address
+  [state]
+  (or (account-context/effective-account-address state)
+      (get-in state [:wallet :address])))
+
 (defn- active-wallet-address?
   [state address]
-  (let [wallet-address (get-in state [:wallet :address])
+  (let [wallet-address (current-order-account-address state)
         address* (account-context/normalize-address address)
         wallet-address* (account-context/normalize-address wallet-address)]
     (if (and address* wallet-address*)
@@ -92,7 +97,7 @@
                (swap! store
                       (fn [state]
                         ;; Guard stale async completions from older wallet sessions.
-                        (if (= address (get-in state [:wallet :address]))
+                        (if (= address (current-order-account-address state))
                           (assoc-in state [:webdata2 :clearinghouseState] data)
                           state)))))
       (.catch (fn [err]
@@ -129,7 +134,7 @@
     :refresh-spot-clearinghouse! spot-refresh/refresh-spot-clearinghouse-snapshot!
     :refresh-perp-dex-clearinghouse! refresh-perp-dex-clearinghouse-snapshot!
     :refresh-spot? refresh-spot?
-    :resolve-current-address (fn [state] (get-in state [:wallet :address]))
+    :resolve-current-address current-order-account-address
     :log-fn telemetry/log!}))
 
 (defn- submit-order-error-message
@@ -402,15 +407,40 @@
     :unlocking waiting-message
     base-message))
 
+(defn- order-mutation-target
+  [state]
+  (let [owner-address (or (account-context/owner-address state)
+                          (get-in state [:wallet :address]))
+        account-address (or (account-context/active-trading-account-address state)
+                            owner-address)
+        vault-address (account-context/exchange-vault-address state)]
+    {:owner-address owner-address
+     :account-address account-address
+     :vault-address vault-address
+     :options (cond-> {}
+                vault-address (assoc :vault-address vault-address))}))
+
+(defn- submit-order-for-target!
+  [store address action options]
+  (apply trading-api/submit-order!
+         (cond-> [store address action]
+           (seq options) (conj options))))
+
+(defn- cancel-order-for-target!
+  [store address action options]
+  (apply trading-api/cancel-order!
+         (cond-> [store address action]
+           (seq options) (conj options))))
+
 (defn- run-pre-submit-actions!
-  [store address request exchange-response-error runtime-error-message]
+  [store address request exchange-response-error runtime-error-message options]
   (let [pre-actions (->> (:pre-actions request)
                          (filter map?)
                          vec)]
     (letfn [(submit-next! [remaining]
               (if (empty? remaining)
                 (js/Promise.resolve {:ok? true})
-                (-> (trading-api/submit-order! store address (first remaining))
+                (-> (submit-order-for-target! store address (first remaining) options)
                     (.then (fn [resp]
                              (let [result (pre-submit-outcome exchange-response-error resp)]
                                (if (:ok? result)
@@ -427,7 +457,8 @@
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [state @store
         spectate-mode-message (spectate-mode-precondition-error state)
-        address (get-in state [:wallet :address])
+        {:keys [owner-address account-address options]} (order-mutation-target state)
+        address owner-address
         agent-status (get-in state [:wallet :agent :status])]
     (if (seq spectate-mode-message)
       (do
@@ -470,13 +501,14 @@
                                          address
                                          request
                                          exchange-response-error
-                                         runtime-error-message)
+                                         runtime-error-message
+                                         options)
                 (.then (fn [pre-submit-result]
                          (if-not (:ok? pre-submit-result)
                            (do
                              (swap! store update-order-submit-runtime (:error-text pre-submit-result))
                              (show-toast! store :error (:toast-message pre-submit-result)))
-                           (-> (trading-api/submit-order! store address (:action request))
+                           (-> (submit-order-for-target! store address (:action request) options)
                                (.then (fn [resp]
                                         (let [{:keys [ok? success-count error-text toast-message]}
                                               (submit-outcome exchange-response-error resp)]
@@ -484,7 +516,7 @@
                                             (do
                                               (swap! store update-order-submit-runtime nil)
                                               (show-toast! store :success {:toast-surface :order-submitted :headline "Order submitted" :subline "Awaiting fill confirmation" :message "Order submitted."})
-                                              (refresh-account-surfaces-after-order-mutation! store address refresh-opts)
+                                              (refresh-account-surfaces-after-order-mutation! store account-address refresh-opts)
                                               (dispatch! store nil [[:actions/refresh-order-history]]))
                                             (if (trading-api/enable-trading-recovery-error? error-text)
                                               (swap! store open-enable-trading-recovery)
@@ -492,7 +524,7 @@
                                                 (swap! store update-order-submit-runtime error-text)
                                                 (show-toast! store :error toast-message)
                                                 (when (pos? success-count)
-                                                  (refresh-account-surfaces-after-order-mutation! store address refresh-opts)
+                                                  (refresh-account-surfaces-after-order-mutation! store account-address refresh-opts)
                                                   (dispatch! store nil [[:actions/refresh-order-history]]))))))))
                                (.catch handle-submit-runtime-error!)))))
                 (.catch handle-submit-runtime-error!))))))))))
@@ -561,17 +593,18 @@
 (defn api-submit-position-tpsl
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [state @store
-        address (get-in state [:wallet :address])
+        {:keys [owner-address account-address options]} (order-mutation-target state)
+        address owner-address
         agent-status (get-in state [:wallet :agent :status])]
     (if-let [error-text (position-tpsl-submit-precondition-error state address agent-status)]
       (reject-position-tpsl-submit! store show-toast! error-text)
-      (-> (trading-api/submit-order! store address (:action request))
+      (-> (submit-order-for-target! store address (:action request) options)
           (.then (partial handle-position-tpsl-submit-response!
                           store
                           dispatch!
                           exchange-response-error
                           show-toast!
-                          address))
+                          account-address))
           (.catch (partial handle-position-tpsl-submit-runtime-error!
                            store
                            runtime-error-message
@@ -632,17 +665,18 @@
 (defn api-submit-position-margin
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
   (let [state @store
-        address (get-in state [:wallet :address])
+        {:keys [owner-address account-address options]} (order-mutation-target state)
+        address owner-address
         agent-status (get-in state [:wallet :agent :status])]
     (if-let [error-text (position-margin-submit-precondition-error state address agent-status)]
       (reject-position-margin-submit! store show-toast! error-text)
-      (-> (trading-api/submit-order! store address (:action request))
+      (-> (submit-order-for-target! store address (:action request) options)
           (.then (partial handle-position-margin-submit-response!
                           store
                           dispatch!
                           exchange-response-error
                           show-toast!
-                          address))
+                          account-address))
           (.catch (partial handle-position-margin-submit-runtime-error!
                            store
                            runtime-error-message
@@ -655,7 +689,8 @@
            runtime-error-message
            show-toast!]} _ store request]
   (let [state @store
-        address (get-in state [:wallet :address])
+        {:keys [owner-address account-address options]} (order-mutation-target state)
+        address owner-address
         spectate-mode-message (spectate-mode-precondition-error state)
         agent-status (get-in state [:wallet :agent :status])
         twap-cancel? (twap-cancel-request? request)
@@ -698,7 +733,7 @@
         ;; Hide targeted orders immediately; rollback by clearing pending ids on failure.
         (when (seq cancel-oids)
           (swap! store add-pending-cancel-oids cancel-oids))
-        (-> (trading-api/cancel-order! store address (:action request))
+        (-> (cancel-order-for-target! store address (:action request) options)
             (.then (fn [resp]
                      (if twap-cancel?
                        (let [{:keys [ok? error-text toast-message]}
@@ -713,7 +748,7 @@
                                     (assoc-in [:orders :cancel-response] resp))))
                          (show-toast! store (if ok? :success :error) toast-message)
                          (when ok?
-                           (refresh-account-surfaces-after-order-mutation! store address)
+                           (refresh-account-surfaces-after-order-mutation! store account-address)
                            (dispatch! store nil [[:actions/refresh-order-history]])))
                        (let [{:keys [ok? success-cancels error-text toast-message]}
                              (cancel-outcome exchange-response-error request resp)
@@ -736,7 +771,7 @@
                                     (prune-fn success-request))))
                          (show-toast! store (if ok? :success :error) toast-message)
                          (when (pos? success-count)
-                           (refresh-account-surfaces-after-order-mutation! store address)
+                           (refresh-account-surfaces-after-order-mutation! store account-address)
                            (dispatch! store nil [[:actions/refresh-order-history]]))))))
             (.catch (fn [err]
                       (let [error-text (runtime-error-message err)]

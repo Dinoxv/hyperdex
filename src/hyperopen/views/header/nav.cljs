@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
-            [hyperopen.router :as router]))
+            [hyperopen.router :as router]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]))
 
 (def ^:private funding-route
   "/funding-comparison")
@@ -49,7 +50,12 @@
     :label "API"
     :route api-wallets-actions/canonical-route
     :placements #{:more}
-    :active-fn api-wallets-actions/api-wallet-route?}])
+    :active-fn api-wallets-actions/api-wallet-route?}
+   {:id :subaccounts
+    :label "Sub-Accounts"
+    :route subaccounts-actions/canonical-route
+    :placements #{:more}
+    :active-fn subaccounts-actions/subaccounts-route?}])
 
 (defn- present-item
   [current-route item]

@@ -21,6 +21,10 @@
 (s/def ::api-wallet-form-field #{:name :address :days-valid})
 (s/def ::api-wallet-form-field-args (s/tuple ::api-wallet-form-field any?))
 (s/def ::api-wallet-row-args (s/tuple map?))
+(s/def ::subaccount-form-field-args
+  (s/tuple (s/or :keyword keyword?
+                 :string string?)
+           any?))
 (s/def ::staking-form-field #{:deposit-amount
                               :withdraw-amount
                               :delegate-amount
@@ -476,6 +480,17 @@
    :actions/open-api-wallet-remove-modal ::api-wallet-row-args
    :actions/close-api-wallet-modal ::common/no-args
    :actions/confirm-api-wallet-modal ::common/no-args
+   :actions/load-subaccounts-route ::common/path-args
+   :actions/select-subaccount ::common/address-args
+   :actions/select-master-account ::common/no-args
+   :actions/set-subaccount-form-field ::subaccount-form-field-args
+   :actions/submit-create-subaccount ::common/no-args
+   :actions/start-rename-subaccount ::common/address-args
+   :actions/cancel-rename-subaccount ::common/no-args
+   :actions/submit-rename-subaccount ::common/address-args
+   :actions/start-transfer-subaccount ::common/address-args
+   :actions/cancel-transfer-subaccount ::common/no-args
+   :actions/submit-transfer-subaccount ::common/address-args
    :actions/load-funding-comparison-route ::common/path-args
    :actions/load-funding-comparison ::common/no-args
    :actions/set-funding-comparison-query ::common/single-input-args

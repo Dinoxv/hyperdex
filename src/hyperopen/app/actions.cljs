@@ -2,7 +2,8 @@
   (:require [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
             [hyperopen.runtime.action-adapters :as action-adapters]
-            [hyperopen.runtime.collaborators :as runtime-collaborators]))
+            [hyperopen.runtime.collaborators :as runtime-collaborators]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]))
 
 (defn- runtime-action-overrides
   []
@@ -40,6 +41,17 @@
                  :open-api-wallet-remove-modal api-wallets-actions/open-api-wallet-remove-modal
                  :close-api-wallet-modal api-wallets-actions/close-api-wallet-modal
                  :confirm-api-wallet-modal api-wallets-actions/confirm-api-wallet-modal}
+   :subaccounts {:load-subaccounts-route action-adapters/load-subaccounts-route-action
+                 :select-subaccount subaccounts-actions/select-subaccount
+                 :select-master-account subaccounts-actions/select-master-account
+                 :set-subaccount-form-field subaccounts-actions/set-subaccount-form-field
+                 :submit-create-subaccount subaccounts-actions/submit-create-subaccount
+                 :start-rename-subaccount subaccounts-actions/start-rename-subaccount
+                 :cancel-rename-subaccount subaccounts-actions/cancel-rename-subaccount
+                 :submit-rename-subaccount subaccounts-actions/submit-rename-subaccount
+                 :start-transfer-subaccount subaccounts-actions/start-transfer-subaccount
+                 :cancel-transfer-subaccount subaccounts-actions/cancel-transfer-subaccount
+                 :submit-transfer-subaccount subaccounts-actions/submit-transfer-subaccount}
    :spectate-mode {:open-spectate-mode-modal action-adapters/open-spectate-mode-modal
                 :close-spectate-mode-modal action-adapters/close-spectate-mode-modal
                 :set-spectate-mode-search action-adapters/set-spectate-mode-search

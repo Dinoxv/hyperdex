@@ -78,6 +78,126 @@
     (is (true? (account-context/trader-portfolio-route-active?
                 {:router {:path (str "/portfolio/trader/" trader)}})))))
 
+(defn- subaccount-state
+  [overrides]
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        row {:name "Desk A"
+             :sub-account-user selected
+             :master owner
+             :clearinghouse-state {:marginSummary {:accountValue "123.45"}}
+             :spot-state {:balances []}}]
+    (merge {:wallet {:address owner}
+            :account-context {:spectate-mode {:active? false
+                                              :address nil}
+                              :subaccounts {:rows [row]
+                                            :selected-address selected}}}
+           overrides)))
+
+(deftest selected-owned-subaccount-becomes-read-and-trading-target-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        row {:name "Desk A"
+             :sub-account-user selected
+             :master owner
+             :clearinghouse-state {:marginSummary {:accountValue "123.45"}}
+             :spot-state {:balances []}}
+        state (subaccount-state {:account-context {:spectate-mode {:active? false
+                                                                    :address nil}
+                                                   :subaccounts {:rows [row]
+                                                                 :selected-address selected}}})]
+    (is (= selected
+           (account-context/selected-subaccount-address state)))
+    (is (= row
+           (account-context/selected-subaccount-row state)))
+    (is (true? (account-context/selected-subaccount-owned-by-owner? state)))
+    (is (= selected
+           (account-context/effective-account-address state)))
+    (is (= selected
+           (account-context/active-trading-account-address state)))
+    (is (= selected
+           (account-context/exchange-vault-address state)))
+    (is (= selected
+           (account-context/live-user-stream-address state)))
+    (is (true? (account-context/mutations-allowed? state)))
+    (is (nil? (account-context/mutations-blocked-message state)))))
+
+(deftest selected-subaccount-preserves-master-default-and-read-only-overrides-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        spectate "0x3333333333333333333333333333333333333333"
+        trader "0x4444444444444444444444444444444444444444"
+        no-selection-state (subaccount-state
+                            {:account-context {:spectate-mode {:active? false
+                                                               :address nil}
+                                               :subaccounts {:rows []
+                                                             :selected-address nil}}})
+        spectate-state (subaccount-state
+                        {:account-context {:spectate-mode {:active? true
+                                                           :address spectate}
+                                           :subaccounts {:rows [{:name "Desk A"
+                                                                :sub-account-user selected
+                                                                :master owner}]
+                                                         :selected-address selected}}})
+        trader-state (subaccount-state
+                      {:router {:path (str "/portfolio/trader/" trader)}
+                       :account-context {:spectate-mode {:active? false
+                                                         :address nil}
+                                         :subaccounts {:rows [{:name "Desk A"
+                                                              :sub-account-user selected
+                                                              :master owner}]
+                                                       :selected-address selected}}})]
+    (is (= owner
+           (account-context/effective-account-address no-selection-state)))
+    (is (= owner
+           (account-context/active-trading-account-address no-selection-state)))
+    (is (nil? (account-context/exchange-vault-address no-selection-state)))
+    (is (= owner
+           (account-context/live-user-stream-address no-selection-state)))
+    (is (= spectate
+           (account-context/effective-account-address spectate-state)))
+    (is (= spectate
+           (account-context/live-user-stream-address spectate-state)))
+    (is (= selected
+           (account-context/active-trading-account-address spectate-state)))
+    (is (false? (account-context/mutations-allowed? spectate-state)))
+    (is (= account-context/spectate-mode-read-only-message
+           (account-context/mutations-blocked-message spectate-state)))
+    (is (= trader
+           (account-context/effective-account-address trader-state)))
+    (is (nil? (account-context/live-user-stream-address trader-state)))
+    (is (= selected
+           (account-context/active-trading-account-address trader-state)))
+    (is (false? (account-context/mutations-allowed? trader-state)))
+    (is (= account-context/trader-portfolio-read-only-message
+           (account-context/mutations-blocked-message trader-state)))))
+
+(deftest stale-or-unowned-selected-subaccount-blocks-mutations-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        other-master "0x5555555555555555555555555555555555555555"
+        stale-state (subaccount-state
+                     {:account-context {:spectate-mode {:active? false
+                                                        :address nil}
+                                        :subaccounts {:rows []
+                                                      :selected-address selected}}})
+        unowned-state (subaccount-state
+                       {:account-context {:spectate-mode {:active? false
+                                                          :address nil}
+                                          :subaccounts {:rows [{:name "External"
+                                                               :sub-account-user selected
+                                                               :master other-master}]
+                                                        :selected-address selected}}})]
+    (is (nil? (account-context/exchange-vault-address stale-state)))
+    (is (false? (account-context/mutations-allowed? stale-state)))
+    (is (re-find #"Subaccount"
+                 (str (account-context/mutations-blocked-message stale-state))))
+    (is (nil? (account-context/exchange-vault-address unowned-state)))
+    (is (false? (account-context/mutations-allowed? unowned-state)))
+    (is (re-find #"Subaccount"
+                 (str (account-context/mutations-blocked-message unowned-state))))
+    (is (false? (account-context/selected-subaccount-owned-by-owner? unowned-state)))))
+
 (deftest mutations-allowed-is-disabled-during-spectate-mode-test
   (is (false? (account-context/mutations-allowed?
                {:account-context {:spectate-mode {:active? true

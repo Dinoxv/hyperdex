@@ -6,6 +6,7 @@
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]))
 
 (defn current-route-path
@@ -33,6 +34,9 @@
 
                      (api-wallets-actions/api-wallet-route? route)
                      [[:actions/load-api-wallet-route route]]
+
+                     (subaccounts-actions/subaccounts-route? route)
+                     [[:actions/load-subaccounts-route route]]
 
                      (portfolio-routes/portfolio-optimize-route? route)
                      [[:actions/load-portfolio-optimizer-route route]]

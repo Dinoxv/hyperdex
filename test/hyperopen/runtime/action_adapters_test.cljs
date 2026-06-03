@@ -37,6 +37,7 @@
   (is (fn? action-adapters/load-funding-comparison-route-action))
   (is (fn? action-adapters/load-staking-route-action))
   (is (fn? action-adapters/load-api-wallet-route-action))
+  (is (fn? action-adapters/load-subaccounts-route-action))
   (is (fn? action-adapters/connect-wallet-action))
   (is (fn? action-adapters/disconnect-wallet-action))
   (is (fn? action-adapters/should-auto-enable-agent-trading?))

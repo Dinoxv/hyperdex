@@ -575,6 +575,20 @@
     (is (= [[:actions/navigate "/api"]]
            (get-in api-link [1 :on :click])))))
 
+(deftest header-more-menu-renders-subaccounts-link-and-highlights-subaccounts-route-test
+  (let [view (header-view/header-view {:wallet {}
+                                       :router {:path "/subAccounts"}})
+        trigger (find-node-by-role view "header-more-trigger")
+        subaccounts-link (find-node-by-role view "header-more-link-subaccounts")
+        trigger-classes (set (class-values (get-in trigger [1 :class])))
+        subaccounts-classes (set (class-values (get-in subaccounts-link [1 :class])))]
+    (is (some? subaccounts-link))
+    (is (contains? trigger-classes "header-nav-link-active"))
+    (is (contains? subaccounts-classes "bg-[#123a36]"))
+    (is (= "/subAccounts" (get-in subaccounts-link [1 :href])))
+    (is (= [[:actions/navigate "/subAccounts"]]
+           (get-in subaccounts-link [1 :on :click])))))
+
 (deftest header-view-uses-app-shell-gutter-test
   (let [view (header-view/header-view {:wallet {}})]
     (is (hiccup/contains-class? view "app-shell-gutter"))))

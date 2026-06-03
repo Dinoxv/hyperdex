@@ -359,6 +359,42 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-load-api-wallets}}
 
+   :actions/load-subaccounts-route
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-load-subaccounts}}
+
+   :actions/select-subaccount
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-load-user-data}}
+
+   :actions/select-master-account
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-load-user-data}}
+
+   :actions/submit-create-subaccount
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-create-subaccount}}
+
+   :actions/submit-rename-subaccount
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-rename-subaccount}}
+
+   :actions/submit-transfer-subaccount
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-transfer-subaccount}}
+
    :actions/confirm-api-wallet-modal
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
@@ -392,6 +428,7 @@
                         :effects/api-fetch-staking-history
                         :effects/api-fetch-staking-spot-state
                         :effects/api-load-api-wallets
+                        :effects/api-load-subaccounts
                         :effects/fetch-asset-selector-markets}}
 
    :actions/navigate-mobile-header-menu
@@ -419,6 +456,7 @@
                         :effects/api-fetch-staking-rewards
                         :effects/api-fetch-staking-history
                         :effects/api-fetch-staking-spot-state
+                        :effects/api-load-subaccounts
                         :effects/fetch-asset-selector-markets}}})
 
 (defn action-policy

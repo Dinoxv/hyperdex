@@ -253,6 +253,19 @@
              :account-context {:spectate-mode {:active? true
                                                :address spectate}}})))))
 
+(deftest desired-user-stream-address-prefers-selected-subaccount-test
+  (let [owner "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        subaccount "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        state {:wallet {:address owner}
+               :router {:path "/portfolio"}
+               :account-context {:subaccounts
+                                 {:selected-address subaccount
+                                  :rows [{:sub-account-user subaccount
+                                          :master owner
+                                          :name "Desk A"}]}}}]
+    (is (= subaccount
+           (subscriptions-runtime/desired-user-stream-address state)))))
+
 (deftest user-handler-unsubscribes-when-trader-portfolio-policy-disables-same-address-test
   (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         calls (atom [])

@@ -23,6 +23,7 @@
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
+(s/def ::api-subaccount-management-args (s/tuple map?))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-send-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-withdraw-args (s/tuple ::api-submit-request))
@@ -113,6 +114,10 @@
    :effects/fetch-asset-selector-markets ::fetch-asset-selector-markets-args
    :effects/sync-active-asset-funding-predictability ::common/coin-args
    :effects/api-load-api-wallets ::common/no-args
+   :effects/api-load-subaccounts ::common/no-args
+   :effects/api-create-subaccount ::api-subaccount-management-args
+   :effects/api-rename-subaccount ::api-subaccount-management-args
+   :effects/api-transfer-subaccount ::api-subaccount-management-args
    :effects/generate-api-wallet ::common/no-args
    :effects/api-authorize-api-wallet ::common/no-args
    :effects/api-remove-api-wallet ::common/no-args

@@ -102,6 +102,9 @@
                   account-endpoints/request-extra-agents! (fn [& args]
                                                             (swap! called conj [:request-extra-agents args])
                                                             {:ok :request-extra-agents})
+                  account-endpoints/request-sub-accounts! (fn [& args]
+                                                            (swap! called conj [:request-sub-accounts args])
+                                                            {:ok :request-sub-accounts})
                   account-endpoints/request-user-webdata2! (fn [& args]
                                                              (swap! called conj [:request-user-webdata2 args])
                                                              {:ok :request-user-webdata2})
@@ -141,6 +144,10 @@
                                                                 {:priority :high})))
       (is (= {:ok :request-extra-agents}
              (account-gateway/request-extra-agents! {:post-info! post-info!}
+                                                    "0xabc"
+                                                    {:priority :high})))
+      (is (= {:ok :request-sub-accounts}
+             (account-gateway/request-sub-accounts! {:post-info! post-info!}
                                                     "0xabc"
                                                     {:priority :high})))
       (is (= {:ok :request-user-webdata2}
@@ -204,6 +211,8 @@
                                                                     {:priority :high})))
       (is (some #(= :request-spot (first %)) @called))
       (is (some #(= :request-extra-agents (first %)) @called))
+      (is (= [:request-sub-accounts [post-info! "0xabc" {:priority :high}]]
+             (some #(when (= :request-sub-accounts (first %)) %) @called)))
       (is (some #(= :request-user-webdata2 (first %)) @called))
       (is (some #(= :request-staking-validator-summaries (first %)) @called))
       (is (some #(= :request-staking-delegator-summary (first %)) @called))

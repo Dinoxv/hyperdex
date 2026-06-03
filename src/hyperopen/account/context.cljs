@@ -14,6 +14,9 @@
 (def trader-portfolio-read-only-message
   "Trader portfolio routes are read-only. Open your Portfolio to place trades or move funds.")
 
+(def selected-subaccount-unavailable-message
+  "Subaccount selection is unavailable. Refresh subaccounts or switch back to the master account.")
+
 (def ^:private max-watchlist-size
   50)
 
@@ -148,6 +151,62 @@
   [state]
   (some? (trader-portfolio-address state)))
 
+(defn selected-subaccount-address
+  [state]
+  (normalize-address (get-in state [:account-context :subaccounts :selected-address])))
+
+(defn- subaccount-row-address
+  [row]
+  (normalize-address (or (:sub-account-user row)
+                         (:subAccountUser row)
+                         (get row "subAccountUser")
+                         (get row "sub-account-user"))))
+
+(defn- subaccount-row-master
+  [row]
+  (normalize-address (or (:master row)
+                         (get row "master"))))
+
+(defn- normalize-subaccount-row
+  [row]
+  (when-let [address (subaccount-row-address row)]
+    (cond-> (assoc row :sub-account-user address)
+      (subaccount-row-master row) (assoc :master (subaccount-row-master row)))))
+
+(defn selected-subaccount-row
+  [state]
+  (let [selected (selected-subaccount-address state)]
+    (when selected
+      (some (fn [row]
+              (let [row* (normalize-subaccount-row row)]
+                (when (= selected (:sub-account-user row*))
+                  row*)))
+            (get-in state [:account-context :subaccounts :rows])))))
+
+(defn selected-subaccount-owned-by-owner?
+  [state]
+  (let [owner (owner-address state)
+        row (selected-subaccount-row state)]
+    (and (some? owner)
+         (some? row)
+         (= owner (:master row)))))
+
+(defn selected-subaccount-unavailable?
+  [state]
+  (and (some? (selected-subaccount-address state))
+       (not (selected-subaccount-owned-by-owner? state))))
+
+(defn active-trading-account-address
+  [state]
+  (if (selected-subaccount-owned-by-owner? state)
+    (:sub-account-user (selected-subaccount-row state))
+    (owner-address state)))
+
+(defn exchange-vault-address
+  [state]
+  (when (selected-subaccount-owned-by-owner? state)
+    (:sub-account-user (selected-subaccount-row state))))
+
 (defn live-user-streams-enabled?
   [state]
   (not (trader-portfolio-route-active? state)))
@@ -162,7 +221,7 @@
     trader-address
     (if (spectate-mode-active? state)
       (spectate-address state)
-      (owner-address state))))
+      (active-trading-account-address state))))
 
 (defn live-user-stream-address
   [state]
@@ -172,7 +231,8 @@
 (defn inspected-account-read-only?
   [state]
   (or (spectate-mode-active? state)
-      (trader-portfolio-route-active? state)))
+      (trader-portfolio-route-active? state)
+      (selected-subaccount-unavailable? state)))
 
 (defn mutations-allowed?
   [state]
@@ -187,6 +247,9 @@
     (trader-portfolio-route-active? state)
     trader-portfolio-read-only-message
 
+    (selected-subaccount-unavailable? state)
+    selected-subaccount-unavailable-message
+
     :else
     nil))
 
@@ -195,6 +258,19 @@
   {:spectate-mode {:active? false
                 :address nil
                 :started-at-ms nil}
+   :subaccounts {:status :idle
+                 :loaded-for-owner nil
+                 :rows []
+                 :error nil
+                 :selected-address nil
+                 :selection-loaded? false
+                 :create-name ""
+                 :rename-name ""
+                 :transfer-amount ""
+                 :transfer-direction :deposit
+                 :creating? false
+                 :renaming-address nil
+                 :transferring-address nil}
    :spectate-ui {:modal-open? false
               :anchor nil
               :search ""

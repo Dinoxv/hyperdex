@@ -15,7 +15,8 @@
 (deftest header-vm-centralizes-route-aware-nav-state-test
   (let [funding-vm (vm/header-vm {:router {:path "/fundingComparison"}})
         leaderboard-vm (vm/header-vm {:router {:path "/leaderboard"}})
-        api-vm (vm/header-vm {:router {:path "/API"}})]
+        api-vm (vm/header-vm {:router {:path "/API"}})
+        subaccounts-vm (vm/header-vm {:router {:path "/subAccounts"}})]
     (is (= [:trade :portfolio :funding :vaults :staking :leaderboard]
            (mapv :id (:desktop-nav-items funding-vm))))
     (is (true? (some->> (:desktop-nav-items funding-vm)
@@ -24,7 +25,10 @@
                         (some #(when (= :leaderboard (:id %)) (:active? %))))))
     (is (= "header-more-link-api"
            (get-in api-vm [:more-nav :items 0 :more-data-role])))
-    (is (true? (get-in api-vm [:more-nav :active?])))))
+    (is (= "header-more-link-subaccounts"
+           (get-in subaccounts-vm [:more-nav :items 1 :more-data-role])))
+    (is (true? (get-in api-vm [:more-nav :active?])))
+    (is (true? (get-in subaccounts-vm [:more-nav :active?])))))
 
 (deftest header-vm-projects-wallet-enable-trading-state-test
   (let [approving-vm (vm/header-vm {:wallet {:connected? true

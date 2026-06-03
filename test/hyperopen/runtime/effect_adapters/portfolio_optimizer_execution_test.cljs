@@ -80,6 +80,61 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest execute-portfolio-optimizer-plan-effect-routes-selected-subaccount-test
+  (async done
+    (let [submitted (atom [])
+          dispatches (atom [])
+          ticks (atom [1000 1100])
+          owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          plan (dissoc ready-plan :scenario-id)
+          store (atom {:wallet {:address owner-address
+                                :agent {:status :ready}}
+                       :account-context {:subaccounts
+                                         {:selected-address subaccount-address
+                                          :rows [{:sub-account-user subaccount-address
+                                                  :master owner-address
+                                                  :name "Desk A"}]}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC"
+                                                     :market-type :perp
+                                                     :asset-id 0
+                                                     :szDecimals 4}}}
+                       :portfolio {:optimizer
+                                   {:execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn []
+                      (let [t (first @ticks)]
+                        (swap! ticks rest)
+                        t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store submitted-address action & [options]]
+                      (swap! submitted conj [submitted-address action options])
+                      (js/Promise.resolve
+                       {:status "ok"
+                        :response {:data {:statuses ["success"]}}}))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [runtime-store ctx effects]
+                      (swap! dispatches conj [runtime-store ctx effects]))]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil
+             store
+            plan)
+            (.then (fn [ledger]
+                     (let [[submitted-address action options] (first @submitted)]
+                       (is (= :executed (:status ledger)))
+                       (is (= owner-address submitted-address))
+                       (is (= "order" (:type action)))
+                       (is (= {:vault-address subaccount-address}
+                              options)))
+                     (is (= [[store nil [[:actions/load-user-data subaccount-address]
+                                          [:actions/refresh-order-history]]]]
+                            @dispatches))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest execute-portfolio-optimizer-plan-effect-records-partial-when-blocked-rows-remain-test
   (async done
     (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

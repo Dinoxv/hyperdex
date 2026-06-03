@@ -106,3 +106,40 @@
     (is (= [["0xabc"]] @open-orders-calls))
     (is (= [["0xabc"]] @fills-calls))
     (is (= [[store "0xabc" {:priority :high}]] @funding-calls))))
+
+(deftest load-user-data-defaults-to-selected-subaccount-test
+  (let [owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        open-orders-calls (atom [])
+        fills-calls (atom [])
+        funding-calls (atom [])
+        store (atom {:wallet {:address owner-address}
+                     :account-context {:subaccounts
+                                       {:selected-address subaccount-address
+                                        :rows [{:sub-account-user subaccount-address
+                                                :master owner-address
+                                                :name "Desk A"}]}}})]
+    (api-effects/load-user-data!
+     {:store store
+      :request-frontend-open-orders! (fn [address opts]
+                                       (swap! open-orders-calls conj [address opts])
+                                       (js/Promise.resolve []))
+      :request-user-fills! (fn [address opts]
+                             (swap! fills-calls conj [address opts])
+                             (js/Promise.resolve []))
+      :apply-open-orders-success (fn [state _dex rows]
+                                   (assoc-in state [:orders :open-orders-snapshot] rows))
+      :apply-open-orders-error (fn [state err]
+                                 (assoc-in state [:orders :open-error] (str err)))
+      :apply-user-fills-success (fn [state rows]
+                                  (assoc-in state [:orders :fills] rows))
+      :apply-user-fills-error (fn [state err]
+                                (assoc-in state [:orders :fills-error] (str err)))
+      :fetch-and-merge-funding-history! (fn [runtime-store address opts]
+                                          (swap! funding-calls conj [runtime-store address opts]))})
+    (is (= [[subaccount-address {:priority :high}]]
+           @open-orders-calls))
+    (is (= [[subaccount-address {:priority :high}]]
+           @fills-calls))
+    (is (= [[store subaccount-address {:priority :high}]]
+           @funding-calls))))

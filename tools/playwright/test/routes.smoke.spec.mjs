@@ -11,7 +11,8 @@ const routeCases = [
     parityId: "portfolio-root"
   },
   { name: "leaderboard", route: "/leaderboard", parityId: "leaderboard-root" },
-  { name: "vaults", route: "/vaults", parityId: "vaults-root" }
+  { name: "vaults", route: "/vaults", parityId: "vaults-root" },
+  { name: "subaccounts", route: "/subAccounts", parityId: "subaccounts-root" }
 ];
 
 test.describe("main route smoke @smoke", () => {

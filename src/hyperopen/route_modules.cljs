@@ -7,6 +7,7 @@
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]
             [shadow.loader :as loader]))
 
@@ -16,6 +17,7 @@
    :funding-comparison "funding_comparison_route"
    :staking "staking_route"
    :api-wallets "api_wallets_route"
+   :subaccounts "subaccounts_route"
    :vaults "vaults_route"})
 
 (def ^:private exported-view-paths-by-module
@@ -24,6 +26,7 @@
    :funding-comparison [["hyperopen" "views" "funding_comparison_view" "route_view"]]
    :staking [["hyperopen" "views" "staking_view" "route_view"]]
    :api-wallets [["hyperopen" "views" "api_wallets_view" "route_view"]]
+   :subaccounts [["hyperopen" "views" "subaccounts_view" "route_view"]]
    :vaults [["hyperopen" "views" "vaults" "list_view" "route_view"]
             ["hyperopen" "views" "vaults" "detail_view" "route_view"]]})
 
@@ -50,6 +53,7 @@
       (funding-comparison-actions/funding-comparison-route? route) :funding-comparison
       (staking-actions/staking-route? route) :staking
       (api-wallets-actions/api-wallet-route? route) :api-wallets
+      (subaccounts-actions/subaccounts-route? route) :subaccounts
       (vault-routes/vault-detail-route? route) :vaults
       (vault-routes/vault-route? route) :vaults
       :else nil)))

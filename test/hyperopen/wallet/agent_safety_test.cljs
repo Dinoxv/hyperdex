@@ -48,3 +48,47 @@
                                                :clear-timeout-fn (fn [_])})
              (done))))
        0))))
+
+(deftest install-agent-safety-routes-selected-subaccount-schedule-cancel-test
+  (async done
+    (let [owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          store (atom {:wallet {:connected? true
+                                :address owner-address
+                                :agent {:status :ready
+                                        :agent-address "0xagent"}}
+                       :account-context {:subaccounts
+                                         {:selected-address subaccount-address
+                                          :rows [{:sub-account-user subaccount-address
+                                                  :master owner-address
+                                                  :name "Desk A"}]}}})
+          runtime (atom {:timeouts {:agent-schedule-cancel-refresh nil}})
+          schedule-calls (atom [])
+          timer-calls (atom [])
+          original-schedule-cancel! trading-api/schedule-cancel!]
+      (set! trading-api/schedule-cancel!
+            (fn [_store address cancel-at-ms & [options]]
+              (swap! schedule-calls conj [address cancel-at-ms options])
+              (js/Promise.resolve {:status "ok"})))
+      (agent-safety/install-agent-safety-watch!
+       {:store store
+        :runtime runtime
+        :ahead-ms 60000
+        :refresh-ms 30000
+        :now-ms-fn (constantly 1000)
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! timer-calls conj [callback delay-ms])
+                          :timer-id)})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= [[owner-address 61000 {:vault-address subaccount-address}]]
+                  @schedule-calls))
+           (is (= 1 (count @timer-calls)))
+           (is (= 30000 (second (first @timer-calls))))
+           (finally
+             (set! trading-api/schedule-cancel! original-schedule-cancel!)
+             (agent-safety/stop-agent-safety! {:runtime runtime
+                                               :clear-timeout-fn (fn [_])})
+             (done))))
+       0))))

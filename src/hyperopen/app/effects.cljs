@@ -50,6 +50,10 @@
                  :generate-api-wallet effect-adapters/generate-api-wallet-effect
                  :api-authorize-api-wallet effect-adapters/api-authorize-api-wallet-effect
                  :api-remove-api-wallet effect-adapters/api-remove-api-wallet-effect}
+   :subaccounts {:api-load-subaccounts effect-adapters/api-load-subaccounts-effect
+                 :api-create-subaccount effect-adapters/api-create-subaccount-effect
+                 :api-rename-subaccount effect-adapters/api-rename-subaccount-effect
+                 :api-transfer-subaccount effect-adapters/api-transfer-subaccount-effect}
    :orders {:api-submit-order (effect-adapters/make-api-submit-order runtime)
             :confirm-api-submit-order effect-adapters/confirm-api-submit-order
             :api-cancel-order (effect-adapters/make-api-cancel-order runtime)

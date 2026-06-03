@@ -68,6 +68,85 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-sub-accounts-normalizes-null-and-addresses-test
+  (async done
+    (let [owner "0x1111111111111111111111111111111111111111"
+          subaccount "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          clearinghouse-state {:marginSummary {:accountValue "123.45"}}
+          spot-state {:balances [{:coin "USDC"
+                                  :total "10"}]}
+          calls (atom [])
+          run-request (fn [payload]
+                        (account/request-sub-accounts!
+                         (api-stubs/post-info-stub calls payload)
+                         owner
+                         {}))]
+      (try
+        (-> (run-request nil)
+            (.then
+             (fn [nil-result]
+               (is (= [] nil-result))
+               (run-request [{:name "Desk A"
+                              :subAccountUser "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                              :master "0x1111111111111111111111111111111111111111"
+                              :clearinghouseState clearinghouse-state
+                              :spotState spot-state}
+                             {:name "Missing user"
+                              :master owner}
+                             {:name "Invalid user"
+                              :subAccountUser "0xabc"
+                              :master owner}
+                             "not-a-row"])))
+            (.then
+             (fn [rows]
+               (is (= [{:name "Desk A"
+                        :sub-account-user subaccount
+                        :master owner
+                        :clearinghouse-state clearinghouse-state
+                        :spot-state spot-state}]
+                      rows))
+               (let [[body opts] (first @calls)]
+                 (is (= {"type" "subAccounts"
+                         "user" owner}
+                        body))
+                 (is (= {:priority :high
+                         :dedupe-key [:sub-accounts owner]
+                         :cache-ttl-ms 5000}
+                        opts)))
+               (is (= 2 (count @calls)))
+               (done)))
+            (.catch (async-support/unexpected-error done)))
+        (catch :default err
+          (is false (str "request-sub-accounts! should exist and return a promise: " err))
+          (done))))))
+
+(deftest request-sub-accounts-short-circuits-without-owner-test
+  (async done
+    (let [calls (atom 0)
+          post-info! (api-stubs/post-info-stub
+                      (fn [_body _opts]
+                        (swap! calls inc)
+                        []))]
+      (try
+        (-> (account/request-sub-accounts! post-info! nil {})
+            (.then
+             (fn [nil-result]
+               (is (= [] nil-result))
+               (account/request-sub-accounts! post-info! "" {})))
+            (.then
+             (fn [blank-result]
+               (is (= [] blank-result))
+               (account/request-sub-accounts! post-info! "   " {})))
+            (.then
+             (fn [whitespace-result]
+               (is (= [] whitespace-result))
+               (is (= 0 @calls))
+               (done)))
+            (.catch (async-support/unexpected-error done)))
+        (catch :default err
+          (is false (str "request-sub-accounts! should exist and return a promise: " err))
+          (done))))))
+
 (deftest request-user-webdata2-sends-user-specific-webdata-body-test
   (async done
     (let [calls (atom [])

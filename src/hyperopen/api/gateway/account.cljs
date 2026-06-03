@@ -53,6 +53,12 @@
    opts]
   (account-endpoints/request-extra-agents! post-info! address opts))
 
+(defn request-sub-accounts!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-sub-accounts! post-info! address opts))
+
 (defn request-user-webdata2!
   [{:keys [post-info!]}
    address

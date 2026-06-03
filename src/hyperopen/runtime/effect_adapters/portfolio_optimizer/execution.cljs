@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
-  (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
@@ -10,16 +11,18 @@
          :error {:message (execution-workflow/error-message err)}))
 
 (defn- submit-action!
-  [submit-order! store address action]
-  (submit-order! store address action))
+  [submit-order! store target action]
+  (apply submit-order!
+         (cond-> [store (:owner-address target) action]
+           (seq (:options target)) (conj (:options target)))))
 
 (defn- submit-actions!
-  [submit-order! store address actions]
+  [submit-order! store target actions]
   (reduce
    (fn [promise action]
      (.then promise
             (fn [responses]
-              (-> (submit-action! submit-order! store address action)
+              (-> (submit-action! submit-order! store target action)
                   (.then (fn [resp]
                            (conj responses resp)))))))
    (js/Promise.resolve [])
@@ -30,7 +33,7 @@
   (some #(when-not (execution/response-ok? %) %) responses))
 
 (defn- submit-execution-row!
-  [submit-order! store address row]
+  [submit-order! store target row]
   (if-not (= :ready (:status row))
     (js/Promise.resolve row)
     (let [request (:request row)
@@ -44,15 +47,15 @@
                 :status :failed
                 :error {:message "Execution row is missing an order action."}))
         (let [submit-promise
-              (.then (submit-actions! submit-order! store address pre-actions)
+              (.then (submit-actions! submit-order! store target pre-actions)
                      (fn [pre-responses]
                        (if-let [failed-pre-action (failed-pre-action-response pre-responses)]
                          (assoc row
                                 :status :failed
                                 :pre-action-responses pre-responses
                                 :error {:message (str "Pre-submit action failed: "
-                                                      (pr-str failed-pre-action))})
-                         (.then (submit-action! submit-order! store address action)
+                                                     (pr-str failed-pre-action))})
+                         (.then (submit-action! submit-order! store target action)
                                 (fn [resp]
                                   (if (execution/response-ok? resp)
                                     (assoc row
@@ -68,12 +71,12 @@
                     (mark-row-failed row err))))))))
 
 (defn- submit-execution-rows!
-  [submit-order! store address rows]
+  [submit-order! store target rows]
   (reduce
    (fn [promise row]
      (.then promise
             (fn [submitted-rows]
-              (-> (submit-execution-row! submit-order! store address row)
+              (-> (submit-execution-row! submit-order! store target row)
                   (.then (fn [submitted-row]
                            (conj submitted-rows submitted-row)))))))
    (js/Promise.resolve [])
@@ -210,6 +213,18 @@
      :address address
      :ledger ledger})))
 
+(defn- execution-mutation-target
+  [state]
+  (let [owner-address (or (account-context/owner-address state)
+                          (get-in state [:wallet :address]))
+        account-address (or (account-context/active-trading-account-address state)
+                            owner-address)
+        vault-address (account-context/exchange-vault-address state)]
+    {:owner-address owner-address
+     :account-address account-address
+     :options (cond-> {}
+                vault-address (assoc :vault-address vault-address))}))
+
 (defn execute-portfolio-optimizer-plan-effect
   [env _ store plan]
   (let [now-ms-fn (:now-ms env)
@@ -219,15 +234,15 @@
                                      [:load-scenario!
                                       :load-scenario-index!
                                       :save-scenario!
-                                      :save-scenario-index!])
+                                     :save-scenario-index!])
         state @store
-        address (get-in state [:wallet :address])
+        {:keys [owner-address account-address] :as target} (execution-mutation-target state)
         started-at-ms (now-ms-fn)
         attempt (execution/build-execution-attempt
                  {:plan plan
                   :market-by-key (get-in state [:asset-selector :market-by-key])
                   :orderbooks (:orderbooks state)})]
-    (if-not address
+    (if-not owner-address
       (let [completed-at-ms (now-ms-fn)
             rows (mapv #(if (= :ready (:status %))
                           (assoc % :status :failed
@@ -244,7 +259,7 @@
         (swap! store assoc-in
                contracts/execution-path
                (execution-workflow/begin-execution-state attempt started-at-ms))
-        (-> (submit-execution-rows! submit-order! store address (:rows attempt))
+        (-> (submit-execution-rows! submit-order! store target (:rows attempt))
             (.then (fn [rows]
                      (let [completed-at-ms (now-ms-fn)
                            ledger (execution-workflow/execution-ledger
@@ -253,8 +268,8 @@
                                    completed-at-ms
                                    rows)]
                        (swap! store execution-workflow/apply-execution-ledger ledger)
-                       (refresh-after-execution! dispatch! store address ledger)
+                       (refresh-after-execution! dispatch! store account-address ledger)
                        (persist-execution-ledger! persistence-env
                                                   store
-                                                  address
+                                                  account-address
                                                   ledger)))))))))

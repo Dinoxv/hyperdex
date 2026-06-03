@@ -24,6 +24,10 @@
   [{:keys [post-info!]} address opts]
   (account-gateway/request-extra-agents! {:post-info! post-info!} address opts))
 
+(defn request-sub-accounts!
+  [{:keys [post-info!]} address opts]
+  (account-gateway/request-sub-accounts! {:post-info! post-info!} address opts))
+
 (defn request-user-webdata2!
   [{:keys [post-info!]} address opts]
   (account-gateway/request-user-webdata2! {:post-info! post-info!} address opts))

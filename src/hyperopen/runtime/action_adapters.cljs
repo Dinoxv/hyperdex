@@ -88,6 +88,8 @@
 
 (def load-api-wallet-route-action navigation-adapters/load-api-wallet-route-action)
 
+(def load-subaccounts-route-action navigation-adapters/load-subaccounts-route-action)
+
 (def connect-wallet-action wallet-adapters/connect-wallet-action)
 
 (def disconnect-wallet-action wallet-adapters/disconnect-wallet-action)

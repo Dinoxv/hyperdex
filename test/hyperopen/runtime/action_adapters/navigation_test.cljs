@@ -7,6 +7,7 @@
             [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
             [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
@@ -72,6 +73,7 @@
   (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
                 funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
                 staking-actions/load-staking-route (fn [_state _path] [])
+                subaccounts-actions/load-subaccounts-route (fn [_state _path] [])
                 api-wallets-actions/load-api-wallet-route (fn [_state _path]
                                                             [[:effects/save [:api-wallets :loading :extra-agents?] true]
                                                              [:effects/api-load-api-wallets]])]
@@ -81,6 +83,22 @@
             [:effects/load-route-module "/API"]
             [:effects/api-load-api-wallets]]
            (navigation-adapters/navigate {} "/API")))))
+
+(deftest navigate-appends-subaccounts-route-effects-after-route-projection-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                subaccounts-actions/load-subaccounts-route
+                (fn [_state _path]
+                  [[:effects/save-many [[[:account-context :subaccounts :status] :loading]]]
+                   [:effects/api-load-subaccounts]])]
+    (is (= [[:effects/save [:router :path] "/subAccounts"]
+            [:effects/save-many [[[:account-context :subaccounts :status] :loading]]]
+            [:effects/push-state "/subAccounts"]
+            [:effects/load-route-module "/subAccounts"]
+            [:effects/api-load-subaccounts]]
+           (navigation-adapters/navigate {} "/subAccounts")))))
 
 (deftest navigate-appends-portfolio-optimizer-route-effects-after-route-module-load-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])

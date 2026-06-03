@@ -37,6 +37,11 @@
            (route-refresh/current-route-refresh-effects
             {:router {:path "/api"}}
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))))
+  (testing "subaccounts route refreshes only subaccounts"
+    (is (= [[:actions/load-subaccounts-route "/subAccounts"]]
+           (route-refresh/current-route-refresh-effects
+            {:router {:path "/subAccounts"}}
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))))
   (testing "optimizer scenario route refreshes only optimizer scenario state"
     (is (= [[:actions/load-portfolio-optimizer-route "/portfolio/optimize/scn_route"]]
            (route-refresh/current-route-refresh-effects

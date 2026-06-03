@@ -1,5 +1,6 @@
 (ns hyperopen.wallet.agent-safety
-  (:require [hyperopen.api.trading :as trading]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.api.trading :as trading]
             [hyperopen.order.exchange-errors :as exchange-errors]
             [hyperopen.platform :as platform]))
 
@@ -36,7 +37,8 @@
   [(boolean (get-in state [:wallet :connected?]))
    (get-in state [:wallet :address])
    (get-in state [:wallet :agent :status])
-   (get-in state [:wallet :agent :agent-address])])
+   (get-in state [:wallet :agent :agent-address])
+   (account-context/exchange-vault-address state)])
 
 (defn- response-text
   [resp]
@@ -56,11 +58,20 @@
         (swap! store update-in [:wallet :agent] dissoc :safety))
       :ok)))
 
+(defn- schedule-cancel-options
+  [state]
+  (if-let [vault-address (account-context/exchange-vault-address state)]
+    {:vault-address vault-address}
+    {}))
+
 (defn- submit-schedule-cancel!
   [store owner-address cancel-at-ms]
-  (-> (trading/schedule-cancel! store owner-address cancel-at-ms)
-      (.then (partial handle-schedule-cancel-response! store))
-      (.catch (fn [_] :error))))
+  (let [options (schedule-cancel-options @store)]
+    (-> (apply trading/schedule-cancel!
+               (cond-> [store owner-address cancel-at-ms]
+                 (seq options) (conj options)))
+        (.then (partial handle-schedule-cancel-response! store))
+        (.catch (fn [_] :error)))))
 
 (defn- refresh-allowed?
   [store disposition]

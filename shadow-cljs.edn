@@ -38,6 +38,8 @@
                                   :depends-on #{:main}}
                   :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
                                       :depends-on #{:main}}
+                  :subaccounts_route {:entries [hyperopen.views.subaccounts-view]
+                                      :depends-on #{:main}}
                   :vaults_route {:entries [hyperopen.views.vaults.list-view
                                            hyperopen.views.vaults.detail-view
                                            hyperopen.views.vaults.startup-preview]
@@ -133,6 +135,8 @@
                       :staking_route {:entries [hyperopen.views.staking-view]
                                       :depends-on #{:main}}
                       :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
+                                          :depends-on #{:main}}
+                      :subaccounts_route {:entries [hyperopen.views.subaccounts-view]
                                           :depends-on #{:main}}
                       :vaults_route {:entries [hyperopen.views.vaults.list-view
                                                hyperopen.views.vaults.detail-view

@@ -2,7 +2,8 @@
   (:require [hyperopen.api.endpoints.account.agents :as agents]
             [hyperopen.api.endpoints.account.funding-history :as funding-history]
             [hyperopen.api.endpoints.account.portfolio :as portfolio]
-            [hyperopen.api.endpoints.account.staking :as staking]))
+            [hyperopen.api.endpoints.account.staking :as staking]
+            [hyperopen.api.endpoints.account.subaccounts :as subaccounts]))
 
 (defn request-user-funding-history!
   [post-info! normalize-info-funding-rows-fn sort-funding-history-rows-fn
@@ -22,6 +23,10 @@
 (defn request-extra-agents!
   [post-info! address opts]
   (agents/request-extra-agents! post-info! address opts))
+
+(defn request-sub-accounts!
+  [post-info! address opts]
+  (subaccounts/request-sub-accounts! post-info! address opts))
 
 (defn request-user-webdata2!
   [post-info! address opts]

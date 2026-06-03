@@ -80,6 +80,8 @@
             [hyperopen.api.trading.internal-seams-test]
             [hyperopen.api.trading.session-invalidation-test]
             [hyperopen.api.trading.sign-and-submit-test]
+            [hyperopen.api.trading.subaccount-management-signing-test]
+            [hyperopen.api.trading.subaccount-vault-signing-test]
             [hyperopen.app.bootstrap-test]
             [hyperopen.app.effects-test]
             [hyperopen.app.startup-test]
@@ -102,6 +104,7 @@
             [hyperopen.core-bootstrap.order-effects.cancel-test]
             [hyperopen.core-bootstrap.order-effects.position-margin-test]
             [hyperopen.core-bootstrap.order-effects.position-tpsl-test]
+            [hyperopen.core-bootstrap.order-effects.subaccount-routing-test]
             [hyperopen.core-bootstrap.order-effects.submit-failures-test]
             [hyperopen.core-bootstrap.order-effects.submit-refresh-test]
             [hyperopen.core-bootstrap.order-effects.test-support-test]
@@ -352,6 +355,8 @@
             [hyperopen.state.trading.order-request-test]
             [hyperopen.state.trading.submit-policy-formal-conformance-test]
             [hyperopen.state.trading.validation-and-scale-test]
+            [hyperopen.subaccounts.actions-test]
+            [hyperopen.subaccounts.effects-test]
             [hyperopen.system-test]
             [hyperopen.telemetry-test]
             [hyperopen.telemetry.console-preload-debug-api-test]
@@ -520,6 +525,7 @@
             [hyperopen.views.portfolio.volume-history-popover-test]
             [hyperopen.views.spectate-mode-modal-test]
             [hyperopen.views.staking-view-test]
+            [hyperopen.views.subaccounts-view-test]
             [hyperopen.views.trade-view.layout-state-test]
             [hyperopen.views.trade-view.layout-test]
             [hyperopen.views.trade-view.loading-shell-test]
@@ -754,6 +760,8 @@
              'hyperopen.api.trading.internal-seams-test
              'hyperopen.api.trading.session-invalidation-test
              'hyperopen.api.trading.sign-and-submit-test
+             'hyperopen.api.trading.subaccount-management-signing-test
+             'hyperopen.api.trading.subaccount-vault-signing-test
              'hyperopen.app.bootstrap-test
              'hyperopen.app.effects-test
              'hyperopen.app.startup-test
@@ -776,6 +784,7 @@
              'hyperopen.core-bootstrap.order-effects.cancel-test
              'hyperopen.core-bootstrap.order-effects.position-margin-test
              'hyperopen.core-bootstrap.order-effects.position-tpsl-test
+             'hyperopen.core-bootstrap.order-effects.subaccount-routing-test
              'hyperopen.core-bootstrap.order-effects.submit-failures-test
              'hyperopen.core-bootstrap.order-effects.submit-refresh-test
              'hyperopen.core-bootstrap.order-effects.test-support-test
@@ -1026,6 +1035,8 @@
              'hyperopen.state.trading.order-request-test
              'hyperopen.state.trading.submit-policy-formal-conformance-test
              'hyperopen.state.trading.validation-and-scale-test
+             'hyperopen.subaccounts.actions-test
+             'hyperopen.subaccounts.effects-test
              'hyperopen.system-test
              'hyperopen.telemetry-test
              'hyperopen.telemetry.console-preload-debug-api-test
@@ -1194,6 +1205,7 @@
              'hyperopen.views.portfolio.volume-history-popover-test
              'hyperopen.views.spectate-mode-modal-test
              'hyperopen.views.staking-view-test
+             'hyperopen.views.subaccounts-view-test
              'hyperopen.views.trade-view.layout-state-test
              'hyperopen.views.trade-view.layout-test
              'hyperopen.views.trade-view.loading-shell-test

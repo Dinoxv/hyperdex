@@ -197,6 +197,10 @@
   ([address] (request-extra-agents! address {}))
   ([address opts] (account/request-extra-agents! {:post-info! post-info!} address opts)))
 
+(defn request-sub-accounts!
+  ([address] (request-sub-accounts! address {}))
+  ([address opts] (account/request-sub-accounts! {:post-info! post-info!} address opts)))
+
 (defn request-user-webdata2!
   ([address] (request-user-webdata2! address {}))
   ([address opts] (account/request-user-webdata2! {:post-info! post-info!} address opts)))

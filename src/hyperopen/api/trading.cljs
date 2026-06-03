@@ -83,20 +83,47 @@
   (cancel-request/build-cancel-twap-request state twap))
 
 (defn submit-order!
-  [store address action]
-  (agent-actions/submit-order! store address action))
+  ([store address action]
+   (agent-actions/submit-order! store address action))
+  ([store address action options]
+   (agent-actions/submit-order! store address action options)))
 
 (defn cancel-order!
-  [store address action]
-  (agent-actions/cancel-order! store address action))
+  ([store address action]
+   (agent-actions/cancel-order! store address action))
+  ([store address action options]
+   (agent-actions/cancel-order! store address action options)))
 
 (defn submit-vault-transfer!
-  [store address action]
-  (agent-actions/submit-vault-transfer! store address action))
+  ([store address action]
+   (agent-actions/submit-vault-transfer! store address action))
+  ([store address action options]
+   (agent-actions/submit-vault-transfer! store address action options)))
+
+(defn create-sub-account!
+  ([store address name]
+   (agent-actions/create-sub-account! store address name))
+  ([store address name options]
+   (agent-actions/create-sub-account! store address name options)))
+
+(defn modify-sub-account!
+  ([store address sub-account-user name]
+   (agent-actions/modify-sub-account! store address sub-account-user name))
+  ([store address sub-account-user name options]
+   (agent-actions/modify-sub-account! store address sub-account-user name options)))
+
+(defn transfer-sub-account!
+  ([store address sub-account-user is-deposit? usd]
+   (agent-actions/transfer-sub-account! store address sub-account-user is-deposit? usd))
+  ([store address sub-account-user is-deposit? usd options]
+   (agent-actions/transfer-sub-account!
+    store address sub-account-user is-deposit? usd options)))
 
 (defn schedule-cancel!
   ([store address cancel-at-ms]
-   (agent-actions/schedule-cancel! store address cancel-at-ms)))
+   (agent-actions/schedule-cancel! store address cancel-at-ms))
+  ([store address cancel-at-ms options]
+   (agent-actions/schedule-cancel! store address cancel-at-ms options)))
 
 (defn approve-agent!
   [store address action]

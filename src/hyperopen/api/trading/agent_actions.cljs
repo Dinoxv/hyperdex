@@ -258,12 +258,67 @@
                                 (get-in @store [:wallet :agent :nonce-cursor]))
                             (:max-nonce-retries options)))))))))))
 
-(defn submit-order! [store address action] (sign-and-post-agent-action! store address action))
-(defn cancel-order! [store address action] (sign-and-post-agent-action! store address action))
-(defn submit-vault-transfer! [store address action] (sign-and-post-agent-action! store address action))
+(defn submit-order!
+  ([store address action]
+   (submit-order! store address action {}))
+  ([store address action options]
+   (sign-and-post-agent-action! store address action options)))
+
+(defn cancel-order!
+  ([store address action]
+   (cancel-order! store address action {}))
+  ([store address action options]
+   (sign-and-post-agent-action! store address action options)))
+
+(defn submit-vault-transfer!
+  ([store address action]
+   (submit-vault-transfer! store address action {}))
+  ([store address action options]
+   (sign-and-post-agent-action! store address action options)))
+
+(defn- management-action-options
+  [options]
+  (assoc (or options {}) :vault-address nil))
+
+(defn create-sub-account!
+  ([store address name]
+   (create-sub-account! store address name {}))
+  ([store address name options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "createSubAccount"
+                                 :name name}
+                                (management-action-options options))))
+
+(defn modify-sub-account!
+  ([store address sub-account-user name]
+   (modify-sub-account! store address sub-account-user name {}))
+  ([store address sub-account-user name options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "subAccountModify"
+                                 :subAccountUser (http/normalize-address sub-account-user)
+                                 :name name}
+                                (management-action-options options))))
+
+(defn transfer-sub-account!
+  ([store address sub-account-user is-deposit? usd]
+   (transfer-sub-account! store address sub-account-user is-deposit? usd {}))
+  ([store address sub-account-user is-deposit? usd options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "subAccountTransfer"
+                                 :subAccountUser (http/normalize-address sub-account-user)
+                                 :isDeposit (boolean is-deposit?)
+                                 :usd usd}
+                                (management-action-options options))))
+
 (defn schedule-cancel!
-  [store address cancel-at-ms]
-  (sign-and-post-agent-action! store
-                               address
-                               {:type "scheduleCancel"
-                                :time cancel-at-ms}))
+  ([store address cancel-at-ms]
+   (schedule-cancel! store address cancel-at-ms {}))
+  ([store address cancel-at-ms options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "scheduleCancel"
+                                 :time cancel-at-ms}
+                                options)))

@@ -9,6 +9,7 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
@@ -83,7 +84,8 @@
                 (vault-actions/load-vault-route state normalized-path)
                 (funding-comparison-actions/load-funding-comparison-route state normalized-path)
                 (staking-actions/load-staking-route state normalized-path)
-                (api-wallets-actions/load-api-wallet-route state normalized-path))))
+                (api-wallets-actions/load-api-wallet-route state normalized-path)
+                (subaccounts-actions/load-subaccounts-route state normalized-path))))
 
 (defn- route-projection-and-follow-up-effects
   [state normalized-path]
@@ -139,3 +141,7 @@
 (defn load-api-wallet-route-action
   [state path]
   (api-wallets-actions/load-api-wallet-route state path))
+
+(defn load-subaccounts-route-action
+  [state path]
+  (subaccounts-actions/load-subaccounts-route state path))

@@ -19,6 +19,7 @@
             [hyperopen.startup.runtime :as startup-runtime]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.surface-modules :as surface-modules]
+            [hyperopen.subaccounts.effects :as subaccounts-effects]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
@@ -404,6 +405,49 @@
   [_ store]
   (api-wallets-effects/api-load-api-wallets!
    (api-wallets-load-deps store)))
+
+(defn- subaccounts-load-deps
+  [store]
+  {:store store
+   :request-sub-accounts! api/request-sub-accounts!
+   :local-storage-get platform/local-storage-get
+   :now-ms-fn platform/now-ms})
+
+(defn api-load-subaccounts-effect
+  [_ store]
+  (subaccounts-effects/api-load-subaccounts!
+   (subaccounts-load-deps store)))
+
+(defn- subaccounts-management-deps
+  [store]
+  (merge (subaccounts-load-deps store)
+         {:create-sub-account! trading-api/create-sub-account!
+          :modify-sub-account! trading-api/modify-sub-account!
+          :transfer-sub-account! trading-api/transfer-sub-account!
+          :runtime-error-message agent-runtime/runtime-error-message
+          :dispatch! nxr/dispatch
+          :load-subaccounts! (fn [opts]
+                               (subaccounts-effects/load-subaccounts!
+                                (merge (subaccounts-load-deps store)
+                                       opts)))}))
+
+(defn api-create-subaccount-effect
+  [_ store request]
+  (subaccounts-effects/create-subaccount!
+   (assoc (subaccounts-management-deps store)
+          :request request)))
+
+(defn api-rename-subaccount-effect
+  [_ store request]
+  (subaccounts-effects/rename-subaccount!
+   (assoc (subaccounts-management-deps store)
+          :request request)))
+
+(defn api-transfer-subaccount-effect
+  [_ store request]
+  (subaccounts-effects/transfer-subaccount!
+   (assoc (subaccounts-management-deps store)
+          :request request)))
 
 (defn generate-api-wallet-effect
   [_ store]

@@ -6,6 +6,7 @@
             [hyperopen.schema.runtime-registration.portfolio :as portfolio]
             [hyperopen.schema.runtime-registration.spectate-mode :as spectate-mode]
             [hyperopen.schema.runtime-registration.staking :as staking]
+            [hyperopen.schema.runtime-registration.subaccounts :as subaccounts]
             [hyperopen.schema.runtime-registration.trade :as trade]
             [hyperopen.schema.runtime-registration.vaults :as vaults]
             [hyperopen.schema.runtime-registration.wallet :as wallet]
@@ -21,6 +22,7 @@
    wallet/effect-binding-rows
    spectate-mode/effect-binding-rows
    api-wallets/effect-binding-rows
+   subaccounts/effect-binding-rows
    leaderboard/effect-binding-rows
    funding-comparison/effect-binding-rows
    portfolio/effect-binding-rows
@@ -39,6 +41,7 @@
    funding/action-binding-rows
    leaderboard/action-binding-rows
    api-wallets/action-binding-rows
+   subaccounts/action-binding-rows
    funding-comparison/action-binding-rows
    staking/action-binding-rows
    vaults/action-binding-rows))

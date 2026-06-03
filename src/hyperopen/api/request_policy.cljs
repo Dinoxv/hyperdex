@@ -12,6 +12,7 @@
    :frontend-open-orders 2500
    :user-fills 5000
    :extra-agents 5000
+   :sub-accounts 5000
    :user-webdata2 5000
    :validator-summaries 10000
    :delegator-summary 5000
