@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.montecarlo.engine-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.portfolio.metrics.returns :as returns]
             [hyperopen.portfolio.montecarlo.engine :as engine]))
 
 (defn- approx= [a b tol]
@@ -38,6 +39,82 @@
   (let [h (engine/histogram [] 8)]
     (is (= 8 (count (:counts h))))
     (is (= 0 (reduce + (:counts h))) "empty input is safe")))
+
+;; ---------------------------------------------------------------------------
+;; Elapsed-time (irregular cadence) annualization
+;; ---------------------------------------------------------------------------
+
+(defn- interval [simple dt-years]
+  {:simple-return simple
+   :log-return (js/Math.log (+ 1 simple))
+   :dt-years dt-years})
+
+(defn- varied-intervals [n]
+  (mapv (fn [i]
+          (interval (* 0.05 (- (js/Math.sin i) 0.1))
+                    (/ (+ 5 (mod (* 7 i) 23)) 365.0))) ; irregular 5–27 day gaps
+        (range n)))
+
+(deftest engine-annualizes-cagr-by-elapsed-time-not-point-count-test
+  ;; 20 intervals each 0.1y => 2.0 years total; each +3.526% compounds to ~+100%
+  ;; over those 2 years. The annualized CAGR must be ~2^(1/2)-1 = +41.4%, NOT a
+  ;; count/365 inflation (which would treat 20 points as 20/365 years and explode).
+  (let [per (- (js/Math.pow 2 (/ 1.0 20)) 1)
+        ivals (mapv (fn [_] (interval per 0.1)) (range 20))
+        res (engine/run {:intervals ivals :sims 200 :method :shuffle :seed 5 :start-equity 1})]
+    (is (approx= 2.0 (get-in res [:meta :total-years]) 1e-9)
+        "elapsed time is 2 years, not 20/365")
+    (is (approx= 0.41421 (get-in res [:cagr :p50]) 1e-3)
+        "CAGR is the ~2-year annualized rate, not a point-count inflation")
+    (is (approx= (returns/interval-cagr ivals) (get-in res [:cagr :p50]) 1e-6)
+        "engine CAGR equals the tearsheet interval-cagr")))
+
+(deftest engine-sharpe-vol-cagr-match-tearsheet-irregular-test
+  ;; The Monte Carlo per-path annualized metrics must equal the tearsheet's
+  ;; irregular-interval math on the same intervals (the whole point of the fix).
+  (let [ivals (varied-intervals 80)
+        res (engine/run {:intervals ivals :sims 600 :method :shuffle :seed 13 :start-equity 1})
+        exp-cagr (returns/interval-cagr ivals)
+        exp-vol (returns/volatility-ann-irregular ivals)
+        exp-sharpe (returns/sharpe-irregular ivals 0)]
+    (is (approx= exp-cagr (get-in res [:cagr :p50]) 1e-6) "CAGR matches interval-cagr")
+    (is (approx= exp-vol (get-in res [:vol :p50]) 1e-6) "vol matches volatility-ann-irregular")
+    (is (number? exp-sharpe))
+    (is (< (js/Math.abs (- exp-sharpe (get-in res [:sharpe :median])))
+           (* 0.15 (js/Math.abs exp-sharpe)))
+        "shuffle Sharpe median ≈ tearsheet sharpe-irregular (leave-one-out narrows to it)")))
+
+(deftest histogram-collapses-near-equal-values-test
+  ;; Values that differ only by floating-point noise (e.g. a shuffle-invariant
+  ;; CAGR, whose product is reordered but not bit-identical) must collapse to a
+  ;; single centered spike, not spread into a fake bell curve across bins.
+  (let [v (mapv (fn [i] (+ 13.8 (* i 1e-14))) (range 100))
+        h (engine/histogram v 34)]
+    (is (:degenerate? h) "near-equal values are treated as a single value")
+    (is (= 100 (reduce + (:counts h))) "all values are still counted")
+    (is (= 100 (nth (:counts h) (quot 34 2))) "they pile into the centre bin"))
+  (let [h (engine/histogram [0 1 2 3 4 5 6 7 8 9] 5)]
+    (is (not (:degenerate? h)) "a genuinely spread metric is not degenerate")))
+
+(deftest histogram-clips-to-percentile-domain-test
+  ;; A heavy right tail — a spread body 0.00..0.99 plus one extreme outlier at
+  ;; 100. Clipping the binning domain to [P1, P99] keeps the outlier from
+  ;; collapsing the body into a single left bar; it is clamped into the last bin
+  ;; and flagged so the renderer can mark the edge.
+  (let [body (mapv (fn [i] (/ i 100.0)) (range 100))
+        v (conj body 100.0)
+        sorted (vec (sort v))
+        lo (engine/percentile sorted 1)
+        hi (engine/percentile sorted 99)
+        full (engine/histogram v 34)
+        clipped (engine/histogram v 34 {:domain [lo hi]})]
+    (is (= 101 (reduce + (:counts full))) "all values counted (unclipped)")
+    (is (= 101 (reduce + (:counts clipped))) "clamped values are still counted")
+    (is (not (:overflow-hi? full)) "no domain ⇒ no overflow flag")
+    (is (:overflow-hi? clipped) "the +100 outlier is clamped into the last bin and flagged")
+    (is (< (:max clipped) (:data-max clipped)) "the displayed max is the clip bound, below the true max")
+    (is (> (count (filter pos? (:counts clipped))) 5) "clipping spreads the body across many bins")
+    (is (<= (count (filter pos? (:counts full))) 2) "without clipping the body collapses into ~one bin")))
 
 (deftest run-is-deterministic-by-seed-test
   (let [returns (varied-returns 250)
@@ -99,3 +176,59 @@
     (is (= 0 (:bust-prob res)))
     (is (= 0 (get-in res [:meta :sample-size])))
     (is (= [] (:draw-paths res)))))
+
+;; ---------------------------------------------------------------------------
+;; QuantStats shuffle method
+;; ---------------------------------------------------------------------------
+
+(deftest bootstrap-clamps-horizon-to-sample-size-test
+  ;; The forecast can never compound more days than were observed: a 365-day
+  ;; horizon over 100 days of history runs as 100 days. This removes the
+  ;; "worst case beats reality" artifact in Forecast mode.
+  (let [res (engine/run {:returns (varied-returns 100) :sims 200 :horizon 365 :seed 3})]
+    (is (= 100 (get-in res [:meta :horizon])) "horizon clamps down to the sample size")
+    (is (= 100 (peek (:times res))))
+    (is (= :bootstrap (get-in res [:meta :method])) "bootstrap is the default method"))
+  (let [res (engine/run {:returns (varied-returns 250) :sims 50 :horizon 90 :seed 3})]
+    (is (= 90 (get-in res [:meta :horizon])) "a horizon within history is left alone")))
+
+(deftest shuffle-pins-terminal-and-varies-drawdown-test
+  ;; A permutation preserves the product of (1+r), so every shuffled path ends
+  ;; at the same realized terminal value (worst case == best case == reality),
+  ;; while the *order* changes the drawdown along the way. This is the whole
+  ;; point of the QuantStats method.
+  (let [returns (varied-returns 120)
+        res (engine/run {:returns returns :sims 400 :horizon 999
+                         :method :shuffle :seed 7 :start-equity 1})
+        term (:terminal res)
+        dd (:maxdd res)
+        cagr (:cagr res)
+        sharpe (:sharpe res)]
+    (is (= :shuffle (get-in res [:meta :method])))
+    (is (= 120 (get-in res [:meta :horizon])) "shuffle length is the history length, not the horizon arg")
+    (is (= 120 (peek (:times res))))
+    (is (approx= (:p5 term) (:p95 term) 1e-9) "terminal P5 equals terminal P95")
+    (is (approx= (:min term) (:max term) 1e-9) "terminal min equals terminal max")
+    (is (< (:std term) 1e-9) "terminal value does not vary across orderings")
+    (is (< (:std cagr) 1e-9) "CAGR is fixed (terminal is shuffle-invariant), matching QuantStats montecarlo_cagr")
+    (is (> (:std dd) 0) "max drawdown genuinely varies across orderings")
+    (is (> (:std sharpe) 0) "Sharpe varies via QuantStats' per-path day-drop (leave-one-out)")))
+
+(deftest shuffle-band-converges-at-the-final-day-test
+  (let [res (engine/run {:returns (varied-returns 150) :sims 500
+                         :method :shuffle :seed 11})
+        {:keys [p5 p50 p95]} (:band res)
+        last-i (dec (count p50))]
+    (is (approx= (nth p5 last-i) (nth p95 last-i) 1e-9)
+        "all paths meet at the same realized endpoint")
+    (is (approx= (nth p50 last-i) (nth p95 last-i) 1e-9))))
+
+(deftest shuffle-is-deterministic-by-seed-test
+  (let [returns (varied-returns 120)
+        opts {:returns returns :sims 300 :method :shuffle :seed 21}
+        a (engine/run opts)
+        b (engine/run opts)
+        c (engine/run (assoc opts :seed 22))]
+    (is (= (:band a) (:band b)) "same seed reshuffles identically")
+    (is (= (get-in a [:maxdd :median]) (get-in b [:maxdd :median])))
+    (is (not= (:band a) (:band c)) "a different seed yields different orderings")))

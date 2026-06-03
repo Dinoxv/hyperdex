@@ -19,16 +19,27 @@
   [250 1000 2500])
 
 (def horizon-options
-  "Selectable forecast horizons in days (segmented control)."
-  [30 90 180 365])
+  "Selectable forecast horizons in MONTHS of calendar time (segmented control).
+  Vault history is sparse and irregularly spaced, so a forecast is expressed in
+  elapsed time, not a count of data points; the view model clamps the chosen
+  span to the realized history and converts it to a resample step count."
+  [3 6 12 24])
+
+(def method-options
+  "Selectable simulation methods (segmented control). `:shuffle` is the faithful
+  QuantStats method — reorder the realized returns (sequence risk), terminal
+  value pinned to reality. `:bootstrap` is the forward forecast — resample with
+  replacement over a horizon."
+  [:shuffle :bootstrap])
 
 (def default-controls
   "Default Monte Carlo controls. `:bust` and `:goal` are stored as whole
   percents (matching the UI); the view-model divides them by 100 before calling
   the engine. `:run-nonce` only exists to force a fresh chart animation when the
   user clicks Re-run with otherwise-identical (deterministic) inputs."
-  {:sims 1000
-   :horizon 90
+  {:method :shuffle
+   :sims 1000
+   :horizon 12
    :bust -30
    :goal 50
    :seed 42
@@ -36,7 +47,7 @@
 
 (def control-keys
   "Controls a user can set via `set-portfolio-monte-carlo-control`."
-  #{:sims :horizon :bust :goal :seed})
+  #{:method :sims :horizon :bust :goal :seed})
 
 (defn- parse-number
   [value]
@@ -84,11 +95,19 @@
   [value]
   (clamp-int value 0 9999 (:seed default-controls)))
 
+(defn normalize-method
+  "Simulation method: `:shuffle` (QuantStats reordering) or `:bootstrap`
+  (forward forecast). Unknown values fall back to the default."
+  [value]
+  (let [k (normalize-keyword-like value)]
+    (if (some #{k} method-options) k (:method default-controls))))
+
 (defn normalize-control
   "Normalize a single control `value` for `control` key. Unknown controls return
   the value unchanged."
   [control value]
   (case control
+    :method (normalize-method value)
     :sims (normalize-sims value)
     :horizon (normalize-horizon value)
     :bust (normalize-bust value)
@@ -133,7 +152,7 @@
     [[:effects/save (conj state-path* :run-nonce) (inc (or (parse-number nonce) 0))]]))
 
 (defn set-portfolio-monte-carlo-control
-  "Set one Monte Carlo control (`:sims`, `:horizon`, `:bust`, `:goal`, `:seed`)."
+  "Set one Monte Carlo control (`:method`, `:sims`, `:horizon`, `:bust`, `:goal`, `:seed`)."
   [_state control value]
   (set-control-at state-path control value))
 

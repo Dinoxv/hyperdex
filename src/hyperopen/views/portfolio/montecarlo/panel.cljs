@@ -10,6 +10,7 @@
   (:require [hyperopen.views.portfolio.montecarlo.chart :as chart]
             [hyperopen.views.portfolio.montecarlo.controls :as controls]
             [hyperopen.views.portfolio.montecarlo.distributions :as distributions]
+            [hyperopen.views.portfolio.montecarlo.format :as fmt]
             [hyperopen.views.portfolio.montecarlo.summary :as summary]))
 
 (defn- intro
@@ -24,41 +25,66 @@
     method-tag]])
 
 (defn- chart-card
-  [{:keys [result run-key controls chrome]}]
-  [:div {:class ["mc-card" "mc-chart-card"]}
-   [:div {:class ["mc-chart-head"]}
-    [:h3 {:class ["mc-chart-title"]}
-     (str "Simulated equity paths · " (:horizon controls) "-day forecast")]
-    [:div {:class ["mc-legend"]}
-     [:span [:i {:class ["mc-swatch" "mc-swatch-accent"]}] "Median (P50)"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-band"]}] "P5–P95 band"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-gold"]}] "Goal"]
-     [:span [:i {:class ["mc-swatch" "mc-swatch-red"]}] "Bust"]]]
-   [:div {:class ["mc-canvas-wrap"]}
-    [:div {:class ["mc-canvas-host"]
-           :data-role (str (:data-role-prefix chrome) "-equity-canvas")
-           :replicant/on-render (chart/spaghetti-on-render
-                                 {:result result
-                                  :show-paths? true
-                                  :path-count 120
-                                  :height 420
-                                  :update-key run-key})}]]])
+  [{:keys [result run-key chrome]}]
+  (let [span-years (get-in result [:meta :span-years])
+        sample (get-in result [:meta :sample-size])
+        shuffle? (= (get-in result [:meta :method]) :shuffle)
+        title (if shuffle?
+                (str "Reshuffled equity paths · " sample " snapshots over ~" (fmt/years-label span-years))
+                (str "Simulated equity paths · ~" (fmt/years-label span-years) " forecast"))]
+    [:div {:class ["mc-card" "mc-chart-card"]}
+     [:div {:class ["mc-chart-head"]}
+      [:h3 {:class ["mc-chart-title"]} title]
+      [:div {:class ["mc-legend"]}
+       [:span [:i {:class ["mc-swatch" "mc-swatch-accent"]}] "Median (P50)"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-band"]}] "P5–P95 band"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-gold"]}] "Goal"]
+       [:span [:i {:class ["mc-swatch" "mc-swatch-red"]}] "Bust"]]]
+     [:div {:class ["mc-canvas-wrap"]}
+      [:div {:class ["mc-canvas-host"]
+             :data-role (str (:data-role-prefix chrome) "-equity-canvas")
+             :replicant/on-render (chart/spaghetti-on-render
+                                   {:result result
+                                    :show-paths? true
+                                    :path-count 120
+                                    :height 420
+                                    :update-key run-key})}]]]))
 
 (defn- footnote
-  [{:keys [controls sample-size chrome]}]
-  (let [{:keys [horizon bust goal]} controls]
-    [:div {:class ["mc-foot"]}
-     [:b "Method. "]
-     (str "Each path draws " horizon
-          " daily returns at random (with replacement) from " (:history-owner chrome)
-          " realized history of "
-          sample-size
-          " trading days — preserving the empirical return distribution while breaking time-ordering. ")
-     [:b "Bust "]
-     (str "counts paths whose worst peak-to-trough drawdown breaches " bust "%; ")
-     [:b "goal "]
-     (str "counts paths ending at or above " goal
-          "%. Past distribution is not a guarantee of future results — this is a range-of-outcomes tool, not a prediction.")]))
+  [{:keys [controls result sample-size chrome]}]
+  (let [{:keys [horizon bust goal]} controls
+        span-years (get-in result [:meta :span-years])
+        total-years (get-in result [:meta :total-years])
+        shuffle? (= (get-in result [:meta :method]) :shuffle)]
+    (if shuffle?
+      [:div {:class ["mc-foot"]}
+       [:b "Method. "]
+       (str "Each path reorders " (:history-owner chrome) " " sample-size
+            " realized return intervals (spanning ~" (fmt/years-label total-years)
+            ") into a fresh random sequence (QuantStats' shuffle). Sharpe, volatility and CAGR are "
+            "annualized by each interval's real elapsed time — the same way the Performance Metrics "
+            "tab computes them, so they match the tearsheet rather than assuming one point per day. "
+            "The same returns reordered give the same product, so total return and CAGR are identical "
+            "on every path (the CAGR card is a single spike); Sharpe varies only marginally (QuantStats "
+            "drops the first interval); max drawdown is the one quantity that genuinely depends on the "
+            "order. ")
+       [:b "Bust "]
+       (str "counts orderings whose worst peak-to-trough drawdown breaches " bust "%. ")
+       "Sequence-risk view, not a forward prediction."]
+      [:div {:class ["mc-foot"]}
+       [:b "Method. "]
+       (str "Each path resamples " (:history-owner chrome) " " sample-size
+            " realized return intervals at random (with replacement) to fill a ~"
+            (fmt/years-label span-years) " calendar forecast"
+            (when (> (/ horizon 12) (or total-years 0))
+              " (clamped to the realized history — a forecast cannot cover more calendar time than was observed)")
+            ". Sharpe, volatility and CAGR are annualized by elapsed time, matching the Performance "
+            "Metrics tab. ")
+       [:b "Bust "]
+       (str "counts paths whose worst peak-to-trough drawdown breaches " bust "%; ")
+       [:b "goal "]
+       (str "counts paths ending at or above " goal
+            "%. Past distribution is not a guarantee of future results — this is a range-of-outcomes tool, not a prediction.")])))
 
 (defn- notice
   [{:keys [title body data-role-prefix]}]
@@ -75,28 +101,30 @@
    (controls/controls-bar model)
    (case status
      :ready
-     (let [{:keys [result run-key controls live-equity]} model]
+     (let [{:keys [result run-key controls live-equity method]} model]
        [:div {:class ["mc-body"]}
         [:div {:class ["mc-grid"]}
-         (chart-card {:result result :run-key run-key :controls controls :chrome chrome})
+         (chart-card {:result result :run-key run-key :chrome chrome})
          [:div {:class ["mc-rail"]}
-          (summary/prob-card {:result result :controls controls :chrome chrome})
-          (summary/percentile-table {:result result :controls controls
-                                     :live-equity live-equity :chrome chrome})]]
-        (distributions/distributions {:result result :controls controls
+          (summary/prob-card {:result result :controls controls :method method :chrome chrome})
+          (if (= method :shuffle)
+            (summary/realized-card {:result result :live-equity live-equity :chrome chrome})
+            (summary/percentile-table {:result result :controls controls
+                                       :live-equity live-equity :chrome chrome}))]]
+        (distributions/distributions {:result result :controls controls :method method
                                       :run-key run-key :chrome chrome})
         (footnote model)])
 
      :insufficient-history
      (notice {:title "Not enough history yet"
               :body (str "Monte Carlo needs at least " min-sample
-                         " days of realized returns to resample from. This " (:subject chrome) " has "
+                         " realized return intervals to resample from. This " (:subject chrome) " has "
                          sample-size
-                         " so far — check back as more daily history accrues, or widen the time range.")
+                         " so far — check back as more history accrues, or widen the time range.")
               :data-role-prefix (:data-role-prefix chrome)})
 
      (notice {:title "No realized returns yet"
-              :body (str "There is no realized daily-return history for the selected scope and time range, so there is nothing to resample. Once this "
+              :body (str "There is no realized return history for the selected scope and time range, so there is nothing to resample. Once this "
                          (:subject chrome)
                          " has trading history, the forecast will populate here.")
               :data-role-prefix (:data-role-prefix chrome)}))])

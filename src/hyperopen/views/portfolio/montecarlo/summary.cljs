@@ -21,30 +21,51 @@
            :style {:width (str (max 2 (* value 100)) "%")}}]]
      [:div {:class ["mc-prob-sub"]} sub]]))
 
+(defn- goal-indicator
+  "Shuffle mode pins the terminal return to the realized return (every ordering
+  ends at the same value), so the goal is deterministic, not probabilistic: the
+  realized return either clears it or it does not."
+  [{:keys [result goal data-role-prefix]}]
+  (let [realized (get-in result [:terminal :p50])
+        reached? (>= realized (/ goal 100))]
+    [:div {:class ["mc-prob"]
+           :data-role (str data-role-prefix "-prob-goal")}
+     [:div {:class ["mc-prob-top"]}
+      [:span {:class ["mc-prob-label"]}
+       [:i {:class ["mc-dot" "mc-dot-goal"]}]
+       "Goal"]
+      [:span {:class ["mc-prob-val" (if reached? "mc-prob-val-goal" "mc-prob-val-bust")]}
+       (if reached? "Reached" "Missed")]]
+     [:div {:class ["mc-prob-sub"]}
+      (str "realized " (fmt/signed-pct realized 1) " vs " goal "% goal · fixed across all orderings")]]))
+
 (defn prob-card
-  [{:keys [result controls chrome]}]
+  [{:keys [result controls method chrome]}]
   (let [{:keys [sims bust goal]} controls
         prefix (:data-role-prefix chrome)
-        goal-prob (:goal-prob result)
+        shuffle? (= method :shuffle)
         bust-prob (:bust-prob result)
-        goal-n (js/Math.round (* goal-prob sims))
         bust-n (js/Math.round (* bust-prob sims))
-        total (.toLocaleString sims)]
+        total (.toLocaleString sims)
+        unit (if shuffle? "orderings" "paths")]
     [:div {:class ["mc-card" "mc-prob-card"]
            :data-role (str prefix "-probabilities")}
-     (prob-row {:label "Probability of goal"
-                :kind :goal
-                :value goal-prob
-                :sub (str "≥ " goal "% return · " goal-n " of " total " paths")
-                :data-role-prefix prefix})
+     (if shuffle?
+       (goal-indicator {:result result :goal goal :data-role-prefix prefix})
+       (prob-row {:label "Probability of goal"
+                  :kind :goal
+                  :value (:goal-prob result)
+                  :sub (str "≥ " goal "% return · "
+                            (js/Math.round (* (:goal-prob result) sims)) " of " total " paths")
+                  :data-role-prefix prefix}))
      (prob-row {:label "Probability of bust"
                 :kind :bust
                 :value bust-prob
-                :sub (str "≤ " bust "% drawdown · " bust-n " of " total " paths")
+                :sub (str "≤ " bust "% drawdown · " bust-n " of " total " " unit)
                 :data-role-prefix prefix})]))
 
 (defn percentile-table
-  [{:keys [result controls live-equity chrome]}]
+  [{:keys [result live-equity chrome]}]
   (let [term (:terminal result)
         rows [["P5 — Worst case" (:p5 term)]
               ["P25" (:p25 term)]
@@ -55,7 +76,7 @@
            :data-role (str (:data-role-prefix chrome) "-terminal-table")}
      [:table {:class ["mc-pct-table"]}
       [:caption {:class ["mc-caption"]}
-       (str "Terminal outcome · day " (:horizon controls))]
+       (str "Terminal outcome · ~" (fmt/years-label (get-in result [:meta :span-years])))]
       [:thead
        [:tr
         [:th "Percentile"]
@@ -71,3 +92,25 @@
            [:td {:class [(if (>= v 0) "mc-pos" "mc-neg")]}
             (fmt/signed-pct v 1)]])
         rows)]]]))
+
+(defn realized-card
+  "Shuffle-mode replacement for the terminal percentile table. Because every
+  ordering ends at the same realized return, there is no terminal spread to
+  tabulate — show the single realized ending equity and total return instead."
+  [{:keys [result live-equity chrome]}]
+  (let [realized (get-in result [:terminal :p50])
+        end-eq (* live-equity (+ 1 realized))]
+    [:div {:class ["mc-card" "mc-card-pad" "mc-realized-card"]
+           :data-role (str (:data-role-prefix chrome) "-realized-outcome")}
+     [:div {:class ["mc-caption"]} "Realized outcome · identical across all orderings"]
+     [:div {:class ["mc-realized-grid"]}
+      [:div {:class ["mc-realized-cell"]}
+       [:div {:class ["mc-realized-k"]} (or (:equity-label chrome) "Ending equity")]
+       [:div {:class ["mc-realized-v"]} (fmt/usd end-eq)]]
+      [:div {:class ["mc-realized-cell"]}
+       [:div {:class ["mc-realized-k"]} "Total return"]
+       [:div {:class ["mc-realized-v" (if (>= realized 0) "mc-pos" "mc-neg")]}
+        (fmt/signed-pct realized 1)]]]
+     [:div {:class ["mc-realized-note"]}
+      (str "Annualized volatility " (fmt/unsigned-pct (get-in result [:vol :p50]) 0)
+           " · also fixed across all orderings")]]))

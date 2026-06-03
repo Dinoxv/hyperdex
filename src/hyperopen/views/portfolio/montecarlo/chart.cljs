@@ -20,6 +20,16 @@
 
 (def ^:private mono-font "\"JetBrains Mono\", ui-monospace, monospace")
 
+(defn- axis-time-label
+  "Compact elapsed-time tick label (the x-axis is calendar time, not a day count
+  — vault points are sparse and irregular)."
+  [y]
+  (cond
+    (<= y 0) "0"
+    (< y (/ 1.0 12)) (str (js/Math.round (* y 365)) "d")
+    (< y 1) (str (js/Math.round (* y 12)) "mo")
+    :else (str (.toFixed y 1) "y")))
+
 (defn- hex->rgba
   [hex a]
   (let [h (subs hex 1)
@@ -55,6 +65,7 @@
         bust-col (or bust-color (:red palette))
         start (get-in result [:meta :start-equity])
         H (get-in result [:meta :horizon])
+        span-years (or (get-in result [:meta :span-years]) 0)
         bust (get-in result [:meta :bust])
         goal (get-in result [:meta :goal])
         progress (if (nil? progress) 1 progress)
@@ -105,13 +116,14 @@
         (set! (.-fillStyle ctx) (:text-3 palette))
         (set! (.-textAlign ctx) "right")
         (.fillText ctx (str (when (>= ret-pct 0) "+") (.toFixed ret-pct 0) "%") (- pad-l 10) y)))
-    ;; x-axis day labels
+    ;; x-axis elapsed-time labels (calendar time, not a day count)
     (set! (.-textAlign ctx) "center")
     (set! (.-textBaseline ctx) "top")
     (dotimes [i 5]
-      (let [t (js/Math.round (* (/ i 4) H))]
+      (let [frac (/ i 4)
+            t (js/Math.round (* frac H))]
         (set! (.-fillStyle ctx) (:text-3 palette))
-        (.fillText ctx (str t "d") (x-of t) (+ pad-t plot-h 8))))
+        (.fillText ctx (axis-time-label (* frac span-years)) (x-of t) (+ pad-t plot-h 8))))
     ;; p5..p95 band
     (.beginPath ctx)
     (doseq [i (range 0 (inc max-i))] (.lineTo ctx (tx i) (y-of (nth p95 i))))
@@ -209,7 +221,15 @@
   [canvas {:keys [dist fmt accent threshold sign-by-value? median height bins progress]}]
   (let [{:keys [ctx w h]} (setup! canvas (or height 92))
         bins (or bins 34)
-        hist (engine/histogram (:raw dist) bins)
+        ;; Clip the x-axis to a P1–P99 band so a few extreme outliers (e.g. one
+        ;; wildly compounded bootstrap path) can't stretch the linear bins and
+        ;; crush the body of a heavy-tailed distribution into a single bar. The
+        ;; out-of-band paths are clamped into the edge bins and flagged so the
+        ;; clipped edge can show a "there is more beyond" marker.
+        sorted (:sorted dist)
+        clip-lo (engine/percentile sorted 1)
+        clip-hi (engine/percentile sorted 99)
+        hist (engine/histogram (:raw dist) bins {:domain [clip-lo clip-hi]})
         counts (:counts hist)
         max-c (max 1 (reduce max counts))
         accent (or accent (:accent palette))
@@ -238,7 +258,9 @@
         (set! (.-fillStyle ctx) (hex->rgba col 0.62))
         (.fillRect ctx (+ x 0.5) (- plot-h bh) (max 1 (- bw 1)) bh)))
     (when (number? median)
-      (let [mx (* (/ (- median mn) span) w)]
+      (let [mx (if (:degenerate? hist)
+                 (/ w 2)                       ; centered spike for a single-valued metric
+                 (* (/ (- median mn) span) w))]
         (set! (.-strokeStyle ctx) "#ffffff")
         (set! (.-globalAlpha ctx) 0.8)
         (set! (.-lineWidth ctx) 1.5)
@@ -251,9 +273,9 @@
     (set! (.-fillStyle ctx) (:text-3 palette))
     (set! (.-textBaseline ctx) "top")
     (set! (.-textAlign ctx) "left")
-    (.fillText ctx (fmt-fn (:min hist)) 2 (+ plot-h 3))
+    (.fillText ctx (str (when (:overflow-lo? hist) "‹ ") (fmt-fn (:min hist))) 2 (+ plot-h 3))
     (set! (.-textAlign ctx) "right")
-    (.fillText ctx (fmt-fn (:max hist)) (- w 2) (+ plot-h 3))
+    (.fillText ctx (str (fmt-fn (:max hist)) (when (:overflow-hi? hist) " ›")) (- w 2) (+ plot-h 3))
     (set! (.-strokeStyle ctx) (hex->rgba (:border palette) 0.8))
     (set! (.-lineWidth ctx) 1)
     (.beginPath ctx)
