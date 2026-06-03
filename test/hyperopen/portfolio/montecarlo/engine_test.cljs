@@ -96,6 +96,26 @@
   (let [h (engine/histogram [0 1 2 3 4 5 6 7 8 9] 5)]
     (is (not (:degenerate? h)) "a genuinely spread metric is not degenerate")))
 
+(deftest histogram-clips-to-percentile-domain-test
+  ;; A heavy right tail — a spread body 0.00..0.99 plus one extreme outlier at
+  ;; 100. Clipping the binning domain to [P1, P99] keeps the outlier from
+  ;; collapsing the body into a single left bar; it is clamped into the last bin
+  ;; and flagged so the renderer can mark the edge.
+  (let [body (mapv (fn [i] (/ i 100.0)) (range 100))
+        v (conj body 100.0)
+        sorted (vec (sort v))
+        lo (engine/percentile sorted 1)
+        hi (engine/percentile sorted 99)
+        full (engine/histogram v 34)
+        clipped (engine/histogram v 34 {:domain [lo hi]})]
+    (is (= 101 (reduce + (:counts full))) "all values counted (unclipped)")
+    (is (= 101 (reduce + (:counts clipped))) "clamped values are still counted")
+    (is (not (:overflow-hi? full)) "no domain ⇒ no overflow flag")
+    (is (:overflow-hi? clipped) "the +100 outlier is clamped into the last bin and flagged")
+    (is (< (:max clipped) (:data-max clipped)) "the displayed max is the clip bound, below the true max")
+    (is (> (count (filter pos? (:counts clipped))) 5) "clipping spreads the body across many bins")
+    (is (<= (count (filter pos? (:counts full))) 2) "without clipping the body collapses into ~one bin")))
+
 (deftest run-is-deterministic-by-seed-test
   (let [returns (varied-returns 250)
         opts {:returns returns :sims 500 :horizon 90 :seed 123 :start-equity 1000}

@@ -221,7 +221,15 @@
   [canvas {:keys [dist fmt accent threshold sign-by-value? median height bins progress]}]
   (let [{:keys [ctx w h]} (setup! canvas (or height 92))
         bins (or bins 34)
-        hist (engine/histogram (:raw dist) bins)
+        ;; Clip the x-axis to a P1–P99 band so a few extreme outliers (e.g. one
+        ;; wildly compounded bootstrap path) can't stretch the linear bins and
+        ;; crush the body of a heavy-tailed distribution into a single bar. The
+        ;; out-of-band paths are clamped into the edge bins and flagged so the
+        ;; clipped edge can show a "there is more beyond" marker.
+        sorted (:sorted dist)
+        clip-lo (engine/percentile sorted 1)
+        clip-hi (engine/percentile sorted 99)
+        hist (engine/histogram (:raw dist) bins {:domain [clip-lo clip-hi]})
         counts (:counts hist)
         max-c (max 1 (reduce max counts))
         accent (or accent (:accent palette))
@@ -265,9 +273,9 @@
     (set! (.-fillStyle ctx) (:text-3 palette))
     (set! (.-textBaseline ctx) "top")
     (set! (.-textAlign ctx) "left")
-    (.fillText ctx (fmt-fn (:min hist)) 2 (+ plot-h 3))
+    (.fillText ctx (str (when (:overflow-lo? hist) "‹ ") (fmt-fn (:min hist))) 2 (+ plot-h 3))
     (set! (.-textAlign ctx) "right")
-    (.fillText ctx (fmt-fn (:max hist)) (- w 2) (+ plot-h 3))
+    (.fillText ctx (str (fmt-fn (:max hist)) (when (:overflow-hi? hist) " ›")) (- w 2) (+ plot-h 3))
     (set! (.-strokeStyle ctx) (hex->rgba (:border palette) 0.8))
     (set! (.-lineWidth ctx) 1)
     (.beginPath ctx)

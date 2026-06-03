@@ -111,38 +111,58 @@
      :sorted sorted}))
 
 (defn histogram
-  "Bin numeric collection `xs` into `bins` equal-width buckets. Returns
-  `{:counts [...] :min :max :span :bin-width}`."
-  [xs bins]
-  (let [v (vec xs)]
-    (if (empty? v)
-      {:counts (vec (repeat bins 0)) :min 0 :max 0 :span 1 :bin-width (/ 1 bins)}
-      (let [mn (reduce min v)
-            mx (reduce max v)
-            ;; "Degenerate" = effectively a single value. A shuffle-invariant metric
-            ;; (e.g. CAGR) is constant in theory but differs by floating-point noise
-            ;; (~1e-13) because reordering a product is not bit-identical; an exact
-            ;; `==` would miss that and spread the noise into a fake bell curve. Use a
-            ;; relative tolerance so such a metric collapses to one centered spike.
-            degenerate? (<= (- mx mn)
-                            (* 1e-9 (max 1 (js/Math.abs mn) (js/Math.abs mx))))
-            span (let [s (- mx mn)] (if (or degenerate? (zero? s)) 1 s))
-            counts (js/Array. bins)]
-        (dotimes [i bins] (aset counts i 0))
-        (doseq [x v]
-          (let [b (if degenerate?
-                    (quot bins 2)
-                    (let [b (js/Math.floor (* (/ (- x mn) span) bins))]
-                      (cond (>= b bins) (dec bins)
-                            (< b 0) 0
-                            :else b)))]
-            (aset counts b (inc (aget counts b)))))
-        {:counts (vec counts)
-         :min mn
-         :max mx
-         :span span
-         :degenerate? degenerate?
-         :bin-width (/ span bins)}))))
+  "Bin numeric collection `xs` into `bins` equal-width buckets over an optional
+  clip `:domain [lo hi]` (default: the data's own min/max). Values outside the
+  domain are clamped into the edge bins, so the counts still sum to the input
+  size; `:overflow-lo?`/`:overflow-hi?` flag whether any were. Clipping the
+  domain to a percentile band keeps a few extreme outliers (e.g. one wildly
+  compounded bootstrap path) from stretching a linear axis and crushing the body
+  of a heavy-tailed distribution into a single bar.
+
+  Returns `{:counts [...] :min :max :data-min :data-max :span :degenerate?
+  :overflow-lo? :overflow-hi? :bin-width}` where `:min`/`:max` are the displayed
+  domain and `:data-min`/`:data-max` are the true extremes."
+  ([xs bins] (histogram xs bins nil))
+  ([xs bins {:keys [domain]}]
+   (let [v (vec xs)]
+     (if (empty? v)
+       {:counts (vec (repeat bins 0)) :min 0 :max 0 :data-min 0 :data-max 0
+        :span 1 :degenerate? true :overflow-lo? false :overflow-hi? false
+        :bin-width (/ 1 bins)}
+       (let [data-min (reduce min v)
+             data-max (reduce max v)
+             dlo (when (and domain (number? (first domain))) (first domain))
+             dhi (when (and domain (number? (second domain))) (second domain))
+             ;; Fall back to the full data range if no (valid) domain was given.
+             [lo hi] (if (and dlo dhi (< dlo dhi)) [dlo dhi] [data-min data-max])
+             ;; "Degenerate" = effectively a single value. A shuffle-invariant
+             ;; metric (e.g. CAGR) is constant in theory but differs by
+             ;; floating-point noise (~1e-13); an exact `==` would miss that and
+             ;; spread the noise into a fake bell curve. Use a relative tolerance
+             ;; so such a metric collapses to one centered spike.
+             degenerate? (<= (- hi lo)
+                             (* 1e-9 (max 1 (js/Math.abs lo) (js/Math.abs hi))))
+             span (if (or degenerate? (<= (- hi lo) 0)) 1 (- hi lo))
+             counts (js/Array. bins)]
+         (dotimes [i bins] (aset counts i 0))
+         (doseq [x v]
+           (let [b (if degenerate?
+                     (quot bins 2)
+                     (let [b (js/Math.floor (* (/ (- x lo) span) bins))]
+                       (cond (>= b bins) (dec bins)   ; clamp high overflow into the last bin
+                             (< b 0) 0                 ; clamp low overflow into the first bin
+                             :else b)))]
+             (aset counts b (inc (aget counts b)))))
+         {:counts (vec counts)
+          :min lo
+          :max hi
+          :data-min data-min
+          :data-max data-max
+          :span span
+          :degenerate? degenerate?
+          :overflow-lo? (boolean (and (not degenerate?) (< data-min lo)))
+          :overflow-hi? (boolean (and (not degenerate?) (> data-max hi)))
+          :bin-width (/ span bins)})))))
 
 ;; ---------------------------------------------------------------------------
 ;; Simulation
