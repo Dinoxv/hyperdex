@@ -81,6 +81,9 @@
         (get-in state [:account-context :subaccounts :rows])))
 
 (def set-subaccount-form-field management/set-subaccount-form-field)
+(def open-create-popover management/open-create-popover)
+(def close-create-popover management/close-create-popover)
+(def copy-subaccount-address management/copy-subaccount-address)
 (def parse-usdc-amount->micros management/parse-usdc-amount->micros)
 (def submit-create-subaccount management/submit-create-subaccount)
 (def start-rename-subaccount management/start-rename-subaccount)
@@ -98,6 +101,7 @@
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :create-name] ""]
+     [[:account-context :subaccounts :create-popover-open?] false]
      [[:account-context :subaccounts :rename-name] ""]
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]
@@ -108,6 +112,7 @@
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :selected-address] nil]
      [[:account-context :subaccounts :create-name] ""]
+     [[:account-context :subaccounts :create-popover-open?] false]
      [[:account-context :subaccounts :rename-name] ""]
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]

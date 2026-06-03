@@ -88,6 +88,7 @@
                                  [[:account-context :subaccounts :error] nil]
                                  [[:account-context :subaccounts :selected-address] nil]
                                  [[:account-context :subaccounts :create-name] ""]
+                                 [[:account-context :subaccounts :create-popover-open?] false]
                                  [[:account-context :subaccounts :rename-name] ""]
                                  [[:account-context :subaccounts :transfer-amount] ""]
                                  [[:account-context :subaccounts :transfer-direction] :deposit]
@@ -142,6 +143,20 @@
   (is (= []
          (actions/set-subaccount-form-field {} :unknown "value"))))
 
+(deftest subaccount-create-popover-actions-toggle-state-test
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] true]
+                                [[:account-context :subaccounts :create-name] ""]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/open-create-popover {})))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] false]
+                                [[:account-context :subaccounts :create-name] ""]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/close-create-popover {}))))
+
+(deftest copy-subaccount-address-emits-wallet-copy-effect-test
+  (is (= [[:effects/copy-wallet-address subaccount-address]]
+         (actions/copy-subaccount-address {} (str " " subaccount-address " ")))))
+
 (deftest subaccount-usdc-amount-parser-uses-raw-micro-usdc-units-test
   (is (= 1230000 (actions/parse-usdc-amount->micros "1.23")))
   (is (= 1 (actions/parse-usdc-amount->micros "0.000001")))
@@ -152,6 +167,7 @@
 
 (deftest submit-create-subaccount-validates-name-and-emits-management-effect-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :creating?] true]
+                                [[:account-context :subaccounts :create-popover-open?] true]
                                 [[:account-context :subaccounts :error] nil]]]
           [:effects/api-create-subaccount {:name "Desk"}]]
          (actions/submit-create-subaccount

@@ -77,6 +77,22 @@
                           [[:account-context :subaccounts :error] nil]]]]
     []))
 
+(defn open-create-popover
+  [_state]
+  [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] true]
+                        [[:account-context :subaccounts :create-name] ""]
+                        [[:account-context :subaccounts :error] nil]]]])
+
+(defn close-create-popover
+  [_state]
+  [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] false]
+                        [[:account-context :subaccounts :create-name] ""]
+                        [[:account-context :subaccounts :error] nil]]]])
+
+(defn copy-subaccount-address
+  [_state address]
+  [[:effects/copy-wallet-address (account-context/normalize-address address)]])
+
 (defn- normalize-subaccount-name
   [value]
   (some-> (str (or value ""))
@@ -135,6 +151,7 @@
       (not (valid-subaccount-name? name*)) (invalid-create-name-effect)
       :else
       [[:effects/save-many [[[:account-context :subaccounts :creating?] true]
+                            [[:account-context :subaccounts :create-popover-open?] true]
                             [[:account-context :subaccounts :error] nil]]]
        [:effects/api-create-subaccount {:name name*}]])))
 

@@ -21,10 +21,7 @@
 (s/def ::api-wallet-form-field #{:name :address :days-valid})
 (s/def ::api-wallet-form-field-args (s/tuple ::api-wallet-form-field any?))
 (s/def ::api-wallet-row-args (s/tuple map?))
-(s/def ::subaccount-form-field-args
-  (s/tuple (s/or :keyword keyword?
-                 :string string?)
-           any?))
+(s/def ::subaccount-form-field-args (s/tuple (s/or :keyword keyword? :string string?) any?))
 (s/def ::staking-form-field #{:deposit-amount
                               :withdraw-amount
                               :delegate-amount
@@ -484,6 +481,9 @@
    :actions/select-subaccount ::common/address-args
    :actions/select-master-account ::common/no-args
    :actions/set-subaccount-form-field ::subaccount-form-field-args
+   :actions/open-subaccount-create-popover ::common/no-args
+   :actions/close-subaccount-create-popover ::common/no-args
+   :actions/copy-subaccount-address ::common/address-args
    :actions/submit-create-subaccount ::common/no-args
    :actions/start-rename-subaccount ::common/address-args
    :actions/cancel-rename-subaccount ::common/no-args

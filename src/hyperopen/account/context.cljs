@@ -265,6 +265,7 @@
                  :selected-address nil
                  :selection-loaded? false
                  :create-name ""
+                 :create-popover-open? false
                  :rename-name ""
                  :transfer-amount ""
                  :transfer-direction :deposit

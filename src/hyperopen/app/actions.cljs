@@ -45,6 +45,9 @@
                  :select-subaccount subaccounts-actions/select-subaccount
                  :select-master-account subaccounts-actions/select-master-account
                  :set-subaccount-form-field subaccounts-actions/set-subaccount-form-field
+                 :open-subaccount-create-popover subaccounts-actions/open-create-popover
+                 :close-subaccount-create-popover subaccounts-actions/close-create-popover
+                 :copy-subaccount-address subaccounts-actions/copy-subaccount-address
                  :submit-create-subaccount subaccounts-actions/submit-create-subaccount
                  :start-rename-subaccount subaccounts-actions/start-rename-subaccount
                  :cancel-rename-subaccount subaccounts-actions/cancel-rename-subaccount

@@ -23,6 +23,7 @@
                                 :sub-account-user subaccount-address}]
                         :selected-address subaccount-address
                         :create-name "Desk"
+                        :create-popover-open? true
                         :rename-name "Ops"
                         :transfer-amount "1.23"
                         :transfer-direction :deposit
@@ -75,6 +76,7 @@
                            :selected-address nil
                            :selection-loaded? false
                            :create-name ""
+                           :create-popover-open? false
                            :rename-name ""
                            :transfer-amount ""
                            :transfer-direction :deposit
@@ -235,6 +237,7 @@
                    (is (= [[store owner-address "Desk"]] @submit-calls))
                    (is (= [{:force-refresh? true}] @refresh-calls))
                    (is (false? (get-in @store [:account-context :subaccounts :creating?])))
+                   (is (false? (get-in @store [:account-context :subaccounts :create-popover-open?])))
                    (is (= "" (get-in @store [:account-context :subaccounts :create-name])))
                    (is (nil? (get-in @store [:account-context :subaccounts :error])))
                    (done)))

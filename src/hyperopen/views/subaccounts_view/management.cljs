@@ -21,7 +21,7 @@
                            ["cursor-not-allowed" "border-base-300" "bg-base-200/30" "text-trading-text-secondary"]
 
                            (= :primary variant)
-                           ["border-[#2dceb3]" "bg-[#0f3a35]" "text-[#97fce4]" "hover:bg-[#174640]"]
+                           ["border-[#54d8c6]" "bg-[#54d8c6]" "text-[#021b18]" "hover:bg-[#69e7d6]"]
 
                            :else
                            ["border-base-300" "bg-[#121d20]" "text-white" "hover:border-[#2dceb3]/60" "hover:bg-[#172528]"]))
@@ -51,24 +51,65 @@
 
 (defn create-panel
   [{:keys [subaccounts connected?]}]
-  (let [creating? (true? (:creating? subaccounts))]
-    [:div {:class ["flex" "w-full" "flex-col" "gap-2" "sm:w-auto" "sm:flex-row" "sm:items-center"]
+  (let [creating? (true? (:creating? subaccounts))
+        open? (true? (:create-popover-open? subaccounts))]
+    [:div {:class ["relative" "flex" "w-full" "justify-end" "sm:w-auto"]
            :data-role "subaccounts-create-panel"}
-     [:span {:class ["text-xs" "font-medium" "text-trading-text-secondary"]}
-      "Create Subaccount"]
-     [:div {:class ["flex" "min-w-0" "flex-col" "gap-2" "sm:flex-row"]}
-      (text-input {:data-role "subaccounts-create-name"
-                   :value (:create-name subaccounts)
-                   :placeholder "Name, 1-16 chars"
-                   :disabled? (or creating? (not connected?))
-                   :on-input [[:actions/set-subaccount-form-field
-                               :create-name
-                               [:event.target/value]]]})
-      (action-button {:data-role "subaccounts-create-submit"
-                      :label (if creating? "Creating..." "Create")
-                      :variant :primary
-                      :disabled? (or creating? (not connected?))
-                      :on-click [[:actions/submit-create-subaccount]]})]]))
+     (action-button {:data-role "subaccounts-open-create-popover"
+                     :label "Create Sub-Account"
+                     :variant :primary
+                     :disabled? (not connected?)
+                     :on-click [[:actions/open-subaccount-create-popover]]})
+     (when open?
+       [:div {:class ["absolute"
+                      "right-0"
+                      "top-12"
+                      "z-20"
+                      "w-[min(92vw,31rem)]"
+                      "rounded-xl"
+                      "border"
+                      "border-[#294145]"
+                      "bg-[#0b171b]"
+                      "p-6"
+                      "shadow-[0_24px_80px_rgba(0,0,0,0.45)]"]
+              :data-role "subaccounts-create-popover"}
+        [:div {:class ["mb-5" "flex" "items-center" "justify-between" "gap-4"]}
+         [:h2 {:class ["text-xl" "font-semibold" "text-white"]} "Create Sub-Account"]
+         [:button {:type "button"
+                   :data-role "subaccounts-create-popover-close"
+                   :class ["text-xl" "leading-none" "text-trading-text-secondary" "hover:text-white"]
+                   :on {:click [[:actions/close-subaccount-create-popover]]}}
+          "x"]]
+        (text-input {:data-role "subaccounts-create-name"
+                     :value (:create-name subaccounts)
+                     :placeholder "Name"
+                     :disabled? (or creating? (not connected?))
+                     :on-input [[:actions/set-subaccount-form-field
+                                 :create-name
+                                 [:event.target/value]]]})
+        [:div {:class ["mt-5" "grid" "grid-cols-2" "gap-4"]}
+         (action-button {:data-role "subaccounts-create-cancel"
+                         :label "Cancel"
+                         :disabled? creating?
+                         :on-click [[:actions/close-subaccount-create-popover]]})
+         (action-button {:data-role "subaccounts-create-submit"
+                         :label (if creating? "Creating..." "Confirm")
+                         :variant :primary
+                         :disabled? (or creating? (not connected?))
+                         :on-click [[:actions/submit-create-subaccount]]})]])]))
+
+(defn trade-button
+  [{:keys [data-role label on-click active? disabled?]}]
+  [:button {:type "button"
+            :data-role data-role
+            :disabled (boolean disabled?)
+            :class (into ["text-sm" "font-medium" "text-[#48dbc8]" "transition-colors"]
+                         (cond
+                           disabled? ["cursor-not-allowed" "opacity-40"]
+                           active? ["text-white"]
+                           :else ["hover:text-white"]))
+            :on {:click on-click}}
+   label])
 
 (defn- rename-controls
   [{:keys [address subaccounts]}]

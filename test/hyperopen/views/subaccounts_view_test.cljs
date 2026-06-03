@@ -43,6 +43,8 @@
         create-panel (hiccup/find-by-data-role view-node "subaccounts-create-panel")
         master-row (hiccup/find-by-data-role view-node "subaccounts-master-row")
         refresh-button (hiccup/find-by-data-role view-node "subaccounts-refresh")
+        copy-master (hiccup/find-by-data-role view-node "subaccounts-copy-master")
+        copy-selected (hiccup/find-by-data-role view-node (str "subaccounts-copy-" subaccount-address))
         selected-row (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address))
         other-row (hiccup/find-by-data-role view-node (str "subaccounts-row-" other-subaccount-address))
         select-master (hiccup/find-by-data-role view-node "subaccounts-select-master")
@@ -59,16 +61,22 @@
     (is (contains? strings "$50.50"))
     (is (contains? strings "$123.45"))
     (is (contains? strings "$250.25"))
-    (is (contains? strings "Selected"))
+    (is (contains? strings "Trade"))
     (is (some? master-row))
     (is (some? console))
     (is (some? create-panel))
+    (is (some? copy-master))
+    (is (some? copy-selected))
     (is (some? selected-row))
     (is (some? other-row))
     (is (= [[:actions/load-subaccounts-route "/subAccounts"]]
            (get-in refresh-button [1 :on :click])))
     (is (= [[:actions/select-master-account]]
            (get-in select-master [1 :on :click])))
+    (is (= [[:actions/copy-subaccount-address owner-address]]
+           (get-in copy-master [1 :on :click])))
+    (is (= [[:actions/copy-subaccount-address subaccount-address]]
+           (get-in copy-selected [1 :on :click])))
     (is (= [[:actions/select-subaccount other-subaccount-address]]
            (get-in select-other [1 :on :click])))))
 
@@ -92,17 +100,21 @@
     (is (contains? (set (hiccup/collect-strings error-node))
                    "boom"))
     (is (contains? (set (hiccup/collect-strings disconnected-node))
-                   "Connect a wallet to load and select subaccounts."))))
+                   "Not connected"))))
 
 (deftest subaccounts-view-renders-create-rename-and-transfer-controls-test
   (let [view-node (view/subaccounts-view
                    (-> (base-state)
                        (assoc-in [:account-context :subaccounts :create-name] "New Desk")
+                       (assoc-in [:account-context :subaccounts :create-popover-open?] true)
                        (assoc-in [:account-context :subaccounts :rename-name] "Desk B")
                        (assoc-in [:account-context :subaccounts :transfer-amount] "1.23")
                        (assoc-in [:account-context :subaccounts :transfer-direction] :withdraw)
                        (assoc-in [:account-context :subaccounts :renaming-address] subaccount-address)
                        (assoc-in [:account-context :subaccounts :transferring-address] other-subaccount-address)))
+        create-open (hiccup/find-by-data-role view-node "subaccounts-open-create-popover")
+        create-popover (hiccup/find-by-data-role view-node "subaccounts-create-popover")
+        create-cancel (hiccup/find-by-data-role view-node "subaccounts-create-cancel")
         create-input (hiccup/find-by-data-role view-node "subaccounts-create-name")
         create-submit (hiccup/find-by-data-role view-node "subaccounts-create-submit")
         rename-button (hiccup/find-by-data-role view-node
@@ -120,6 +132,11 @@
         transfer-submit (hiccup/find-by-data-role view-node
                                                   (str "subaccounts-transfer-submit-" other-subaccount-address))]
     (is (= "New Desk" (get-in create-input [1 :value])))
+    (is (= [[:actions/open-subaccount-create-popover]]
+           (get-in create-open [1 :on :click])))
+    (is (some? create-popover))
+    (is (= [[:actions/close-subaccount-create-popover]]
+           (get-in create-cancel [1 :on :click])))
     (is (= [[:actions/set-subaccount-form-field :create-name [:event.target/value]]]
            (get-in create-input [1 :on :input])))
     (is (= [[:actions/submit-create-subaccount]]

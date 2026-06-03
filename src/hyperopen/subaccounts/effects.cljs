@@ -64,6 +64,7 @@
           :selected-address nil
           :selection-loaded? false
           :create-name ""
+          :create-popover-open? false
           :rename-name ""
           :transfer-amount ""
           :transfer-direction :deposit
@@ -181,6 +182,7 @@
          (fn [state]
            (-> state
                (assoc-in [:account-context :subaccounts :creating?] false)
+               (assoc-in [:account-context :subaccounts :create-popover-open?] false)
                (assoc-in [:account-context :subaccounts :create-name] "")
                (assoc-in [:account-context :subaccounts :error] nil)))))
 

@@ -1,9 +1,9 @@
 (ns hyperopen.views.subaccounts-view
-  (:require [clojure.string :as str]
+  (:require ["lucide/dist/esm/icons/copy.js" :default lucide-copy-node]
+            [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.subaccounts.actions :as subaccounts-actions]
-            [hyperopen.views.subaccounts-view.management :as management]
-            [hyperopen.wallet.core :as wallet]))
+            [hyperopen.views.subaccounts-view.management :as management]))
 
 (def ^:private usd-formatter
   (js/Intl.NumberFormat.
@@ -89,22 +89,26 @@
   [value]
   (if-let [value* (parse-number value)]
     (.format usd-formatter value*)
-    "N/A"))
+    "--"))
 
-(defn- pill
-  [label active?]
-  [:span {:class (into ["inline-flex"
-                        "items-center"
-                        "rounded-md"
-                        "border"
-                        "px-2"
-                        "py-1"
-                        "text-xs"
-                        "font-semibold"]
-                       (if active?
-                         ["border-[#2dceb3]/70" "bg-[#0f3a35]" "text-[#97fce4]"]
-                         ["border-base-300" "bg-[#121d20]" "text-trading-text-secondary"]))}
-   label])
+(defn- lucide-node->hiccup
+  [node]
+  (let [tag-name (aget node 0)
+        attrs (js->clj (aget node 1) :keywordize-keys true)]
+    [(keyword tag-name) attrs]))
+
+(defn- copy-icon
+  []
+  (into [:svg {:class ["h-3.5" "w-3.5"]
+               :viewBox "0 0 24 24"
+               :fill "none"
+               :stroke "currentColor"
+               :stroke-width 1.8
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :aria-hidden true}]
+        (map lucide-node->hiccup
+             (array-seq lucide-copy-node))))
 
 (defn- action-button
   [{:keys [data-role label on-click active? disabled?]}]
@@ -136,17 +140,37 @@
 
 (defn- table-header
   [labels]
-  [:thead {:class ["text-left" "text-xs" "text-trading-text-secondary"]}
+  [:thead {:class ["text-left" "text-xs" "text-[#8b999d]"]}
    [:tr
     (for [label labels]
       ^{:key label}
       [:th {:class ["px-3" "py-2.5" "font-medium"]} label])]])
 
 (defn- section-heading
-  [title accessory]
-  [:div {:class ["flex" "items-center" "justify-between" "gap-3" "px-3" "pb-1" "pt-3"]}
-   [:h2 {:class ["text-sm" "font-semibold" "text-white"]} title]
-   accessory])
+  [title]
+  [:h2 {:class ["px-3" "pb-1" "pt-3" "text-sm" "font-semibold" "text-white"]}
+   title])
+
+(defn- address-cell
+  [address role]
+  [:div {:class ["flex" "min-w-0" "items-center" "gap-2" "whitespace-nowrap"]}
+   [:span {:class ["num"
+                   "block"
+                   "max-w-[16rem]"
+                   "truncate"
+                   "font-medium"
+                   "text-white"
+                   "md:max-w-none"]
+           :title address}
+    address]
+   (when (seq address)
+     [:button {:type "button"
+               :data-role role
+               :title "Copy address"
+               :aria-label "Copy address"
+               :class ["inline-flex" "h-5" "w-5" "items-center" "justify-center" "text-[#48dbc8]" "hover:text-white"]
+               :on {:click [[:actions/copy-subaccount-address address]]}}
+      (copy-icon)])])
 
 (defn- empty-row
   [colspan message]
@@ -158,25 +182,26 @@
 (defn- master-section
   [{:keys [owner-address selected-master? connected? perps-value spot-value]}]
   [:div
-   (section-heading "Master Account"
-                    (pill (if selected-master? "Selected" "Available") selected-master?))
+   (section-heading "Master Account")
    [:div {:class ["overflow-x-auto"]}
     [:table {:class ["min-w-[760px]" "w-full" "text-sm"]}
      (table-header ["Name" "Address" "Perps Account Equity" "Spot Account Equity" "Action"])
      [:tbody
       [:tr {:data-role "subaccounts-master-row"
-            :class ["border-t" "border-base-300" "transition-colors" "hover:bg-white/[0.025]"]}
-       [:td {:class ["px-3" "py-4" "font-semibold" "text-white"]} "Master Account"]
-       [:td {:class ["px-3" "py-4" "num" "text-trading-text-secondary"]}
-        (or (wallet/short-addr owner-address) "Not connected")]
+            :class ["transition-colors" "hover:bg-white/[0.02]"]}
+       [:td {:class ["px-3" "py-2.5" "font-semibold" "text-white"]} "Master Account"]
+       [:td {:class ["px-3" "py-2.5"]}
+        (if connected?
+          (address-cell owner-address "subaccounts-copy-master")
+          [:span {:class ["text-[#8b999d]"]} "Not connected"])]
        [:td {:class ["px-3" "py-4" "num" "font-medium" "text-white"]} (format-usd perps-value)]
        [:td {:class ["px-3" "py-4" "num" "font-medium" "text-white"]} (format-usd spot-value)]
        [:td {:class ["px-3" "py-4" "text-right"]}
-        (action-button {:data-role "subaccounts-select-master"
-                        :label (if selected-master? "Selected" "Use Master")
-                        :active? selected-master?
-                        :disabled? (not connected?)
-                        :on-click [[:actions/select-master-account]]})]]]]]])
+        (management/trade-button {:data-role "subaccounts-select-master"
+                                  :label "Trade"
+                                  :active? selected-master?
+                                  :disabled? (not connected?)
+                                  :on-click [[:actions/select-master-account]]})]]]]]])
 
 (defn- subaccount-row
   [{:keys [row selected-address subaccounts]}]
@@ -187,25 +212,25 @@
                        (when selected?
                          ["bg-[#123a36]/35"]))}
      [:td {:class ["px-3" "py-4" "align-top" "font-semibold" "text-white"]} (row-name row)]
-     [:td {:class ["px-3" "py-4" "align-top" "num" "text-trading-text-secondary"]} address]
+     [:td {:class ["px-3" "py-4" "align-top"]}
+      (address-cell address (str "subaccounts-copy-" address))]
      [:td {:class ["px-3" "py-4" "align-top" "num" "font-medium" "text-white"]}
       (format-usd (account-value row))]
      [:td {:class ["px-3" "py-4" "align-top" "num" "font-medium" "text-white"]}
       (format-usd (spot-account-value row))]
      [:td {:class ["px-3" "py-4" "align-top" "text-right"]}
       [:div {:class ["flex" "justify-end" "gap-2"]}
-       (action-button {:data-role (str "subaccounts-select-" address)
-                       :label (if selected? "Selected" "Use")
-                       :active? selected?
-                       :on-click [[:actions/select-subaccount address]]})
+       (management/trade-button {:data-role (str "subaccounts-select-" address)
+                                 :label "Trade"
+                                 :active? selected?
+                                 :on-click [[:actions/select-subaccount address]]})
        (management/row-controls {:address address
                                  :subaccounts subaccounts})]]]))
 
 (defn- subaccounts-section
   [{:keys [rows selected-address status error subaccounts]}]
   [:div
-   (section-heading "Sub-Accounts"
-                    (pill (str (count rows) " loaded") (seq rows)))
+   (section-heading "Sub-Accounts")
    (when (seq error)
      [:div {:class ["mx-3" "mb-2" "rounded-md" "border" "border-red-500/30" "bg-red-500/10" "px-3" "py-2" "text-sm" "text-red-200"]}
       error])
@@ -228,20 +253,6 @@
                                      :subaccounts subaccounts}))
                   rows)))]]])
 
-(defn- page-kicker
-  [connected? owner-address selected-master? selected-address]
-  [:div {:class ["flex" "flex-wrap" "items-center" "gap-2" "text-xs" "text-trading-text-secondary"]}
-   (if connected?
-     [:span
-      "Managing "
-      [:span {:class ["num" "text-trading-text"]} (wallet/short-addr owner-address)]]
-     [:span "Connect a wallet to load and select subaccounts."])
-   (when connected?
-     (pill (if selected-master?
-             "Trading Master"
-             (str "Trading " (wallet/short-addr selected-address)))
-           true))])
-
 (defn subaccounts-view
   [state]
   (let [owner-address (account-context/owner-address state)
@@ -254,44 +265,33 @@
         error (:error subaccounts)
         master-perps-value (account-value {:clearinghouse-state (get-in state [:webdata2 :clearinghouseState])})
         master-spot-value (spot-account-value {:spot-state (get-in state [:spot :clearinghouse-state])})]
-    [:div {:class ["app-shell-gutter"
-                   "flex"
-                   "w-full"
-                   "flex-col"
-                   "gap-5"
-                   "pt-5"
-                   "pb-16"]
+    [:div {:class ["app-shell-gutter" "flex" "min-h-[calc(100vh-4rem)]" "w-full" "flex-col" "gap-5" "pt-8" "pb-16"]
+           :style {:background-color "#002f24"
+                   :background-image "radial-gradient(circle at 88% 112%, transparent 0 21%, rgba(97,222,203,0.13) 21.1% 21.3%, transparent 21.4% 26%, rgba(97,222,203,0.13) 26.1% 26.3%, transparent 26.4% 31%, rgba(97,222,203,0.13) 31.1% 31.3%, transparent 31.4% 36%, rgba(97,222,203,0.13) 36.1% 36.3%, transparent 36.4%)"}
            :data-parity-id "subaccounts-root"}
-     [:section {:class ["flex" "flex-col" "gap-4" "md:flex-row" "md:items-end" "md:justify-between"]}
-      [:div {:class ["space-y-2"]}
+     [:div {:class ["mx-auto" "flex" "w-full" "max-w-[82rem]" "flex-col" "gap-5"]}
+      [:section {:class ["flex" "flex-col" "gap-4" "md:flex-row" "md:items-center" "md:justify-between"]}
        [:h1 {:class ["text-[2rem]" "font-semibold" "leading-tight" "text-white" "sm:text-[2.5rem]"]}
         "Sub-Accounts"]
-       (page-kicker connected? owner-address selected-master? selected-address)]
-      [:div {:class ["flex" "w-full" "flex-col" "gap-2" "sm:w-auto" "sm:flex-row" "sm:items-center"]}
+       [:div {:class ["flex" "w-full" "justify-end" "gap-2" "sm:w-auto"]}
+        (action-button {:data-role "subaccounts-refresh"
+                        :label (if (= :loading status) "Refreshing..." "Refresh")
+                        :disabled? (not connected?)
+                        :on-click [[:actions/load-subaccounts-route subaccounts-actions/canonical-route]]})
        (management/create-panel {:subaccounts subaccounts
-                                 :connected? (boolean connected?)})
-       (action-button {:data-role "subaccounts-refresh"
-                       :label (if (= :loading status) "Refreshing..." "Refresh")
-                       :disabled? (not connected?)
-                       :on-click [[:actions/load-subaccounts-route subaccounts-actions/canonical-route]]})]]
-     [:section {:class ["overflow-hidden"
-                        "rounded-lg"
-                        "border"
-                        "border-[#1b3133]"
-                        "bg-[#0d171a]"
-                        "shadow-[0_18px_60px_rgba(0,0,0,0.22)]"]
-                :data-role "subaccounts-console"}
-      (master-section {:owner-address owner-address
-                       :selected-master? selected-master?
-                       :connected? connected?
-                       :perps-value master-perps-value
-                       :spot-value master-spot-value})
-      [:div {:class ["border-t" "border-base-300"]}]
-      (subaccounts-section {:rows rows
-                            :selected-address selected-address
-                            :status status
-                            :error error
-                            :subaccounts subaccounts})]]))
+                                  :connected? (boolean connected?)})]]
+      [:section {:class ["overflow-hidden" "rounded-lg" "bg-[#0d171a]" "shadow-[0_18px_60px_rgba(0,0,0,0.18)]"]
+                 :data-role "subaccounts-console"}
+       (master-section {:owner-address owner-address
+                        :selected-master? selected-master?
+                        :connected? connected?
+                        :perps-value master-perps-value
+                        :spot-value master-spot-value})
+       (subaccounts-section {:rows rows
+                             :selected-address selected-address
+                             :status status
+                             :error error
+                             :subaccounts subaccounts})]]]))
 
 (defn ^:export route-view
   [state]
