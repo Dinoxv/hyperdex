@@ -127,6 +127,16 @@
                                                   (str "subaccounts-transfer-" other-subaccount-address))
         transfer-amount (hiccup/find-by-data-role view-node
                                                   (str "subaccounts-transfer-amount-" other-subaccount-address))
+        transfer-popover (hiccup/find-by-data-role view-node
+                                                   (str "subaccounts-transfer-popover-" other-subaccount-address))
+        transfer-source (hiccup/find-by-data-role view-node
+                                                 (str "subaccounts-transfer-source-" other-subaccount-address))
+        transfer-destination (hiccup/find-by-data-role view-node
+                                                      (str "subaccounts-transfer-destination-" other-subaccount-address))
+        transfer-max (hiccup/find-by-data-role view-node
+                                               (str "subaccounts-transfer-max-" other-subaccount-address))
+        transfer-token (hiccup/find-by-data-role view-node
+                                                 (str "subaccounts-transfer-token-" other-subaccount-address))
         transfer-direction (hiccup/find-by-data-role view-node
                                                      (str "subaccounts-transfer-direction-" other-subaccount-address))
         transfer-submit (hiccup/find-by-data-role view-node
@@ -150,6 +160,15 @@
            (get-in rename-submit [1 :on :click])))
     (is (= [[:actions/start-transfer-subaccount other-subaccount-address]]
            (get-in transfer-button [1 :on :click])))
+    (is (some? transfer-popover))
+    (is (contains? (set (hiccup/collect-strings transfer-popover)) "Send Tokens"))
+    (is (contains? (set (hiccup/collect-strings transfer-popover))
+                   "Transfer tokens between sub-account and master account."))
+    (is (contains? (set (hiccup/collect-strings transfer-source)) "Ops"))
+    (is (contains? (set (hiccup/collect-strings transfer-destination)) "Master Account"))
+    (is (contains? (set (hiccup/collect-strings transfer-max)) "MAX: 0 USDC"))
+    (is (= "USDC" (get-in transfer-token [1 :value])))
+    (is (true? (get-in transfer-token [1 :disabled])))
     (is (= "1.23" (get-in transfer-amount [1 :value])))
     (is (= [[:actions/set-subaccount-form-field :transfer-amount [:event.target/value]]]
            (get-in transfer-amount [1 :on :input])))

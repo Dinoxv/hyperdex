@@ -13,6 +13,12 @@
         :minimumFractionDigits 2
         :maximumFractionDigits 2}))
 
+(def ^:private usdc-amount-formatter
+  (js/Intl.NumberFormat.
+   "en-US"
+   #js {:minimumFractionDigits 0
+        :maximumFractionDigits 6}))
+
 (defn- normalize-address
   [value]
   (account-context/normalize-address value))
@@ -89,6 +95,12 @@
   [value]
   (if-let [value* (parse-number value)]
     (.format usd-formatter value*)
+    "--"))
+
+(defn- format-usdc-amount
+  [value]
+  (if-let [value* (parse-number value)]
+    (.format usdc-amount-formatter value*)
     "--"))
 
 (defn- lucide-node->hiccup
@@ -204,20 +216,23 @@
                                   :on-click [[:actions/select-master-account]]})]]]]]])
 
 (defn- subaccount-row
-  [{:keys [row selected-address subaccounts]}]
+  [{:keys [row selected-address subaccounts master-transfer-max]}]
   (let [address (row-address row)
+        name (row-name row)
+        perps-value (account-value row)
+        spot-value (spot-account-value row)
         selected? (= address selected-address)]
     [:tr {:data-role (str "subaccounts-row-" address)
           :class (into ["border-t" "border-base-300" "transition-colors" "hover:bg-white/[0.025]"]
                        (when selected?
                          ["bg-[#123a36]/35"]))}
-     [:td {:class ["px-3" "py-4" "align-top" "font-semibold" "text-white"]} (row-name row)]
+     [:td {:class ["px-3" "py-4" "align-top" "font-semibold" "text-white"]} name]
      [:td {:class ["px-3" "py-4" "align-top"]}
       (address-cell address (str "subaccounts-copy-" address))]
      [:td {:class ["px-3" "py-4" "align-top" "num" "font-medium" "text-white"]}
-      (format-usd (account-value row))]
+      (format-usd perps-value)]
      [:td {:class ["px-3" "py-4" "align-top" "num" "font-medium" "text-white"]}
-      (format-usd (spot-account-value row))]
+      (format-usd spot-value)]
      [:td {:class ["px-3" "py-4" "align-top" "text-right"]}
       [:div {:class ["flex" "justify-end" "gap-2"]}
        (management/trade-button {:data-role (str "subaccounts-select-" address)
@@ -225,10 +240,13 @@
                                  :active? selected?
                                  :on-click [[:actions/select-subaccount address]]})
        (management/row-controls {:address address
+                                 :subaccount-name name
+                                 :deposit-max (format-usdc-amount master-transfer-max)
+                                 :withdraw-max (format-usdc-amount perps-value)
                                  :subaccounts subaccounts})]]]))
 
 (defn- subaccounts-section
-  [{:keys [rows selected-address status error subaccounts]}]
+  [{:keys [rows selected-address status error subaccounts master-transfer-max]}]
   [:div
    (section-heading "Sub-Accounts")
    (when (seq error)
@@ -250,6 +268,7 @@
                     ^{:key (row-address row)}
                     (subaccount-row {:row row
                                      :selected-address selected-address
+                                     :master-transfer-max master-transfer-max
                                      :subaccounts subaccounts}))
                   rows)))]]])
 
@@ -291,6 +310,7 @@
                              :selected-address selected-address
                              :status status
                              :error error
+                             :master-transfer-max master-perps-value
                              :subaccounts subaccounts})]]]))
 
 (defn ^:export route-view

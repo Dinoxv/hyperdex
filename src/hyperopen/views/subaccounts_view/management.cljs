@@ -1,7 +1,7 @@
 (ns hyperopen.views.subaccounts-view.management)
 
 (defn- action-button
-  [{:keys [data-role label on-click disabled? variant]}]
+  [{:keys [data-role label on-click disabled? variant class]}]
   [:button {:type "button"
             :data-role data-role
             :disabled (boolean disabled?)
@@ -16,15 +16,17 @@
                           "font-medium"
                           "leading-none"
                           "transition-colors"]
-                         (cond
-                           disabled?
-                           ["cursor-not-allowed" "border-base-300" "bg-base-200/30" "text-trading-text-secondary"]
+                         (concat
+                          (cond
+                            disabled?
+                            ["cursor-not-allowed" "border-base-300" "bg-base-200/30" "text-trading-text-secondary"]
 
-                           (= :primary variant)
-                           ["border-[#54d8c6]" "bg-[#54d8c6]" "text-[#021b18]" "hover:bg-[#69e7d6]"]
+                            (= :primary variant)
+                            ["border-[#54d8c6]" "bg-[#54d8c6]" "text-[#021b18]" "hover:bg-[#69e7d6]"]
 
-                           :else
-                           ["border-base-300" "bg-[#121d20]" "text-white" "hover:border-[#2dceb3]/60" "hover:bg-[#172528]"]))
+                            :else
+                            ["border-base-300" "bg-[#121d20]" "text-white" "hover:border-[#2dceb3]/60" "hover:bg-[#172528]"])
+                          class))
             :on {:click on-click}}
    label])
 
@@ -136,56 +138,183 @@
                         :label "Cancel"
                         :on-click [[:actions/cancel-rename-subaccount]]})])]))
 
+(defn- transfer-field-shell
+  [{:keys [children class]}]
+  (into [:div {:class (into ["flex"
+                             "h-10"
+                             "items-center"
+                             "rounded-md"
+                             "border"
+                             "border-[#263b3f]"
+                             "bg-[#0b1518]"
+                             "px-3"
+                             "text-sm"
+                             "text-white"
+                             "transition-colors"
+                             "focus-within:border-[#54d8c6]"]
+                            class)}]
+        children))
+
 (defn- transfer-direction-select
   [{:keys [address subaccounts]}]
   [:select {:data-role (str "subaccounts-transfer-direction-" address)
             :value (name (or (:transfer-direction subaccounts) :deposit))
-            :class ["h-8"
-                    "rounded-md"
-                    "border"
-                    "border-base-300"
-                    "bg-[#0a1417]"
-                    "px-2.5"
-                    "text-xs"
+            :aria-label "Transfer direction"
+            :class ["h-full"
+                    "w-full"
+                    "appearance-none"
+                    "bg-transparent"
+                    "text-sm"
+                    "font-medium"
                     "text-white"
                     "outline-none"
-                    "focus:border-[#2dceb3]"]
+                    "focus:outline-none"]
             :on {:change [[:actions/set-subaccount-form-field
                            :transfer-direction
                            [:event.target/value]]]}}
-   [:option {:value "deposit"} "Master to subaccount"]
-   [:option {:value "withdraw"} "Subaccount to master"]])
+   [:option {:value "deposit"} "Trading Account"]
+   [:option {:value "withdraw"} "Sub-Account"]])
+
+(defn- token-select
+  [{:keys [address]}]
+  [:select {:data-role (str "subaccounts-transfer-token-" address)
+            :value "USDC"
+            :disabled true
+            :aria-label "Transfer token"
+            :class ["h-full"
+                    "w-full"
+                    "appearance-none"
+                    "bg-transparent"
+                    "text-sm"
+                    "font-medium"
+                    "text-white"
+                    "outline-none"
+                    "disabled:opacity-100"]}
+   [:option {:value "USDC"} "USDC"]])
+
+(defn- transfer-direction-summary
+  [{:keys [address direction subaccount-name]}]
+  (let [withdraw? (= :withdraw direction)
+        from-label (if withdraw? subaccount-name "Master Account")
+        to-label (if withdraw? "Master Account" subaccount-name)]
+    [:div {:class ["grid" "gap-3" "sm:grid-cols-[1fr_auto_1fr]"]}
+     [:div {:data-role (str "subaccounts-transfer-source-" address)
+            :class ["min-w-0"]}
+      [:div {:class ["mb-2" "text-xs" "font-medium" "text-[#9aa8ab]"]} "From"]
+      [:div {:class ["truncate" "text-sm" "font-semibold" "text-white"]
+             :title from-label}
+       from-label]]
+     [:div {:class ["hidden" "items-end" "pb-0.5" "text-[#54d8c6]" "sm:flex"]
+            :aria-hidden true}
+      "<->"]
+     [:div {:data-role (str "subaccounts-transfer-destination-" address)
+            :class ["min-w-0"]}
+      [:div {:class ["mb-2" "text-xs" "font-medium" "text-[#9aa8ab]"]} "To"]
+      [:div {:class ["truncate" "text-sm" "font-semibold" "text-white"]
+             :title to-label}
+       to-label]]]))
+
+(defn- transfer-popover
+  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max]}]
+  (let [direction (or (:transfer-direction subaccounts) :deposit)
+        withdrawing? (= :withdraw direction)
+        max-label (if withdrawing? withdraw-max deposit-max)]
+    [:div {:data-role (str "subaccounts-transfer-popover-" address)
+           :class ["absolute"
+                   "right-0"
+                   "top-10"
+                   "z-30"
+                   "w-[min(92vw,32.5rem)]"
+                   "rounded-xl"
+                   "border"
+                   "border-[#294145]"
+                   "bg-[#0b171b]"
+                   "p-6"
+                   "text-left"
+                   "shadow-[0_24px_80px_rgba(0,0,0,0.48)]"]}
+     [:button {:type "button"
+               :data-role (str "subaccounts-transfer-close-" address)
+               :aria-label "Close transfer"
+               :class ["absolute"
+                       "right-5"
+                       "top-5"
+                       "text-xl"
+                       "leading-none"
+                       "text-[#9aa8ab]"
+                       "transition-colors"
+                       "hover:text-white"]
+               :on {:click [[:actions/cancel-transfer-subaccount]]}}
+      "x"]
+     [:div {:class ["mb-6" "pr-8" "text-center"]}
+      [:h3 {:class ["text-2xl" "font-semibold" "leading-tight" "text-white"]}
+       "Send Tokens"]
+      [:p {:class ["mt-2" "text-sm" "text-[#d6dddf]"]}
+       "Transfer tokens between sub-account and master account."]]
+     (transfer-direction-summary {:address address
+                                  :direction direction
+                                  :subaccount-name subaccount-name})
+     [:div {:class ["mt-5" "grid" "gap-3" "sm:grid-cols-2"]}
+      (transfer-field-shell
+       {:children [(transfer-direction-select {:address address
+                                               :subaccounts subaccounts})
+                   [:span {:class ["ml-2" "text-[#9aa8ab]"] :aria-hidden true} "v"]]})
+      (transfer-field-shell
+       {:children [(token-select {:address address})
+                   [:span {:class ["ml-2" "text-[#9aa8ab]"] :aria-hidden true} "v"]]})]
+     [:div {:class ["mt-3"]}
+      (transfer-field-shell
+       {:class ["justify-between" "gap-3"]
+        :children [[:input {:type "text"
+                            :data-role (str "subaccounts-transfer-amount-" address)
+                            :value (:transfer-amount subaccounts)
+                            :placeholder "Amount"
+                            :aria-label "Transfer amount"
+                            :class ["min-w-0"
+                                    "flex-1"
+                                    "bg-transparent"
+                                    "text-sm"
+                                    "text-white"
+                                    "outline-none"
+                                    "placeholder:text-[#9aa8ab]"]
+                            :on {:input [[:actions/set-subaccount-form-field
+                                          :transfer-amount
+                                          [:event.target/value]]]}}]
+                   [:span {:data-role (str "subaccounts-transfer-max-" address)
+                           :class ["shrink-0" "text-xs" "font-medium" "text-[#54d8c6]"]}
+                    (str "MAX: " max-label " USDC")]]})]
+     [:div {:class ["mt-6" "grid" "grid-cols-2" "gap-3"]}
+      (action-button {:data-role (str "subaccounts-transfer-cancel-" address)
+                      :label "Cancel"
+                      :class ["w-full"]
+                      :on-click [[:actions/cancel-transfer-subaccount]]})
+      (action-button {:data-role (str "subaccounts-transfer-submit-" address)
+                      :label "Send"
+                      :variant :primary
+                      :class ["w-full"]
+                      :on-click [[:actions/submit-transfer-subaccount address]]})]]))
 
 (defn- transfer-controls
-  [{:keys [address subaccounts]}]
+  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max]}]
   (let [active? (= address (:transferring-address subaccounts))]
-    [:div {:class ["flex" "min-w-0" "flex-col" "gap-2"]}
+    [:div {:class ["relative" "flex" "min-w-0" "justify-end"]}
      (action-button {:data-role (str "subaccounts-transfer-" address)
                      :label "Transfer"
                      :disabled? active?
                      :on-click [[:actions/start-transfer-subaccount address]]})
      (when active?
-       [:div {:class ["flex" "min-w-[18rem]" "flex-col" "gap-2" "xl:flex-row"]}
-        (transfer-direction-select {:address address
-                                    :subaccounts subaccounts})
-        (text-input {:data-role (str "subaccounts-transfer-amount-" address)
-                     :value (:transfer-amount subaccounts)
-                     :placeholder "USDC"
-                     :on-input [[:actions/set-subaccount-form-field
-                                 :transfer-amount
-                                 [:event.target/value]]]})
-        (action-button {:data-role (str "subaccounts-transfer-submit-" address)
-                        :label "Submit"
-                        :variant :primary
-                        :on-click [[:actions/submit-transfer-subaccount address]]})
-        (action-button {:data-role (str "subaccounts-transfer-cancel-" address)
-                        :label "Cancel"
-                        :on-click [[:actions/cancel-transfer-subaccount]]})])]))
+       (transfer-popover {:address address
+                          :subaccount-name subaccount-name
+                          :subaccounts subaccounts
+                          :deposit-max deposit-max
+                          :withdraw-max withdraw-max}))]))
 
 (defn row-controls
-  [{:keys [address subaccounts]}]
-  [:div {:class ["flex" "min-w-[16rem]" "flex-wrap" "items-start" "justify-end" "gap-2"]}
+  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max]}]
+  [:div {:class ["flex" "min-w-[10rem]" "flex-wrap" "items-start" "justify-end" "gap-2"]}
    (rename-controls {:address address
                      :subaccounts subaccounts})
    (transfer-controls {:address address
+                       :subaccount-name subaccount-name
+                       :deposit-max deposit-max
+                       :withdraw-max withdraw-max
                        :subaccounts subaccounts})])
