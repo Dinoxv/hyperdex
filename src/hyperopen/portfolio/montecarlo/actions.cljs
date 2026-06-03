@@ -96,29 +96,49 @@
     :seed (normalize-seed value)
     value))
 
-(defn controls
-  "Read the current Monte Carlo controls from `state`, filling defaults."
-  [state]
-  (let [stored (get-in state state-path)]
+(defn controls-at
+  "Read the current Monte Carlo controls from `state` at `state-path*`, filling
+  defaults. State-path-generic so other surfaces (e.g. the vault detail tab) can
+  reuse the same control semantics under their own app-state path."
+  [state state-path*]
+  (let [stored (get-in state state-path*)]
     (reduce (fn [acc k]
               (assoc acc k (normalize-control k (get stored k (get default-controls k)))))
             (select-keys default-controls [:run-nonce])
             control-keys)))
 
+(defn controls
+  "Read the current Monte Carlo controls from `state`, filling defaults."
+  [state]
+  (controls-at state state-path))
+
 ;; ---------------------------------------------------------------------------
 ;; Nexus action handlers (return effect descriptors only)
 ;; ---------------------------------------------------------------------------
 
+(defn set-control-at
+  "Effect that sets one Monte Carlo `control` to `value` under `state-path*`.
+  Returns nil for unknown controls. Shared by every Monte Carlo surface."
+  [state-path* control value]
+  (let [control* (normalize-keyword-like control)]
+    (when (contains? control-keys control*)
+      [[:effects/save (conj state-path* control*) (normalize-control control* value)]])))
+
+(defn rerun-at
+  "Effect that bumps the run nonce under `state-path*` so the chart replays its
+  reveal animation. The simulation is deterministic, so the numbers are unchanged
+  unless a control differs."
+  [state state-path*]
+  (let [nonce (get-in state (conj state-path* :run-nonce) 0)]
+    [[:effects/save (conj state-path* :run-nonce) (inc (or (parse-number nonce) 0))]]))
+
 (defn set-portfolio-monte-carlo-control
   "Set one Monte Carlo control (`:sims`, `:horizon`, `:bust`, `:goal`, `:seed`)."
   [_state control value]
-  (let [control* (normalize-keyword-like control)]
-    (when (contains? control-keys control*)
-      [[:effects/save (conj state-path control*) (normalize-control control* value)]])))
+  (set-control-at state-path control value))
 
 (defn rerun-portfolio-monte-carlo
   "Bump the run nonce so the chart replays its reveal animation. The simulation
   is deterministic, so the numbers are unchanged unless a control differs."
   [state]
-  (let [nonce (get-in state (conj state-path :run-nonce) 0)]
-    [[:effects/save (conj state-path :run-nonce) (inc (or (parse-number nonce) 0))]]))
+  (rerun-at state state-path))

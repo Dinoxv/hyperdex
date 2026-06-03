@@ -1,5 +1,6 @@
 (ns hyperopen.views.vaults.detail.activity.shell
-  (:require [hyperopen.views.vaults.detail.activity.performance-metrics :as metrics]
+  (:require [hyperopen.views.portfolio.montecarlo.panel :as montecarlo-panel]
+            [hyperopen.views.vaults.detail.activity.performance-metrics :as metrics]
             [hyperopen.views.vaults.detail.activity.tables :as tables]))
 
 (defn- format-activity-count [count]
@@ -24,12 +25,17 @@
             :on {:click [[:actions/set-vault-detail-activity-tab value]]}}
    (if-let [count-label (format-activity-count count)]
      (str label " (" count-label ")")
-     label)])
+     label)
+   (when (= value :monte-carlo)
+     [:span {:class ["account-info-tab-badge"]
+             :data-role "vault-detail-activity-tab-badge-new"}
+      "New"])])
 
 (defn activity-panel [{:keys [selected-activity-tab
                               activity-tabs
                               activity-table-config
                               performance-metrics
+                              monte-carlo
                               activity-direction-filter
                               activity-filter-open?
                               activity-filter-options
@@ -123,6 +129,7 @@
                 "●"])])])]]
      (case selected-activity-tab
        :performance-metrics (metrics/performance-metrics-card performance-metrics)
+       :monte-carlo (montecarlo-panel/monte-carlo-card monte-carlo)
        :balances (tables/balances-table activity-balances
                                         (get sort-state-by-tab :balances)
                                         (table-columns :balances))

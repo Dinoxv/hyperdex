@@ -20,6 +20,9 @@
          (ui-state/normalize-vault-detail-tab "vaultPerformance")))
   (is (= :open-orders
          (ui-state/normalize-vault-detail-activity-tab "openOrders")))
+  (is (= :monte-carlo
+         (ui-state/normalize-vault-detail-activity-tab "monteCarlo")))
+  (is (= [:vaults-ui :monte-carlo] ui-state/vault-monte-carlo-state-path))
   (is (= :short
          (ui-state/normalize-vault-detail-activity-direction-filter "SHORT")))
   (is (= :asc (ui-state/normalize-sort-direction "ASC")))

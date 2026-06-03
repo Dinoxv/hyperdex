@@ -376,6 +376,7 @@
             [hyperopen.utils.parse-test]
             [hyperopen.vaults.actions-test]
             [hyperopen.vaults.adapters.webdata-test]
+            [hyperopen.vaults.application.detail-commands-test]
             [hyperopen.vaults.application.list-commands-test]
             [hyperopen.vaults.application.list-vm-test]
             [hyperopen.vaults.application.query-state-test]
@@ -1048,6 +1049,7 @@
              'hyperopen.utils.parse-test
              'hyperopen.vaults.actions-test
              'hyperopen.vaults.adapters.webdata-test
+             'hyperopen.vaults.application.detail-commands-test
              'hyperopen.vaults.application.list-commands-test
              'hyperopen.vaults.application.list-vm-test
              'hyperopen.vaults.application.query-state-test

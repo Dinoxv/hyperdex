@@ -47,6 +47,7 @@
 
 (def ^:private vault-detail-activity-tabs
   #{:performance-metrics
+    :monte-carlo
     :balances
     :positions
     :open-orders
@@ -56,6 +57,11 @@
     :order-history
     :deposits-withdrawals
     :depositors})
+
+(def vault-monte-carlo-state-path
+  "App-state path under which the vault detail Monte Carlo control values live.
+  Kept distinct from the portfolio surface so the two keep independent controls."
+  [:vaults-ui :monte-carlo])
 
 (def ^:private vault-detail-activity-direction-filters
   #{:all :long :short})
@@ -122,6 +128,8 @@
         normalized (case token
                      :performancemetrics :performance-metrics
                      :performancemetric :performance-metrics
+                     :montecarlo :monte-carlo
+                     :monte :monte-carlo
                      :openorders :open-orders
                      :tradehistory :trade-history
                      :fundinghistory :funding-history

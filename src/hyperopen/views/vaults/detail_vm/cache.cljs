@@ -2,7 +2,8 @@
   (:require [hyperopen.vaults.detail.benchmarks :as benchmarks-model]
             [hyperopen.vaults.detail.metrics-bridge :as metrics-bridge]
             [hyperopen.vaults.detail.performance :as performance-model]
-            [hyperopen.views.vaults.detail-vm.context :as context]))
+            [hyperopen.views.vaults.detail-vm.context :as context]
+            [hyperopen.views.vaults.detail-vm.montecarlo :as montecarlo]))
 
 (defonce summary-cache
   (atom nil))
@@ -22,7 +23,8 @@
   (reset! summary-cache nil)
   (reset! chart-series-data-cache nil)
   (reset! benchmark-points-cache nil)
-  (reset! performance-metrics-cache nil))
+  (reset! performance-metrics-cache nil)
+  (montecarlo/reset-cache!))
 
 (defn- source-row-time-ms
   [row]

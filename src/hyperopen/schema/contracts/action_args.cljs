@@ -97,6 +97,8 @@
            (s/coll-of ::common/non-empty-string :kind vector?)))
 (s/def ::portfolio-monte-carlo-control-args
   (s/tuple ::common/keyword-or-string any?))
+(s/def ::vault-monte-carlo-control-args
+  (s/tuple ::common/keyword-or-string any?))
 (s/def ::staking-action-popover-open-args
   (s/or :kind-only (s/tuple (s/or :keyword keyword?
                                    :string string?))
@@ -521,6 +523,8 @@
    :actions/prev-vaults-user-page ::common/max-page-args
    :actions/set-vault-detail-tab ::common/keyword-or-string-args
    :actions/set-vault-detail-activity-tab ::common/keyword-or-string-args
+   :actions/set-vault-monte-carlo-control ::vault-monte-carlo-control-args
+   :actions/rerun-vault-monte-carlo ::common/no-args
    :actions/sort-vault-detail-activity ::common/vault-detail-activity-sort-args
    :actions/toggle-vault-detail-activity-filter-open ::common/no-args
    :actions/close-vault-detail-activity-filter ::common/no-args

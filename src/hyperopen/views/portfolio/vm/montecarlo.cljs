@@ -21,6 +21,21 @@
   Below this we show an explanatory state instead of a misleading fan."
   30)
 
+(def ^:private chrome
+  "Per-surface copy, data-role prefix, root class, and action ids consumed by the
+  shared Monte Carlo views (`views/portfolio/montecarlo/*`)."
+  {:root-class "portfolio-monte-carlo"
+   :data-role-prefix "portfolio-monte-carlo"
+   :set-control-action :actions/set-portfolio-monte-carlo-control
+   :rerun-action :actions/rerun-portfolio-monte-carlo
+   :subject "portfolio"
+   :history-owner "your"
+   :equity-label "Ending equity"
+   :lede (str "Resamples your realized daily returns thousands of times to map the "
+              "range of outcomes the same strategy could produce. Preserves your "
+              "return distribution while reshuffling the path — isolating luck from "
+              "skill across drawdowns, Sharpe and terminal value.")})
+
 (def ^:private scope-labels
   {:all "Perps + Spot + Vaults"
    :perps "Perps"})
@@ -80,6 +95,7 @@
                         (get range-labels summary-time-range "")
                         " window")
         base {:controls controls
+              :chrome chrome
               :sims-options mc-actions/sims-options
               :horizon-options mc-actions/horizon-options
               :sample-size sample-size

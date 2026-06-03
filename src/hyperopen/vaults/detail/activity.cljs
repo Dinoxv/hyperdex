@@ -39,6 +39,8 @@
 (def tabs
   [{:value :performance-metrics
     :label "Performance Metrics"}
+   {:value :monte-carlo
+    :label "Monte Carlo"}
    {:value :balances
     :label "Balances"}
    {:value :positions
@@ -71,6 +73,10 @@
                          :columns []
                          :default-sort {:column nil
                                         :direction :desc}}
+   :monte-carlo {:supports-direction? false
+                 :columns []
+                 :default-sort {:column nil
+                                :direction :desc}}
    :balances {:supports-direction? false
               :columns [{:id :coin
                          :label "Coin"

@@ -62,6 +62,8 @@
 (def next-vaults-user-page list-commands/next-vaults-user-page)
 (def prev-vaults-user-page list-commands/prev-vaults-user-page)
 (def set-vault-detail-tab detail-commands/set-vault-detail-tab)
+(def set-vault-monte-carlo-control detail-commands/set-vault-monte-carlo-control)
+(def rerun-vault-monte-carlo detail-commands/rerun-vault-monte-carlo)
 (def sort-vault-detail-activity detail-commands/sort-vault-detail-activity)
 (def toggle-vault-detail-activity-filter-open detail-commands/toggle-vault-detail-activity-filter-open)
 (def close-vault-detail-activity-filter detail-commands/close-vault-detail-activity-filter)

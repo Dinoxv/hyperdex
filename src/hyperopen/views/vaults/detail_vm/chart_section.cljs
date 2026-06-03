@@ -4,6 +4,7 @@
             [hyperopen.vaults.detail.types :as detail-types]
             [hyperopen.views.vaults.detail.chart :as chart-model]
             [hyperopen.views.vaults.detail-vm.cache :as cache]
+            [hyperopen.views.vaults.detail-vm.montecarlo :as montecarlo]
             [hyperopen.vaults.application.ui-state :as vault-ui-state]))
 
 (def ^:private chart-timeframe-options
@@ -139,8 +140,25 @@
                                    :loading? (or benchmark-history-loading?
                                                  (:loading? performance-metrics-base)))
         return-for-range (:return-for-range metrics-context)
-        month-return (:month-return metrics-context)]
+        month-return (:month-return metrics-context)
+        ;; Build the Monte Carlo model only when its tab is active so the engine
+        ;; runs lazily on tab open rather than on every vault detail re-render.
+        ;; The vault MC tab has no range control of its own, so it always
+        ;; resamples the vault's all-time realized returns (not the chart
+        ;; range-windowed series) to maximize bootstrap samples.
+        monte-carlo (when (= activity-tab :monte-carlo)
+                      (let [mc-summary (performance-model/portfolio-summary details :all-time)
+                            mc-rows (performance-model/cumulative-rows
+                                     (:returns (performance-model/chart-series-data state mc-summary)))]
+                        (montecarlo/montecarlo-model
+                         state
+                         {:strategy-cumulative-rows mc-rows
+                          :strategy-source-version (cache/sampled-series-source-version mc-rows)
+                          :start-equity (:tvl metrics-context)
+                          :window-label "All-time"
+                          :vault-label vault-label})))]
     {:background-status (background-status-model benchmark-history-loading?)
+     :monte-carlo monte-carlo
      :snapshot-range snapshot-range
      :snapshot {:day (return-for-range :day)
                 :week (return-for-range :week)

@@ -34,6 +34,8 @@
    [:actions/prev-vaults-user-page :prev-vaults-user-page]
    [:actions/set-vault-detail-tab :set-vault-detail-tab]
    [:actions/set-vault-detail-activity-tab :set-vault-detail-activity-tab]
+   [:actions/set-vault-monte-carlo-control :set-vault-monte-carlo-control]
+   [:actions/rerun-vault-monte-carlo :rerun-vault-monte-carlo]
    [:actions/sort-vault-detail-activity :sort-vault-detail-activity]
    [:actions/toggle-vault-detail-activity-filter-open :toggle-vault-detail-activity-filter-open]
    [:actions/close-vault-detail-activity-filter :close-vault-detail-activity-filter]

@@ -1,5 +1,6 @@
 (ns hyperopen.vaults.application.detail-commands
   (:require [hyperopen.portfolio.actions :as portfolio-actions]
+            [hyperopen.portfolio.montecarlo.actions :as mc-actions]
             [hyperopen.vaults.domain.identity :as identity]
             [hyperopen.vaults.detail.activity :as activity-model]
             [hyperopen.vaults.detail.types :as detail-types]
@@ -171,6 +172,19 @@
     (into [projection-effect
            replace-shareable-route-query-effect]
           fetch-effects)))
+
+(defn set-vault-monte-carlo-control
+  "Set one vault Monte Carlo control (`:sims`, `:horizon`, `:bust`, `:goal`,
+  `:seed`)."
+  [_state control value]
+  (mc-actions/set-control-at ui-state/vault-monte-carlo-state-path control value))
+
+(defn rerun-vault-monte-carlo
+  "Bump the vault Monte Carlo run nonce so the chart replays its reveal
+  animation. The simulation is deterministic, so the numbers are unchanged
+  unless a control differs."
+  [state]
+  (mc-actions/rerun-at state ui-state/vault-monte-carlo-state-path))
 
 (defn sort-vault-detail-activity
   [state tab column]
