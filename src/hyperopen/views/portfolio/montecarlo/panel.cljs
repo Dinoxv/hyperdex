@@ -57,12 +57,15 @@
       [:div {:class ["mc-foot"]}
        [:b "Method. "]
        (str "Each path reorders " (:history-owner chrome) " " sample-size
-            " realized daily returns into a fresh random sequence — the same returns, so "
-            "every path ends at the same realized total return. Only the order, and therefore "
-            "the drawdown along the way, changes. ")
+            " realized daily returns into a fresh random sequence (QuantStats' shuffle). The same "
+            "returns reordered give the same product, so total return and CAGR are identical on "
+            "every path (the CAGR card is a single spike); Sharpe varies only marginally, mirroring "
+            "QuantStats' montecarlo_sharpe, which derives each path's returns from the cumulative "
+            "curve and so drops the first day. Max drawdown is the one quantity that genuinely "
+            "depends on the order. ")
        [:b "Bust "]
        (str "counts orderings whose worst peak-to-trough drawdown breaches " bust "%. ")
-       "This is a sequence-risk view (the QuantStats shuffle), not a forward prediction."]
+       "Sequence-risk view, not a forward prediction."]
       [:div {:class ["mc-foot"]}
        [:b "Method. "]
        (str "Each path draws " h

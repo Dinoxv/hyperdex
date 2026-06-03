@@ -25,36 +25,27 @@
     [:span (str "median " (range-fmt (:median dist)))]
     [:span (str "μ " (range-fmt (:mean dist)))]]])
 
-(defn- realized-strip
-  "Single-value chips for the metrics a shuffle leaves unchanged. Total return,
-  Sharpe, and annualized vol are functions only of the *set* of daily returns,
-  so reordering them does not move these values — their histograms would be a
-  single spike. In shuffle mode we show the fixed values as chips instead."
-  [{:keys [terminal sharpe vol pct0 pctp0 r2 data-role-prefix]}]
-  [:div {:class ["mc-card" "mc-realized-strip"]
-         :data-role (str data-role-prefix "-realized-stats")}
-   [:div {:class ["mc-realized-strip-title"]} "Realized · fixed across orderings"]
-   [:div {:class ["mc-chip-row"]}
-    (for [[k v] [["Total return" (pct0 (:p50 terminal))]
-                 ["Sharpe" (r2 (:p50 sharpe))]
-                 ["Annualized vol" (pctp0 (:p50 vol))]]]
-      ^{:key k}
-      [:div {:class ["mc-chip"]}
-       [:div {:class ["mc-chip-k"]} k]
-       [:div {:class ["mc-chip-v"]} v]])]])
-
 (defn distributions
   [{:keys [result controls run-key method chrome]}]
-  (let [{:keys [terminal maxdd sharpe vol]} result
+  (let [{:keys [terminal maxdd sharpe cagr vol]} result
         prefix (:data-role-prefix chrome)
         bust-fraction (/ (:bust controls) 100)
         pct0 (fn [v] (fmt/signed-pct v 0))
         pctp0 (fn [v] (fmt/unsigned-pct v 0))
         r2 (fn [v] (fmt/ratio v 2))]
     (if (= method :shuffle)
-      ;; Shuffle: only max drawdown genuinely varies; the rest are fixed chips.
-      [:div {:class ["mc-dist-grid" "mc-dist-grid-shuffle"]
+      ;; Shuffle: mirror QuantStats' montecarlo_sharpe / montecarlo_drawdown /
+      ;; montecarlo_cagr. Drawdown genuinely varies with the ordering; Sharpe
+      ;; varies only via QuantStats' per-path day-drop; CAGR is fixed (terminal
+      ;; is shuffle-invariant) so its card renders as a centered single spike.
+      [:div {:class ["mc-dist-grid" "mc-dist-grid-3"]
              :data-role (str prefix "-distributions")}
+       (dist-card {:title "Sharpe ratio"
+                   :dist sharpe
+                   :sign-by-value? true
+                   :range-fmt r2
+                   :update-key [:sharpe run-key]
+                   :data-role-prefix prefix})
        (dist-card {:title "Max drawdown"
                    :dist maxdd
                    :fmt-kind :pct
@@ -62,8 +53,13 @@
                    :range-fmt pct0
                    :update-key [:maxdd run-key]
                    :data-role-prefix prefix})
-       (realized-strip {:terminal terminal :sharpe sharpe :vol vol
-                        :pct0 pct0 :pctp0 pctp0 :r2 r2 :data-role-prefix prefix})]
+       (dist-card {:title "CAGR"
+                   :dist cagr
+                   :fmt-kind :pct
+                   :sign-by-value? true
+                   :range-fmt pct0
+                   :update-key [:cagr run-key]
+                   :data-role-prefix prefix})]
       [:div {:class ["mc-dist-grid"]
              :data-role (str prefix "-distributions")}
        (dist-card {:title "Total return"

@@ -119,19 +119,29 @@
       {:counts (vec (repeat bins 0)) :min 0 :max 0 :span 1 :bin-width (/ 1 bins)}
       (let [mn (reduce min v)
             mx (reduce max v)
-            span (let [s (- mx mn)] (if (zero? s) 1 s))
+            ;; "Degenerate" = effectively a single value. A shuffle-invariant metric
+            ;; (e.g. CAGR) is constant in theory but differs by floating-point noise
+            ;; (~1e-13) because reordering a product is not bit-identical; an exact
+            ;; `==` would miss that and spread the noise into a fake bell curve. Use a
+            ;; relative tolerance so such a metric collapses to one centered spike.
+            degenerate? (<= (- mx mn)
+                            (* 1e-9 (max 1 (js/Math.abs mn) (js/Math.abs mx))))
+            span (let [s (- mx mn)] (if (or degenerate? (zero? s)) 1 s))
             counts (js/Array. bins)]
         (dotimes [i bins] (aset counts i 0))
         (doseq [x v]
-          (let [b (js/Math.floor (* (/ (- x mn) span) bins))
-                b (cond (>= b bins) (dec bins)
-                        (< b 0) 0
-                        :else b)]
+          (let [b (if degenerate?
+                    (quot bins 2)
+                    (let [b (js/Math.floor (* (/ (- x mn) span) bins))]
+                      (cond (>= b bins) (dec bins)
+                            (< b 0) 0
+                            :else b)))]
             (aset counts b (inc (aget counts b)))))
         {:counts (vec counts)
          :min mn
          :max mx
          :span span
+         :degenerate? degenerate?
          :bin-width (/ span bins)}))))
 
 ;; ---------------------------------------------------------------------------
@@ -274,10 +284,26 @@
                                  (+ sum-r r) (+ sum-r2 (* r r)) gp*)))))
                   [equity worst-dd sum-r sum-r2] result
                   mean (/ sum-r H)
-                  sd (js/Math.sqrt (max 1e-12 (- (/ sum-r2 H) (* mean mean))))]
+                  sd (js/Math.sqrt (max 1e-12 (- (/ sum-r2 H) (* mean mean))))
+                  ;; Sharpe over the full step set is order-invariant, so a pure
+                  ;; shuffle alone would make it constant. QuantStats' montecarlo_sharpe
+                  ;; (stats.py) instead derives each path's returns via
+                  ;; cumret.pct_change().dropna(), which drops the first day — so its
+                  ;; Sharpe is a leave-one-out over the returns after slot 0, and the
+                  ;; spread is purely which day is dropped. We mirror that for :shuffle
+                  ;; so the distribution matches QuantStats; :bootstrap keeps the
+                  ;; genuine full-path Sharpe (each path is a distinct resample).
+                  sharpe-val (if shuffle?
+                               (let [r0 (aget ret (aget perm 0))
+                                     k (max 1 (dec H))
+                                     mean* (/ (- sum-r r0) k)
+                                     var* (max 1e-12 (- (/ (- sum-r2 (* r0 r0)) k)
+                                                        (* mean* mean*)))]
+                                 (* (/ mean* (js/Math.sqrt var*)) ann))
+                               (* (/ mean sd) ann))]
               (aset terminal s (- equity 1))
               (aset maxdd s worst-dd)
-              (aset sharpe s (* (/ mean sd) ann))
+              (aset sharpe s sharpe-val)
               (aset cagr s (- (js/Math.pow equity (/ ppy H)) 1))
               (aset vol s (* sd ann))
               (when (<= worst-dd bust) (vswap! busts inc))

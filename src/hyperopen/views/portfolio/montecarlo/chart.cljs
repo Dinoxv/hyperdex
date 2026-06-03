@@ -238,7 +238,9 @@
         (set! (.-fillStyle ctx) (hex->rgba col 0.62))
         (.fillRect ctx (+ x 0.5) (- plot-h bh) (max 1 (- bw 1)) bh)))
     (when (number? median)
-      (let [mx (* (/ (- median mn) span) w)]
+      (let [mx (if (:degenerate? hist)
+                 (/ w 2)                       ; centered spike for a single-valued metric
+                 (* (/ (- median mn) span) w))]
         (set! (.-strokeStyle ctx) "#ffffff")
         (set! (.-globalAlpha ctx) 0.8)
         (set! (.-lineWidth ctx) 1.5)

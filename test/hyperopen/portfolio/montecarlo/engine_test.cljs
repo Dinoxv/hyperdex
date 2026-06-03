@@ -39,6 +39,18 @@
     (is (= 8 (count (:counts h))))
     (is (= 0 (reduce + (:counts h))) "empty input is safe")))
 
+(deftest histogram-collapses-near-equal-values-test
+  ;; Values that differ only by floating-point noise (e.g. a shuffle-invariant
+  ;; CAGR, whose product is reordered but not bit-identical) must collapse to a
+  ;; single centered spike, not spread into a fake bell curve across bins.
+  (let [v (mapv (fn [i] (+ 13.8 (* i 1e-14))) (range 100))
+        h (engine/histogram v 34)]
+    (is (:degenerate? h) "near-equal values are treated as a single value")
+    (is (= 100 (reduce + (:counts h))) "all values are still counted")
+    (is (= 100 (nth (:counts h) (quot 34 2))) "they pile into the centre bin"))
+  (let [h (engine/histogram [0 1 2 3 4 5 6 7 8 9] 5)]
+    (is (not (:degenerate? h)) "a genuinely spread metric is not degenerate")))
+
 (deftest run-is-deterministic-by-seed-test
   (let [returns (varied-returns 250)
         opts {:returns returns :sims 500 :horizon 90 :seed 123 :start-equity 1000}
@@ -124,14 +136,18 @@
         res (engine/run {:returns returns :sims 400 :horizon 999
                          :method :shuffle :seed 7 :start-equity 1})
         term (:terminal res)
-        dd (:maxdd res)]
+        dd (:maxdd res)
+        cagr (:cagr res)
+        sharpe (:sharpe res)]
     (is (= :shuffle (get-in res [:meta :method])))
     (is (= 120 (get-in res [:meta :horizon])) "shuffle length is the history length, not the horizon arg")
     (is (= 120 (peek (:times res))))
     (is (approx= (:p5 term) (:p95 term) 1e-9) "terminal P5 equals terminal P95")
     (is (approx= (:min term) (:max term) 1e-9) "terminal min equals terminal max")
     (is (< (:std term) 1e-9) "terminal value does not vary across orderings")
-    (is (> (:std dd) 0) "max drawdown genuinely varies across orderings")))
+    (is (< (:std cagr) 1e-9) "CAGR is fixed (terminal is shuffle-invariant), matching QuantStats montecarlo_cagr")
+    (is (> (:std dd) 0) "max drawdown genuinely varies across orderings")
+    (is (> (:std sharpe) 0) "Sharpe varies via QuantStats' per-path day-drop (leave-one-out)")))
 
 (deftest shuffle-band-converges-at-the-final-day-test
   (let [res (engine/run {:returns (varied-returns 150) :sims 500

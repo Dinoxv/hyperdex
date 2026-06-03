@@ -110,4 +110,7 @@
       [:div {:class ["mc-realized-cell"]}
        [:div {:class ["mc-realized-k"]} "Total return"]
        [:div {:class ["mc-realized-v" (if (>= realized 0) "mc-pos" "mc-neg")]}
-        (fmt/signed-pct realized 1)]]]]))
+        (fmt/signed-pct realized 1)]]]
+     [:div {:class ["mc-realized-note"]}
+      (str "Annualized volatility " (fmt/unsigned-pct (get-in result [:vol :p50]) 0)
+           " · also fixed across all orderings")]]))
