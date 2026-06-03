@@ -49,4 +49,8 @@
            (portfolio-routes/portfolio-route? route)
            (not (portfolio-routes/portfolio-optimize-route? route)))
       (conj [:actions/select-portfolio-chart-tab
-             (get-in state [:portfolio-ui :chart-tab])]))))
+             (get-in state [:portfolio-ui :chart-tab])])
+
+      (and new-address
+           (not (subaccounts-actions/subaccounts-route? route)))
+      (conj [:effects/api-load-subaccounts]))))

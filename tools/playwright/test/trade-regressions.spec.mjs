@@ -700,9 +700,13 @@ async function seedReadyTradingSession(page, options = {}) {
   });
 }
 
-async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress }) {
+async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress, selectedAddress = null }) {
   await page.evaluate(
-    ({ ownerAddress: nextOwnerAddress, subaccountAddress: nextSubaccountAddress }) => {
+    ({
+      ownerAddress: nextOwnerAddress,
+      selectedAddress: nextSelectedAddress,
+      subaccountAddress: nextSubaccountAddress
+    }) => {
       const c = globalThis.cljs?.core;
       const store = globalThis.hyperopen?.system?.store;
 
@@ -750,11 +754,16 @@ async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress }) {
       nextState = c.assoc_in(
         nextState,
         kwPath("account-context", "subaccounts", "selected-address"),
-        null
+        nextSelectedAddress ? String(nextSelectedAddress).toLowerCase() : null
       );
       c.reset_BANG_(store, nextState);
+
+      const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+      if (typeof renderApp === "function") {
+        renderApp(c.deref(store));
+      }
     },
-    { ownerAddress, subaccountAddress }
+    { ownerAddress, selectedAddress, subaccountAddress }
   );
 }
 
@@ -784,6 +793,46 @@ async function selectHeaderAccountTarget(page, optionDataRole) {
   }
 
   await option.click();
+}
+
+async function closeHeaderAccountTarget(page) {
+  await page.locator('[data-role="header-account-target-details"]').evaluate((node) => {
+    node.open = false;
+  });
+}
+
+async function openHeaderAccountTarget(page) {
+  await page.locator('[data-role="header-account-target-details"]').evaluate((node) => {
+    node.open = true;
+  });
+  await expect(page.locator('[data-role="header-account-target-menu"]')).toBeVisible();
+}
+
+async function headerSubaccountGeometry(page) {
+  return page.evaluate(() => {
+    const viewportWidth = window.innerWidth;
+    const readRect = (role) => {
+      const node = document.querySelector(`[data-role="${role}"]`);
+      if (!node) {
+        return null;
+      }
+      const rect = node.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height
+      };
+    };
+    return {
+      viewportWidth,
+      banner: readRect("header-subaccount-active-banner"),
+      trigger: readRect("header-account-target-trigger"),
+      menu: readRect("header-account-target-menu")
+    };
+  });
 }
 
 async function setTradingConfirmations(page, { openOrders, closePosition } = {}) {
@@ -2565,12 +2614,82 @@ test("order submit and cancel gating uses simulator-backed assertions @regressio
   );
 });
 
+test("header subaccount state stays visible across review widths @regression", async ({
+  page
+}) => {
+  const ownerAddress = "0x1111111111111111111111111111111111111111";
+  const subaccountAddress = "0x2222222222222222222222222222222222222222";
+  const viewports = [
+    { width: 375, height: 812 },
+    { width: 768, height: 900 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 }
+  ];
+
+  await visitRoute(page, "/trade");
+  await freezeAccountSurfaceSync(page, ownerAddress);
+  await seedReadyTradingSession(page, { walletAddress: ownerAddress });
+  await seedOwnedSubaccounts(page, {
+    ownerAddress,
+    subaccountAddress,
+    selectedAddress: subaccountAddress
+  });
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+
+  const banner = page.locator('[data-role="header-subaccount-active-banner"]');
+  const trigger = page.locator('[data-role="header-account-target-trigger"]');
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await expect(banner).toBeVisible();
+    await expect(banner).toHaveText(
+      "IMPORTANT: You are trading on behalf of your sub-account Desk"
+    );
+
+    const closedGeometry = await headerSubaccountGeometry(page);
+    expect(closedGeometry.banner.left).toBeGreaterThanOrEqual(0);
+    expect(closedGeometry.banner.right).toBeLessThanOrEqual(viewport.width + 1);
+    expect(closedGeometry.banner.height).toBeGreaterThanOrEqual(28);
+
+    if (viewport.width >= 768) {
+      await expect(trigger).toBeVisible();
+      await expect(trigger).toContainText("Sub: Desk");
+      await trigger.click();
+      await expect(page.locator('[data-role="header-account-target-menu"]')).toBeVisible();
+      await expect(page.locator('[data-role="header-account-target-copy-master"]')).toBeVisible();
+      await expect(
+        page.locator(`[data-role="header-account-target-copy-${subaccountAddress}"]`)
+      ).toBeVisible();
+      await expect(page.locator('[data-role="header-account-target-disconnect"]')).toBeVisible();
+
+      const openGeometry = await headerSubaccountGeometry(page);
+      expect(openGeometry.trigger.right).toBeLessThanOrEqual(viewport.width + 1);
+      expect(openGeometry.menu.right).toBeLessThanOrEqual(viewport.width + 1);
+      await closeHeaderAccountTarget(page);
+    } else {
+      await expect(trigger).toBeHidden();
+    }
+  }
+});
+
 test("header account selector routes subaccount order payloads through vaultAddress @smoke @regression", async ({
   page
 }) => {
   const ownerAddress = "0x1111111111111111111111111111111111111111";
   const subaccountAddress = "0x2222222222222222222222222222222222222222";
 
+  await page.addInitScript(() => {
+    globalThis.__headerAccountClipboardWrites = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText(text) {
+          globalThis.__headerAccountClipboardWrites.push(text);
+          return Promise.resolve();
+        }
+      }
+    });
+  });
   await visitRoute(page, "/trade");
   await freezeAccountSurfaceSync(page, ownerAddress);
   await debugCall(page, "installExchangeSimulator", {
@@ -2610,6 +2729,26 @@ test("header account selector routes subaccount order payloads through vaultAddr
   );
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
   await expect(trigger).toContainText("Desk");
+  await expect(trigger).toContainText("Sub: Desk");
+  await expect(page.locator('[data-role="header-subaccount-active-banner"]')).toHaveText(
+    "IMPORTANT: You are trading on behalf of your sub-account Desk"
+  );
+  await openHeaderAccountTarget(page);
+  const masterCopy = page.locator('[data-role="header-account-target-copy-master"]');
+  const subaccountCopy = page.locator(
+    `[data-role="header-account-target-copy-${subaccountAddress}"]`
+  );
+  await expect(masterCopy).toBeVisible();
+  await expect(
+    subaccountCopy
+  ).toBeVisible();
+  await expect(page.locator('[data-role="header-account-target-disconnect"]')).toBeVisible();
+  await masterCopy.click();
+  await subaccountCopy.click();
+  await expect
+    .poll(() => page.evaluate(() => globalThis.__headerAccountClipboardWrites ?? []))
+    .toEqual([ownerAddress, subaccountAddress]);
+  await closeHeaderAccountTarget(page);
 
   await fillLimitOrderForm(page);
   await dispatch(page, [":actions/submit-order"]);
@@ -2637,9 +2776,11 @@ test("header account selector routes subaccount order payloads through vaultAddr
       cancelVaults: expect.arrayContaining([subaccountAddress])
     });
 
-  await selectHeaderAccountTarget(page, "header-account-target-option-master");
+  await openHeaderAccountTarget(page);
+  await page.locator('[data-role="header-account-target-disconnect"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
   await expect(trigger).toContainText("Master");
+  await expect(page.locator('[data-role="header-subaccount-active-banner"]')).toHaveCount(0);
 
   const beforeMasterSnapshot = await debugCall(page, "exchangeSimulatorSnapshot");
   const orderCountBeforeMaster = signedActionRequests(beforeMasterSnapshot, "order").length;

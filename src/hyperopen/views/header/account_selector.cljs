@@ -45,18 +45,25 @@
    :address-label (wallet/short-addr owner)
    :selected? selected?
    :data-role "header-account-target-option-master"
+   :copy-data-role "header-account-target-copy-master"
+   :copy-label "Copy master account address"
+   :copy-action [[:actions/copy-subaccount-address owner]]
    :action [[:actions/select-master-account]]})
 
 (defn- subaccount-option
   [selected-address row]
   (let [address (:sub-account-user row)
-        label (or (row-name row) "Subaccount")]
+        name (or (row-name row) "Subaccount")]
     {:kind :subaccount
      :value address
-     :label label
+     :label "Sub"
+     :name-label name
      :address-label (wallet/short-addr address)
      :selected? (= selected-address address)
      :data-role (str "header-account-target-option-" address)
+     :copy-data-role (str "header-account-target-copy-" address)
+     :copy-label "Copy subaccount address"
+     :copy-action [[:actions/copy-subaccount-address address]]
      :action [[:actions/select-subaccount address]]}))
 
 (defn- selected-owned-address
@@ -81,37 +88,99 @@
                           (mapv (partial subaccount-option selected) rows))
             selected-option (or (some #(when (:selected? %) %) options)
                                 (first options))]
-        {:trigger-label (:label selected-option)
+        {:trigger-label (if (= :subaccount (:kind selected-option))
+                          (str "Sub: " (:name-label selected-option))
+                          (:label selected-option))
          :trigger-address-label (:address-label selected-option)
+         :active-subaccount (when (= :subaccount (:kind selected-option))
+                              {:name (:name-label selected-option)
+                               :address (:value selected-option)})
+         :disconnect (when (= :subaccount (:kind selected-option))
+                       {:label "Disconnect"
+                        :action [[:actions/select-master-account]]})
          :options options}))))
 
 (defn- option-row
-  [{:keys [action address-label data-role label selected? value]}]
+  [{:keys [action address-label copy-action copy-data-role copy-label data-role kind label name-label selected? value]}]
   ^{:key (str "header-account-target:" value)}
+  [:div {:class ["flex"
+                 "items-center"
+                 "border-b"
+                 "border-white/5"
+                 "last:border-b-0"
+                 "hover:bg-white/[0.04]"]}
+   [:button {:type "button"
+             :data-role data-role
+             :aria-current (when selected? "true")
+             :class (into ["grid"
+                           "min-w-0"
+                           "flex-1"
+                           "grid-cols-[4.5rem_minmax(0,1fr)]"
+                           "items-center"
+                           "gap-3"
+                           "px-3"
+                           "py-2.5"
+                           "text-left"
+                           "text-xs"
+                           "transition-colors"
+                           "focus:outline-none"
+                           "focus-visible:bg-white/[0.05]"]
+                          (if selected?
+                            ["text-[#97fce4]"]
+                            ["text-white"]))
+             :on {:click action}}
+    [:span {:class ["min-w-0" "truncate" "font-medium"]} label]
+    [:span {:class ["num"
+                    "min-w-0"
+                    "truncate"
+                    "text-right"
+                    (if (= :subaccount kind)
+                      "text-white"
+                      "text-trading-text-secondary")]}
+     (or name-label address-label)]]
+   [:button {:type "button"
+             :data-role copy-data-role
+             :aria-label copy-label
+             :class ["mr-2"
+                     "inline-flex"
+                     "h-7"
+                     "w-7"
+                     "shrink-0"
+                     "items-center"
+                     "justify-center"
+                     "rounded-md"
+                     "text-[#56dcca]"
+                     "transition-colors"
+                     "hover:bg-[#123a36]"
+                     "hover:text-[#97fce4]"
+                     "focus:outline-none"
+                     "focus-visible:ring-1"
+                     "focus-visible:ring-[#56dcca]"]
+             :on {:click copy-action}}
+    (icons/wallet-copy-icon)]])
+
+(defn- disconnect-row
+  [{:keys [action label]}]
   [:button {:type "button"
-            :data-role data-role
-            :aria-current (when selected? "true")
-            :class (into ["flex"
-                          "w-full"
-                          "items-center"
-                          "justify-between"
-                          "gap-3"
-                          "px-3"
-                          "py-2.5"
-                          "text-left"
-                          "text-xs"
-                          "transition-colors"
-                          "hover:bg-base-200"
-                          "focus:outline-none"]
-                         (if selected?
-                           ["text-[#97fce4]"]
-                           ["text-white"]))
+            :data-role "header-account-target-disconnect"
+            :class ["flex"
+                    "w-full"
+                    "items-center"
+                    "px-3"
+                    "py-2.5"
+                    "text-left"
+                    "text-xs"
+                    "font-medium"
+                    "text-[#56dcca]"
+                    "transition-colors"
+                    "hover:bg-white/[0.04]"
+                    "focus:outline-none"
+                    "focus-visible:bg-white/[0.05]"]
             :on {:click action}}
-   [:span {:class ["min-w-0" "truncate" "font-medium"]} label]
-   [:span {:class ["num" "shrink-0" "text-trading-text-secondary"]} address-label]])
+   label])
 
 (defn render
-  [{:keys [options trigger-address-label trigger-label] :as selector}]
+  [{:keys [disconnect options trigger-address-label trigger-label] :as selector}]
   (when selector
     [:details {:class ["relative" "group" "hidden" "md:inline-flex"]
                :data-role "header-account-target-details"}
@@ -122,11 +191,11 @@
                         "list-none"
                         "items-center"
                         "gap-2"
-                        "rounded-xl"
+                        "rounded-lg"
                         "border"
                         "border-base-300"
                         "bg-base-100"
-                        "px-2.5"
+                        "px-3"
                         "text-xs"
                         "text-white"
                         "transition-colors"
@@ -147,13 +216,16 @@
                     "top-full"
                     "z-[250]"
                     "mt-2"
-                    "w-60"
+                    "w-56"
                     "overflow-hidden"
-                    "rounded-xl"
+                    "rounded-lg"
                     "border"
                     "border-base-300"
-                    "bg-trading-bg"
+                    "bg-[#121b1f]"
                     "shadow-2xl"]
             :data-ui-native-details-panel "true"
             :data-role "header-account-target-menu"}
-      (map option-row options)]]))
+      (map option-row options)
+      (when disconnect
+        [:div {:class ["border-t" "border-white/10"]}
+         (disconnect-row disconnect)])]]))

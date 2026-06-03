@@ -31,22 +31,33 @@
                         :renaming-address subaccount-address
                         :transferring-address subaccount-address}}}))
 
-(deftest load-subaccounts-resolves-without-requesting-when-route-is-inactive-test
+(deftest load-subaccounts-loads-global-header-state-when-route-is-inactive-test
   (async done
-    (let [calls (atom 0)
+    (let [calls (atom [])
           store (atom {:router {:path "/trade"}
                        :wallet {:address owner-address}})]
       (-> (effects/load-subaccounts!
            {:store store
             :request-sub-accounts! (fn [_address _opts]
-                                     (swap! calls inc)
-                                     (js/Promise.resolve []))})
+                                     (swap! calls conj [_address _opts])
+                                     (js/Promise.resolve
+                                      [{:name "Desk"
+                                        :master owner-address
+                                        :sub-account-user subaccount-address}]))
+            :local-storage-get (fn [key]
+                                 (when (= key (actions/selected-subaccount-storage-key owner-address))
+                                   subaccount-address))})
           (.then (fn [result]
                    (is (nil? result))
-                   (is (= 0 @calls))
+                   (is (= [[owner-address {:priority :high}]]
+                          @calls))
+                   (is (= :loaded
+                          (get-in @store [:account-context :subaccounts :status])))
+                   (is (= subaccount-address
+                          (get-in @store [:account-context :subaccounts :selected-address])))
                    (done)))
           (.catch (fn [err]
-                    (is false (str "Unexpected inactive-route error: " err))
+                    (is false (str "Unexpected global header load error: " err))
                     (done)))))))
 
 (deftest load-subaccounts-resets-state-when-owner-wallet-is-missing-test

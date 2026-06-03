@@ -5,11 +5,6 @@
             [hyperopen.platform :as platform]
             [hyperopen.subaccounts.actions :as actions]))
 
-(defn- load-route-active?
-  [store]
-  (actions/subaccounts-route?
-   (get-in @store [:router :path] "")))
-
 (defn- subaccount-row-address
   [row]
   (account-context/normalize-address
@@ -100,41 +95,39 @@
            force-refresh?]
     :or {local-storage-get platform/local-storage-get
          now-ms-fn platform/now-ms}}]
-  (if-not (load-route-active? store)
-    (js/Promise.resolve nil)
-    (let [owner-address (account-context/owner-address @store)]
-      (if-not (seq owner-address)
-        (do
-          (reset-subaccounts! store)
-          (js/Promise.resolve nil))
-        (-> (request-sub-accounts! owner-address
-                                    (request-opts owner-address force-refresh? now-ms-fn))
-            (.then (fn [rows]
-                     (let [rows* (->> (or rows [])
-                                      (keep normalize-subaccount-row)
-                                      vec)
-                           selected (next-selected-address @store
-                                                           owner-address
-                                                           rows*
-                                                           local-storage-get)]
-                       (swap! store
-                              (fn [state]
-                                (-> state
-                                    (assoc-in [:account-context :subaccounts :status] :loaded)
-                                    (assoc-in [:account-context :subaccounts :loaded-for-owner] owner-address)
-                                    (assoc-in [:account-context :subaccounts :rows] rows*)
-                                    (assoc-in [:account-context :subaccounts :error] nil)
-                                    (assoc-in [:account-context :subaccounts :selected-address] selected)
-                                    (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
-                       nil)))
-            (.catch (fn [err]
-                      (swap! store
-                             (fn [state]
-                               (-> state
-                                   (assoc-in [:account-context :subaccounts :status] :error)
-                                   (assoc-in [:account-context :subaccounts :error] (error-message err))
-                                   (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
-                      nil)))))))
+  (let [owner-address (account-context/owner-address @store)]
+    (if-not (seq owner-address)
+      (do
+        (reset-subaccounts! store)
+        (js/Promise.resolve nil))
+      (-> (request-sub-accounts! owner-address
+                                  (request-opts owner-address force-refresh? now-ms-fn))
+          (.then (fn [rows]
+                   (let [rows* (->> (or rows [])
+                                    (keep normalize-subaccount-row)
+                                    vec)
+                         selected (next-selected-address @store
+                                                         owner-address
+                                                         rows*
+                                                         local-storage-get)]
+                     (swap! store
+                            (fn [state]
+                              (-> state
+                                  (assoc-in [:account-context :subaccounts :status] :loaded)
+                                  (assoc-in [:account-context :subaccounts :loaded-for-owner] owner-address)
+                                  (assoc-in [:account-context :subaccounts :rows] rows*)
+                                  (assoc-in [:account-context :subaccounts :error] nil)
+                                  (assoc-in [:account-context :subaccounts :selected-address] selected)
+                                  (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
+                     nil)))
+          (.catch (fn [err]
+                    (swap! store
+                           (fn [state]
+                             (-> state
+                                 (assoc-in [:account-context :subaccounts :status] :error)
+                                 (assoc-in [:account-context :subaccounts :error] (error-message err))
+                                 (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
+                    nil))))))
 
 (defn api-load-subaccounts!
   [deps]

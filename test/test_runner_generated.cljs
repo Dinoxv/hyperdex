@@ -465,6 +465,7 @@
             [hyperopen.views.funding-modal-test]
             [hyperopen.views.header-account-selector-test]
             [hyperopen.views.header-settings-view-test]
+            [hyperopen.views.header-subaccount-state-test]
             [hyperopen.views.header-view-test]
             [hyperopen.views.header.vm-test]
             [hyperopen.views.l2-orderbook-view-test]
@@ -1146,6 +1147,7 @@
              'hyperopen.views.funding-modal-test
              'hyperopen.views.header-account-selector-test
              'hyperopen.views.header-settings-view-test
+             'hyperopen.views.header-subaccount-state-test
              'hyperopen.views.header-view-test
              'hyperopen.views.header.vm-test
              'hyperopen.views.l2-orderbook-view-test

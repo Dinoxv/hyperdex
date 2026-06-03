@@ -20,35 +20,52 @@
    "italic"
    "select-none"])
 
+(defn- active-subaccount-banner
+  [{:keys [name]}]
+  (when (seq name)
+    [:div {:class ["w-full"
+                   "bg-[#56dcca]"
+                   "px-3"
+                   "py-2"
+                   "text-xs"
+                   "font-medium"
+                   "text-black"
+                   "sm:px-4"]
+           :data-role "header-subaccount-active-banner"}
+     (str "IMPORTANT: You are trading on behalf of your sub-account " name)]))
+
 (defn header-view
   [state]
   (let [{:keys [account-selector desktop-nav-items mobile-menu-open? mobile-nav more-nav settings spectate wallet]}
         (vm/header-vm state)]
-    [:header.bg-base-200.border-b.border-base-300.w-full
-     {:data-parity-id "header"}
-     [:div {:class ["w-full" "app-shell-gutter" "py-2" "md:py-3"]}
-      [:div {:class ["flex" "items-center" "gap-2" "md:gap-4"]}
-       [:div {:class ["flex" "items-center" "gap-2.5" "md:gap-3" "min-w-0"]}
-        (navigation/render-mobile-menu mobile-nav spectate mobile-menu-open?)
-        [:button {:type "button"
-                  :class ["md:hidden" "inline-flex" "items-center" "rounded-lg" "px-1" "py-0.5"]
-                  :on {:click [[:actions/navigate "/trade"]]}
-                  :data-role "mobile-brand"}
-         [:span {:class (into ["text-lg" "leading-none"]
-                              brand-mark-classes)}
-          "HO"]]
-        [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
-         [:span {:class (into ["text-xl" "leading-none" "sm:text-3xl"]
-                              brand-wordmark-classes)}
-          "HyperOpen"]]]
-       (navigation/render-desktop-nav desktop-nav-items more-nav)
-       [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-2.5" "lg:gap-4"]
-              :data-parity-id "header-wallet-control"}
-        [:div {:class ["inline-flex" "md:hidden" "lg:inline-flex"]}
-         (spectate/render-trigger spectate)]
-        (account-selector/render account-selector)
-        (wallet/render wallet)
-        [:div {:class ["relative" "flex" "items-center" "gap-1.5" "sm:gap-2"]
-               :data-role "header-settings-toolbar"}
-         (settings/render-trigger settings)
-         (settings/render-shell settings)]]]]]))
+    [:div {:class ["contents"]
+           :data-role "header-shell"}
+     [:header.bg-base-200.border-b.border-base-300.w-full
+      {:data-parity-id "header"}
+      [:div {:class ["w-full" "app-shell-gutter" "py-2" "md:py-3"]}
+       [:div {:class ["flex" "items-center" "gap-2" "md:gap-4"]}
+        [:div {:class ["flex" "items-center" "gap-2.5" "md:gap-3" "min-w-0"]}
+         (navigation/render-mobile-menu mobile-nav spectate mobile-menu-open?)
+         [:button {:type "button"
+                   :class ["md:hidden" "inline-flex" "items-center" "rounded-lg" "px-1" "py-0.5"]
+                   :on {:click [[:actions/navigate "/trade"]]}
+                   :data-role "mobile-brand"}
+          [:span {:class (into ["text-lg" "leading-none"]
+                               brand-mark-classes)}
+           "HO"]]
+         [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
+          [:span {:class (into ["text-xl" "leading-none" "sm:text-3xl"]
+                               brand-wordmark-classes)}
+           "HyperOpen"]]]
+        (navigation/render-desktop-nav desktop-nav-items more-nav)
+        [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-2.5" "lg:gap-4"]
+               :data-parity-id "header-wallet-control"}
+         [:div {:class ["inline-flex" "md:hidden" "lg:inline-flex"]}
+          (spectate/render-trigger spectate)]
+         (account-selector/render account-selector)
+         (wallet/render wallet)
+         [:div {:class ["relative" "flex" "items-center" "gap-1.5" "sm:gap-2"]
+                :data-role "header-settings-toolbar"}
+          (settings/render-trigger settings)
+          (settings/render-shell settings)]]]]]
+     (active-subaccount-banner (:active-subaccount account-selector))]))
