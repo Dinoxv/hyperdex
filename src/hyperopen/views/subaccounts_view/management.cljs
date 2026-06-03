@@ -36,7 +36,8 @@
            :placeholder placeholder
            :disabled (boolean disabled?)
            :class ["min-w-0"
-                   "h-8"
+                   "h-10"
+                   "w-full"
                    "rounded-md"
                    "border"
                    "border-base-300"
