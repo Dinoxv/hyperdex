@@ -33,7 +33,6 @@
             [hyperopen.websocket.client :as ws-client]))
 
 (def append-diagnostics-event! ws-adapters/append-diagnostics-event!)
-
 (def sync-websocket-health-with-runtime! ws-adapters/sync-websocket-health-with-runtime!)
 
 (def sync-websocket-health! ws-adapters/sync-websocket-health!)
@@ -424,6 +423,7 @@
          {:create-sub-account! trading-api/create-sub-account!
           :modify-sub-account! trading-api/modify-sub-account!
           :transfer-sub-account! trading-api/transfer-sub-account!
+          :transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
           :runtime-error-message agent-runtime/runtime-error-message
           :dispatch! nxr/dispatch
           :load-subaccounts! (fn [opts]

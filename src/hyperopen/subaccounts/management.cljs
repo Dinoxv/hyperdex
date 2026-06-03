@@ -14,6 +14,12 @@
 (def invalid-transfer-amount-message
   "Enter a positive USDC amount with at most 6 decimal places.")
 
+(def invalid-spot-transfer-amount-message
+  "Enter a positive spot amount.")
+
+(def invalid-spot-transfer-token-message
+  "Select a spot asset to transfer.")
+
 (defn- subaccount-row-address
   [row]
   (account-context/normalize-address
@@ -55,6 +61,10 @@
       "renamename" :rename-name
       "transferamount" :transfer-amount
       "transferdirection" :transfer-direction
+      "transferaccount" :transfer-account
+      "transfertoken" :transfer-token
+      "transfertokenmenuopen?" :transfer-token-menu-open?
+      "transfertokenmenuopen" :transfer-token-menu-open?
       nil)))
 
 (defn- normalize-transfer-direction
@@ -63,19 +73,48 @@
     :withdraw
     :deposit))
 
+(defn- normalize-transfer-account
+  [value]
+  (if (= "spot" (-> value name str/lower-case))
+    :spot
+    :trading))
+
+(defn- normalize-boolean
+  [value]
+  (or (true? value)
+      (= "true" (-> value str str/lower-case))))
+
 (defn- normalize-form-value
   [field value]
   (case field
     :transfer-direction (normalize-transfer-direction value)
+    :transfer-account (normalize-transfer-account value)
+    :transfer-token-menu-open? (normalize-boolean value)
     (str (or value ""))))
 
 (defn set-subaccount-form-field
   [_state field value]
   (if-let [field* (normalize-form-field field)]
-    [[:effects/save-many [[[:account-context :subaccounts field*]
-                           (normalize-form-value field* value)]
-                          [[:account-context :subaccounts :error] nil]]]]
+    [[:effects/save-many (cond-> [[[:account-context :subaccounts field*]
+                                    (normalize-form-value field* value)]]
+                           (= field* :transfer-account)
+                           (conj [[:account-context :subaccounts :transfer-token-menu-open?] false])
+
+                           (= field* :transfer-token)
+                           (conj [[:account-context :subaccounts :transfer-token-menu-open?] false])
+
+                           true
+                           (conj [[:account-context :subaccounts :error] nil]))]]
     []))
+
+(defn toggle-transfer-direction
+  [state]
+  (let [current (normalize-transfer-direction
+                 (get-in state [:account-context :subaccounts :transfer-direction]))
+        next-direction (if (= :deposit current) :withdraw :deposit)]
+    [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] next-direction]
+                          [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                          [[:account-context :subaccounts :error] nil]]]]))
 
 (defn open-create-popover
   [_state]
@@ -202,6 +241,9 @@
       [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
                             [[:account-context :subaccounts :transfer-amount] ""]
                             [[:account-context :subaccounts :transfer-direction] :deposit]
+                            [[:account-context :subaccounts :transfer-account] :trading]
+                            [[:account-context :subaccounts :transfer-token] "USDC"]
+                            [[:account-context :subaccounts :transfer-token-menu-open?] false]
                             [[:account-context :subaccounts :error] nil]]]])))
 
 (defn cancel-transfer-subaccount
@@ -209,7 +251,25 @@
   [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
                         [[:account-context :subaccounts :transfer-amount] ""]
                         [[:account-context :subaccounts :transfer-direction] :deposit]
+                        [[:account-context :subaccounts :transfer-account] :trading]
+                        [[:account-context :subaccounts :transfer-token] "USDC"]
+                        [[:account-context :subaccounts :transfer-token-menu-open?] false]
                         [[:account-context :subaccounts :error] nil]]]])
+
+(defn- valid-spot-amount?
+  [value]
+  (boolean
+   (let [amount-text (str/trim (str (or value "")))]
+     (when (re-matches #"^\d+(?:\.\d+)?$" amount-text)
+       (let [parsed (js/Number amount-text)]
+         (and (number? parsed)
+              (not (js/isNaN parsed))
+              (js/isFinite parsed)
+              (pos? parsed)))))))
+
+(defn- normalize-transfer-token
+  [value]
+  (some-> value str str/trim not-empty))
 
 (defn submit-transfer-subaccount
   [state address]
@@ -220,10 +280,35 @@
                              ""))
         usd (parse-usdc-amount->micros amount-text)
         direction (normalize-transfer-direction
-                   (get-in state [:account-context :subaccounts :transfer-direction]))]
+                   (get-in state [:account-context :subaccounts :transfer-direction]))
+        account-kind (normalize-transfer-account
+                      (get-in state [:account-context :subaccounts :transfer-account]))
+        transfer-token (normalize-transfer-token
+                        (get-in state [:account-context :subaccounts :transfer-token]))]
     (cond
       (not (seq owner-address)) (invalid-owner-effect)
       (not row) (invalid-row-effect)
+      (= :spot account-kind)
+      (cond
+        (not (valid-spot-amount? amount-text))
+        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
+                              [[:account-context :subaccounts :error]
+                               invalid-spot-transfer-amount-message]]]]
+
+        (not transfer-token)
+        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
+                              [[:account-context :subaccounts :error]
+                               invalid-spot-transfer-token-message]]]]
+
+        :else
+        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
+                              [[:account-context :subaccounts :error] nil]]]
+         [:effects/api-transfer-subaccount {:sub-account-user address*
+                                            :is-deposit (= :deposit direction)
+                                            :amount amount-text
+                                            :account-kind :spot
+                                            :token transfer-token}]])
+
       (not usd)
       [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
                             [[:account-context :subaccounts :error]

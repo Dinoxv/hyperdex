@@ -313,6 +313,19 @@
                                  :usd usd}
                                 (management-action-options options))))
 
+(defn transfer-sub-account-spot!
+  ([store address sub-account-user is-deposit? token amount]
+   (transfer-sub-account-spot! store address sub-account-user is-deposit? token amount {}))
+  ([store address sub-account-user is-deposit? token amount options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "subAccountSpotTransfer"
+                                 :subAccountUser (http/normalize-address sub-account-user)
+                                 :isDeposit (boolean is-deposit?)
+                                 :token (str token)
+                                 :amount (str amount)}
+                                (management-action-options options))))
+
 (defn schedule-cancel!
   ([store address cancel-at-ms]
    (schedule-cancel! store address cancel-at-ms {}))

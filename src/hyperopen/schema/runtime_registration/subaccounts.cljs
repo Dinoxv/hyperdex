@@ -11,6 +11,7 @@
    [:actions/select-subaccount :select-subaccount]
    [:actions/select-master-account :select-master-account]
    [:actions/set-subaccount-form-field :set-subaccount-form-field]
+   [:actions/toggle-transfer-direction :toggle-transfer-direction]
    [:actions/open-subaccount-create-popover :open-subaccount-create-popover]
    [:actions/close-subaccount-create-popover :close-subaccount-create-popover]
    [:actions/copy-subaccount-address :copy-subaccount-address]

@@ -269,6 +269,9 @@
                  :rename-name ""
                  :transfer-amount ""
                  :transfer-direction :deposit
+                 :transfer-account :trading
+                 :transfer-token "USDC"
+                 :transfer-token-menu-open? false
                  :creating? false
                  :renaming-address nil
                  :transferring-address nil}

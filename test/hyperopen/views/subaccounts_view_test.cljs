@@ -17,7 +17,10 @@
   {:wallet {:address owner-address}
    :webdata2 {:clearinghouseState {:marginSummary {:accountValue "999.99"}}}
    :spot {:clearinghouse-state {:balances [{:coin "USDC"
-                                             :total "50.50"}]}}
+                                             :total "50.50"}
+                                            {:coin "USDH"
+                                             :token "USDH:0xabc"
+                                             :total "8.25"}]}}
    :account-context
    {:subaccounts
     {:status :loaded
@@ -27,11 +30,17 @@
              :sub-account-user subaccount-address
              :clearinghouse-state {:marginSummary {:accountValue "123.45"}}
              :spot-state {:balances [{:coin "USDC"
-                                       :total "250.25"}]}}
+                                       :total "250.25"}
+                                      {:coin "MEOW"
+                                       :token "MEOW:0xdef"
+                                       :total "0.02"}]}}
             {:name "Ops"
              :master owner-address
              :sub-account-user other-subaccount-address
-             :clearinghouse-state {:marginSummary {:accountValue "0"}}}]
+             :clearinghouse-state {:marginSummary {:accountValue "0"}}
+             :spot-state {:balances [{:coin "MEOW"
+                                       :token "MEOW:0xdef"
+                                       :total "0.02"}]}}]
      :error nil
      :selected-address subaccount-address
      :selection-loaded? true}}})
@@ -110,6 +119,9 @@
                        (assoc-in [:account-context :subaccounts :rename-name] "Desk B")
                        (assoc-in [:account-context :subaccounts :transfer-amount] "1.23")
                        (assoc-in [:account-context :subaccounts :transfer-direction] :withdraw)
+                       (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+                       (assoc-in [:account-context :subaccounts :transfer-token] "MEOW:0xdef")
+                       (assoc-in [:account-context :subaccounts :transfer-token-menu-open?] true)
                        (assoc-in [:account-context :subaccounts :renaming-address] subaccount-address)
                        (assoc-in [:account-context :subaccounts :transferring-address] other-subaccount-address)))
         create-open (hiccup/find-by-data-role view-node "subaccounts-open-create-popover")
@@ -137,6 +149,12 @@
                                                (str "subaccounts-transfer-max-" other-subaccount-address))
         transfer-token (hiccup/find-by-data-role view-node
                                                  (str "subaccounts-transfer-token-" other-subaccount-address))
+        transfer-token-menu (hiccup/find-by-data-role view-node
+                                                      (str "subaccounts-transfer-token-menu-" other-subaccount-address))
+        transfer-meow-option (hiccup/find-by-data-role view-node
+                                                       (str "subaccounts-transfer-token-option-" other-subaccount-address "-MEOW:0xdef"))
+        transfer-toggle (hiccup/find-by-data-role view-node
+                                                  (str "subaccounts-transfer-toggle-direction-" other-subaccount-address))
         transfer-direction (hiccup/find-by-data-role view-node
                                                      (str "subaccounts-transfer-direction-" other-subaccount-address))
         transfer-submit (hiccup/find-by-data-role view-node
@@ -166,14 +184,20 @@
                    "Transfer tokens between sub-account and master account."))
     (is (contains? (set (hiccup/collect-strings transfer-source)) "Ops"))
     (is (contains? (set (hiccup/collect-strings transfer-destination)) "Master Account"))
-    (is (contains? (set (hiccup/collect-strings transfer-max)) "MAX: 0 USDC"))
-    (is (= "USDC" (get-in transfer-token [1 :value])))
-    (is (true? (get-in transfer-token [1 :disabled])))
+    (is (contains? (set (hiccup/collect-strings transfer-max)) "MAX: 0.02 MEOW"))
+    (is (= [[:actions/toggle-transfer-direction]]
+           (get-in transfer-toggle [1 :on :click])))
+    (is (contains? (set (hiccup/collect-strings transfer-token)) "MEOW"))
+    (is (some? transfer-token-menu))
+    (is (contains? (set (hiccup/collect-strings transfer-token-menu)) "MEOW"))
+    (is (contains? (set (hiccup/collect-strings transfer-token-menu)) "0.02"))
+    (is (= [[:actions/set-subaccount-form-field :transfer-token "MEOW:0xdef"]]
+           (get-in transfer-meow-option [1 :on :click])))
     (is (= "1.23" (get-in transfer-amount [1 :value])))
     (is (= [[:actions/set-subaccount-form-field :transfer-amount [:event.target/value]]]
            (get-in transfer-amount [1 :on :input])))
-    (is (= "withdraw" (get-in transfer-direction [1 :value])))
-    (is (= [[:actions/set-subaccount-form-field :transfer-direction [:event.target/value]]]
+    (is (= "spot" (get-in transfer-direction [1 :value])))
+    (is (= [[:actions/set-subaccount-form-field :transfer-account [:event.target/value]]]
            (get-in transfer-direction [1 :on :change])))
     (is (= [[:actions/submit-transfer-subaccount other-subaccount-address]]
            (get-in transfer-submit [1 :on :click])))))

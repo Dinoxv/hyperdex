@@ -103,6 +103,67 @@
     (.format usdc-amount-formatter value*)
     "--"))
 
+(defn- balance-coin
+  [balance]
+  (some-> (or (:coin balance) (get balance "coin")) str str/trim))
+
+(defn- balance-token
+  [balance coin]
+  (let [token (some-> (or (:token balance)
+                          (:token-id balance)
+                          (:tokenId balance)
+                          (get balance "token")
+                          (get balance "tokenId")
+                          (get balance "token-id"))
+                      str
+                      str/trim)]
+    (if (seq token) token coin)))
+
+(defn- balance-available
+  [balance]
+  (let [total (parse-number (or (:total balance)
+                                (:totalBalance balance)
+                                (get balance "total")
+                                (get balance "totalBalance")))
+        hold (or (parse-number (or (:hold balance)
+                                   (get balance "hold")))
+                 0)]
+    (when total
+      (max 0 (- total hold)))))
+
+(defn- transfer-asset-row
+  [balance]
+  (when-let [coin (balance-coin balance)]
+    (let [available (or (balance-available balance) 0)]
+      {:symbol coin
+       :token (balance-token balance coin)
+       :available available
+       :available-display (format-usdc-amount available)})))
+
+(defn- spot-transfer-assets
+  [spot-state]
+  (let [balances (or (:balances spot-state)
+                     (get spot-state "balances"))]
+    (or (seq (keep transfer-asset-row balances))
+        [{:symbol "USDC"
+          :token "USDC"
+          :available 0
+          :available-display "0"}])))
+
+(defn- transfer-assets
+  [{:keys [subaccounts active-transfer master-spot-state deposit-max withdraw-max]}]
+  (let [direction (or (:transfer-direction subaccounts) :deposit)
+        account-kind (or (:transfer-account subaccounts) :trading)
+        withdrawing? (= :withdraw direction)]
+    (if (= :spot account-kind)
+      (spot-transfer-assets
+       (if withdrawing?
+         (spot-state active-transfer)
+         master-spot-state))
+      [{:symbol "USDC"
+        :token "USDC"
+        :available-display (if withdrawing? withdraw-max deposit-max)}])))
+
 (defn- lucide-node->hiccup
   [node]
   (let [tag-name (aget node 0)
@@ -289,7 +350,8 @@
         error (:error subaccounts)
         active-transfer (active-transfer-row rows (:transferring-address subaccounts))
         master-perps-value (account-value {:clearinghouse-state (get-in state [:webdata2 :clearinghouseState])})
-        master-spot-value (spot-account-value {:spot-state (get-in state [:spot :clearinghouse-state])})]
+        master-spot-state (get-in state [:spot :clearinghouse-state])
+        master-spot-value (spot-account-value {:spot-state master-spot-state})]
     [:div {:class ["app-shell-gutter" "flex" "min-h-[calc(100vh-4rem)]" "w-full" "flex-col" "gap-5" "pt-8" "pb-16"]
            :style {:background-color "#002f24"
                    :background-image "radial-gradient(circle at 88% 112%, transparent 0 21%, rgba(97,222,203,0.13) 21.1% 21.3%, transparent 21.4% 26%, rgba(97,222,203,0.13) 26.1% 26.3%, transparent 26.4% 31%, rgba(97,222,203,0.13) 31.1% 31.3%, transparent 31.4% 36%, rgba(97,222,203,0.13) 36.1% 36.3%, transparent 36.4%)"}
@@ -320,12 +382,19 @@
                              :subaccounts subaccounts})]
       (when active-transfer
         (let [address (row-address active-transfer)
-              perps-value (account-value active-transfer)]
+              perps-value (account-value active-transfer)
+              deposit-max (format-usdc-amount master-perps-value)
+              withdraw-max (format-usdc-amount perps-value)]
           (management/transfer-popover-layer
            {:address address
             :subaccount-name (row-name active-transfer)
-            :deposit-max (format-usdc-amount master-perps-value)
-            :withdraw-max (format-usdc-amount perps-value)
+            :deposit-max deposit-max
+            :withdraw-max withdraw-max
+            :transfer-assets (transfer-assets {:subaccounts subaccounts
+                                               :active-transfer active-transfer
+                                               :master-spot-state master-spot-state
+                                               :deposit-max deposit-max
+                                               :withdraw-max withdraw-max})
             :subaccounts subaccounts})))]]))
 
 (defn ^:export route-view

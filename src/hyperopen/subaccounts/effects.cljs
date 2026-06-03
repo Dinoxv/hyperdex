@@ -63,6 +63,9 @@
           :rename-name ""
           :transfer-amount ""
           :transfer-direction :deposit
+          :transfer-account :trading
+          :transfer-token "USDC"
+          :transfer-token-menu-open? false
           :creating? false
           :renaming-address nil
           :transferring-address nil}))
@@ -244,6 +247,9 @@
                (assoc-in [:account-context :subaccounts :transferring-address] nil)
                (assoc-in [:account-context :subaccounts :transfer-amount] "")
                (assoc-in [:account-context :subaccounts :transfer-direction] :deposit)
+               (assoc-in [:account-context :subaccounts :transfer-account] :trading)
+               (assoc-in [:account-context :subaccounts :transfer-token] "USDC")
+               (assoc-in [:account-context :subaccounts :transfer-token-menu-open?] false)
                (assoc-in [:account-context :subaccounts :error] nil)))))
 
 (defn- dispatch-active-user-refresh!
@@ -252,16 +258,23 @@
     (dispatch! store nil [[:effects/api-load-user-data address]])))
 
 (defn transfer-subaccount!
-  [{:keys [store request transfer-sub-account! dispatch! runtime-error-message]
+  [{:keys [store request transfer-sub-account! transfer-sub-account-spot! dispatch! runtime-error-message]
     :as deps
     :or {transfer-sub-account! trading-api/transfer-sub-account!
+         transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
          dispatch! (fn [_store _ctx _effects] nil)
          runtime-error-message error-message}}]
   (let [owner (owner-address store)
         address (account-context/normalize-address (:sub-account-user request))
         is-deposit? (boolean (:is-deposit request))
-        usd (:usd request)]
-    (-> (transfer-sub-account! store owner address is-deposit? usd)
+        spot? (= :spot (:account-kind request))
+        usd (:usd request)
+        token (:token request)
+        amount (:amount request)
+        submit! (if spot?
+                  (transfer-sub-account-spot! store owner address is-deposit? token amount)
+                  (transfer-sub-account! store owner address is-deposit? usd))]
+    (-> submit!
         (.then (fn [resp]
                  (if (response-ok? resp)
                    (do

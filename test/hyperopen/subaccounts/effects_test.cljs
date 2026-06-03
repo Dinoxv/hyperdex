@@ -27,6 +27,9 @@
                         :rename-name "Ops"
                         :transfer-amount "1.23"
                         :transfer-direction :deposit
+                        :transfer-account :trading
+                        :transfer-token "USDC"
+                        :transfer-token-menu-open? false
                         :creating? true
                         :renaming-address subaccount-address
                         :transferring-address subaccount-address}}}))
@@ -91,6 +94,9 @@
                            :rename-name ""
                            :transfer-amount ""
                            :transfer-direction :deposit
+                           :transfer-account :trading
+                           :transfer-token "USDC"
+                           :transfer-token-menu-open? false
                            :creating? false
                            :renaming-address nil
                            :transferring-address nil}
@@ -346,8 +352,48 @@
                    (is (= "" (get-in @store [:account-context :subaccounts :transfer-amount])))
                    (is (= :deposit
                           (get-in @store [:account-context :subaccounts :transfer-direction])))
+                   (is (= :trading
+                          (get-in @store [:account-context :subaccounts :transfer-account])))
+                   (is (= "USDC"
+                          (get-in @store [:account-context :subaccounts :transfer-token])))
+                   (is (false?
+                        (get-in @store [:account-context :subaccounts :transfer-token-menu-open?])))
                    (is (nil? (get-in @store [:account-context :subaccounts :error])))
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected transfer-subaccount success error: " err))
+                    (done)))))))
+
+(deftest transfer-subaccount-spot-success-submits-token-transfer-test
+  (async done
+    (let [store (management-store)
+          submit-calls (atom [])
+          refresh-calls (atom [])]
+      (-> (effects/transfer-subaccount!
+           {:store store
+            :request {:sub-account-user subaccount-address
+                      :is-deposit false
+                      :amount "4.63"
+                      :account-kind :spot
+                      :token "USDH:0xabc"}
+            :transfer-sub-account-spot! (fn [store* owner address is-deposit? token amount]
+                                          (swap! submit-calls conj
+                                                 [store* owner address is-deposit? token amount])
+                                          (js/Promise.resolve {:status "ok"
+                                                               :response {:type "default"}}))
+            :load-subaccounts! (fn [opts]
+                                 (swap! refresh-calls conj
+                                        (select-keys opts [:force-refresh?]))
+                                 (js/Promise.resolve :reloaded))
+            :dispatch! (fn [_store _ctx _effects] nil)
+            :runtime-error-message (fn [err] (str err))})
+          (.then (fn [result]
+                   (is (= :reloaded result))
+                   (is (= [[store owner-address subaccount-address false "USDH:0xabc" "4.63"]]
+                          @submit-calls))
+                   (is (= [{:force-refresh? true}] @refresh-calls))
+                   (is (nil? (get-in @store [:account-context :subaccounts :transferring-address])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected spot transfer success error: " err))
                     (done)))))))

@@ -30,7 +30,6 @@
                               :validator-search-query
                               :validator-dropdown-open?})
 (s/def ::staking-form-field-args (s/tuple ::staking-form-field any?))
-
 (s/def ::set-hyperunit-lifecycle-args (s/tuple ::state/hyperunit-lifecycle-input))
 (s/def ::set-hyperunit-lifecycle-error-args (s/tuple (s/nilable string?)))
 (s/def ::position-tpsl-open-args
@@ -481,6 +480,7 @@
    :actions/select-subaccount ::common/address-args
    :actions/select-master-account ::common/no-args
    :actions/set-subaccount-form-field ::subaccount-form-field-args
+   :actions/toggle-transfer-direction ::common/no-args
    :actions/open-subaccount-create-popover ::common/no-args
    :actions/close-subaccount-create-popover ::common/no-args
    :actions/copy-subaccount-address ::common/address-args

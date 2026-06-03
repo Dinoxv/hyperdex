@@ -136,3 +136,26 @@
                                                    :expires-after expires-after
                                                    :is-mainnet false
                                                    :max-nonce-retries 0}))}))))
+
+(deftest transfer-sub-account-spot-public-facade-signs-master-scoped-action-test
+  (async done
+    (let [subaccount "0xabcdef1234567890abcdef1234567890abcdef12"
+          action {:type "subAccountSpotTransfer"
+                  :subAccountUser subaccount
+                  :isDeposit false
+                  :token "USDH:0xabc"
+                  :amount "4.63"}]
+      (assert-public-management-action-omits-vault!
+       done
+       {:expected-action action
+        :invoke! (fn [store owner-address vault-address expires-after]
+                   (trading/transfer-sub-account-spot! store
+                                                       owner-address
+                                                       subaccount
+                                                       false
+                                                       "USDH:0xabc"
+                                                       "4.63"
+                                                       {:vault-address vault-address
+                                                        :expires-after expires-after
+                                                        :is-mainnet false
+                                                        :max-nonce-retries 0}))}))))

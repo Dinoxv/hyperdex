@@ -37,7 +37,10 @@
                   :create-name ""
                   :rename-name ""
                   :transfer-amount ""
-                  :transfer-direction :deposit}}})
+                  :transfer-direction :deposit
+                  :transfer-account :trading
+                  :transfer-token "USDC"
+                  :transfer-token-menu-open? false}}})
 
 (deftest parse-subaccounts-route-supports-hyperliquid-casing-test
   (is (= "/subAccounts" actions/canonical-route))
@@ -92,6 +95,9 @@
                                  [[:account-context :subaccounts :rename-name] ""]
                                  [[:account-context :subaccounts :transfer-amount] ""]
                                  [[:account-context :subaccounts :transfer-direction] :deposit]
+                                 [[:account-context :subaccounts :transfer-account] :trading]
+                                 [[:account-context :subaccounts :transfer-token] "USDC"]
+                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                  [[:account-context :subaccounts :selection-loaded?] false]]]]
            effects))
     (is (= :idle (path-value effects [:account-context :subaccounts :status])))))
@@ -140,8 +146,35 @@
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :withdraw]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/set-subaccount-form-field {} "transferDirection" "withdraw")))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-account] :spot]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/set-subaccount-form-field {} "transferAccount" "spot")))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-token] "USDH:0xabc"]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/set-subaccount-form-field {} :transfer-token "USDH:0xabc")))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-token-menu-open?] true]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/set-subaccount-form-field {} :transfer-token-menu-open? true)))
   (is (= []
          (actions/set-subaccount-form-field {} :unknown "value"))))
+
+(deftest toggle-transfer-direction-swaps-master-and-subaccount-sides-test
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :withdraw]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/toggle-transfer-direction
+          (assoc-in (base-management-state)
+                    [:account-context :subaccounts :transfer-direction]
+                    :deposit))))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :deposit]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/toggle-transfer-direction
+          (assoc-in (base-management-state)
+                    [:account-context :subaccounts :transfer-direction]
+                    :withdraw)))))
 
 (deftest subaccount-create-popover-actions-toggle-state-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] true]
@@ -216,12 +249,18 @@
                                  subaccount-address]
                                 [[:account-context :subaccounts :transfer-amount] ""]
                                 [[:account-context :subaccounts :transfer-direction] :deposit]
+                                [[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-token] "USDC"]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/start-transfer-subaccount (base-management-state)
                                             subaccount-address)))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
                                 [[:account-context :subaccounts :transfer-amount] ""]
                                 [[:account-context :subaccounts :transfer-direction] :deposit]
+                                [[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-token] "USDC"]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/cancel-transfer-subaccount {})))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address]
@@ -247,6 +286,20 @@
           (-> (base-management-state)
               (assoc-in [:account-context :subaccounts :transfer-amount] "0.000001")
               (assoc-in [:account-context :subaccounts :transfer-direction] :withdraw))
+          subaccount-address)))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address]
+                                 subaccount-address]
+                                [[:account-context :subaccounts :error] nil]]]
+          [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
+                                             :is-deposit true
+                                             :amount "2.5"
+                                             :account-kind :spot
+                                             :token "USDH:0xabc"}]]
+         (actions/submit-transfer-subaccount
+          (-> (base-management-state)
+              (assoc-in [:account-context :subaccounts :transfer-amount] "2.5")
+              (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+              (assoc-in [:account-context :subaccounts :transfer-token] "USDH:0xabc"))
           subaccount-address)))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
                                 [[:account-context :subaccounts :error]

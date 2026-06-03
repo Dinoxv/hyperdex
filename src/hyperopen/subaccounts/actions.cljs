@@ -81,6 +81,7 @@
         (get-in state [:account-context :subaccounts :rows])))
 
 (def set-subaccount-form-field management/set-subaccount-form-field)
+(def toggle-transfer-direction management/toggle-transfer-direction)
 (def open-create-popover management/open-create-popover)
 (def close-create-popover management/close-create-popover)
 (def copy-subaccount-address management/copy-subaccount-address)
@@ -105,6 +106,9 @@
      [[:account-context :subaccounts :rename-name] ""]
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]
+     [[:account-context :subaccounts :transfer-account] :trading]
+     [[:account-context :subaccounts :transfer-token] "USDC"]
+     [[:account-context :subaccounts :transfer-token-menu-open?] false]
      [[:account-context :subaccounts :selection-loaded?] false]]
     [[[:account-context :subaccounts :status] :idle]
      [[:account-context :subaccounts :loaded-for-owner] nil]
@@ -116,6 +120,9 @@
      [[:account-context :subaccounts :rename-name] ""]
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]
+     [[:account-context :subaccounts :transfer-account] :trading]
+     [[:account-context :subaccounts :transfer-token] "USDC"]
+     [[:account-context :subaccounts :transfer-token-menu-open?] false]
      [[:account-context :subaccounts :selection-loaded?] false]]))
 
 (defn load-subaccounts-route

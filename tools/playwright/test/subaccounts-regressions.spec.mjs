@@ -33,6 +33,11 @@ async function seedSubaccountsState(page) {
               {
                 coin: "USDC",
                 total: "0"
+              },
+              {
+                coin: "MEOW",
+                token: "MEOW:0xdef",
+                total: "0.02"
               }
             ]
           }
@@ -57,6 +62,16 @@ async function seedSubaccountsState(page) {
             {
               coin: "USDC",
               total: "358.56"
+            },
+            {
+              coin: "USDH",
+              token: "USDH:0xabc",
+              total: "8.28"
+            },
+            {
+              coin: "STAR",
+              token: "STAR:0x456",
+              total: "0"
             }
           ]
         }
@@ -81,6 +96,17 @@ async function seedSubaccountsState(page) {
       nextState,
       kwPath("account-context", "subaccounts", "transfer-direction"),
       keyword("deposit")
+    );
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "transfer-account"),
+      keyword("trading")
+    );
+    nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "transfer-token"), "USDC");
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "transfer-token-menu-open?"),
+      false
     );
     nextState = c.assoc_in(nextState, kwPath("webdata2"), webdata2);
     nextState = c.assoc_in(nextState, kwPath("spot"), spot);
@@ -116,6 +142,11 @@ async function interceptSubaccountsApi(page) {
                 {
                   coin: "USDC",
                   total: "0"
+                },
+                {
+                  coin: "MEOW",
+                  token: "MEOW:0xdef",
+                  total: "0.02"
                 }
               ]
             }
@@ -207,7 +238,7 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
     await expect(page.locator(`[data-role="subaccounts-transfer-destination-${subaccountAddress}"]`))
       .toContainText("test");
     await expect(page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`))
-      .toHaveValue("USDC");
+      .toContainText("USDC");
     await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
       .toContainText(/^MAX: [0-9,.]+(?:\.\d+)? USDC$/);
 
@@ -226,12 +257,24 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
     expect(Object.values(geometry.tokenBorders)).toEqual(["0px", "0px", "0px", "0px"]);
     expect(Object.values(geometry.amountBorders)).toEqual(["0px", "0px", "0px", "0px"]);
 
-    await page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`)
-      .selectOption("withdraw");
+    await page.locator(`[data-role="subaccounts-transfer-toggle-direction-${subaccountAddress}"]`).click();
     await expect(page.locator(`[data-role="subaccounts-transfer-source-${subaccountAddress}"]`))
       .toContainText("test");
     await expect(page.locator(`[data-role="subaccounts-transfer-destination-${subaccountAddress}"]`))
       .toContainText("Master Account");
+
+    await page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`)
+      .selectOption("spot");
+    await page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`).click();
+    const tokenMenu = page.locator(`[data-role="subaccounts-transfer-token-menu-${subaccountAddress}"]`);
+    await expect(tokenMenu).toBeVisible();
+    await expect(tokenMenu).toContainText("MEOW");
+    await expect(tokenMenu).toContainText("0.02");
+    await page.locator(`[data-role="subaccounts-transfer-token-option-${subaccountAddress}-MEOW:0xdef"]`).click();
+    await expect(page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`))
+      .toContainText("MEOW");
+    await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
+      .toContainText(/^MAX: [0-9,.]+(?:\.\d+)? MEOW$/);
 
     await page.locator(`[data-role="subaccounts-transfer-close-${subaccountAddress}"]`).click();
     await expect(popover).toHaveCount(0);

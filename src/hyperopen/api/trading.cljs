@@ -119,6 +119,14 @@
    (agent-actions/transfer-sub-account!
     store address sub-account-user is-deposit? usd options)))
 
+(defn transfer-sub-account-spot!
+  ([store address sub-account-user is-deposit? token amount]
+   (agent-actions/transfer-sub-account-spot!
+    store address sub-account-user is-deposit? token amount))
+  ([store address sub-account-user is-deposit? token amount options]
+   (agent-actions/transfer-sub-account-spot!
+    store address sub-account-user is-deposit? token amount options)))
+
 (defn schedule-cancel!
   ([store address cancel-at-ms]
    (agent-actions/schedule-cancel! store address cancel-at-ms))
