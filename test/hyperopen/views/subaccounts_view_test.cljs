@@ -120,6 +120,7 @@
                        (assoc-in [:account-context :subaccounts :transfer-amount] "1.23")
                        (assoc-in [:account-context :subaccounts :transfer-direction] :withdraw)
                        (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+                       (assoc-in [:account-context :subaccounts :transfer-account-menu-open?] true)
                        (assoc-in [:account-context :subaccounts :transfer-token] "MEOW:0xdef")
                        (assoc-in [:account-context :subaccounts :transfer-token-menu-open?] true)
                        (assoc-in [:account-context :subaccounts :renaming-address] subaccount-address)
@@ -159,6 +160,12 @@
                                                        (str "subaccounts-transfer-flow-arrow-" other-subaccount-address))
         transfer-direction (hiccup/find-by-data-role view-node
                                                      (str "subaccounts-transfer-direction-" other-subaccount-address))
+        transfer-account-menu (hiccup/find-by-data-role view-node
+                                                        (str "subaccounts-transfer-account-menu-" other-subaccount-address))
+        transfer-trading-option (hiccup/find-by-data-role view-node
+                                                          (str "subaccounts-transfer-account-option-"
+                                                               other-subaccount-address
+                                                               "-trading"))
         transfer-submit (hiccup/find-by-data-role view-node
                                                   (str "subaccounts-transfer-submit-" other-subaccount-address))]
     (is (= "New Desk" (get-in create-input [1 :value])))
@@ -201,8 +208,13 @@
     (is (= "1.23" (get-in transfer-amount [1 :value])))
     (is (= [[:actions/set-subaccount-form-field :transfer-amount [:event.target/value]]]
            (get-in transfer-amount [1 :on :input])))
-    (is (= "spot" (get-in transfer-direction [1 :value])))
-    (is (= [[:actions/set-subaccount-form-field :transfer-account [:event.target/value]]]
-           (get-in transfer-direction [1 :on :change])))
+    (is (= :button (first transfer-direction)))
+    (is (= "listbox" (get-in transfer-direction [1 :aria-haspopup])))
+    (is (= "true" (get-in transfer-direction [1 :aria-expanded])))
+    (is (contains? (set (hiccup/collect-strings transfer-direction)) "Spot Account"))
+    (is (some? transfer-account-menu))
+    (is (contains? (set (hiccup/collect-strings transfer-account-menu)) "Trading Account"))
+    (is (= [[:actions/set-subaccount-form-field :transfer-account :trading]]
+           (get-in transfer-trading-option [1 :on :click])))
     (is (= [[:actions/submit-transfer-subaccount other-subaccount-address]]
            (get-in transfer-submit [1 :on :click])))))

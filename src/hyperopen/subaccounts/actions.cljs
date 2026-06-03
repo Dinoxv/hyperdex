@@ -107,6 +107,7 @@
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]
      [[:account-context :subaccounts :transfer-account] :trading]
+     [[:account-context :subaccounts :transfer-account-menu-open?] false]
      [[:account-context :subaccounts :transfer-token] "USDC"]
      [[:account-context :subaccounts :transfer-token-menu-open?] false]
      [[:account-context :subaccounts :selection-loaded?] false]]
@@ -121,6 +122,7 @@
      [[:account-context :subaccounts :transfer-amount] ""]
      [[:account-context :subaccounts :transfer-direction] :deposit]
      [[:account-context :subaccounts :transfer-account] :trading]
+     [[:account-context :subaccounts :transfer-account-menu-open?] false]
      [[:account-context :subaccounts :transfer-token] "USDC"]
      [[:account-context :subaccounts :transfer-token-menu-open?] false]
      [[:account-context :subaccounts :selection-loaded?] false]]))

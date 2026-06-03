@@ -28,6 +28,7 @@
                         :transfer-amount "1.23"
                         :transfer-direction :deposit
                         :transfer-account :trading
+                        :transfer-account-menu-open? false
                         :transfer-token "USDC"
                         :transfer-token-menu-open? false
                         :creating? true
@@ -95,6 +96,7 @@
                            :transfer-amount ""
                            :transfer-direction :deposit
                            :transfer-account :trading
+                           :transfer-account-menu-open? false
                            :transfer-token "USDC"
                            :transfer-token-menu-open? false
                            :creating? false
@@ -354,6 +356,8 @@
                           (get-in @store [:account-context :subaccounts :transfer-direction])))
                    (is (= :trading
                           (get-in @store [:account-context :subaccounts :transfer-account])))
+                   (is (false?
+                        (get-in @store [:account-context :subaccounts :transfer-account-menu-open?])))
                    (is (= "USDC"
                           (get-in @store [:account-context :subaccounts :transfer-token])))
                    (is (false?

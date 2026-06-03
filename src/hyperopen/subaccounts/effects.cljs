@@ -64,6 +64,7 @@
           :transfer-amount ""
           :transfer-direction :deposit
           :transfer-account :trading
+          :transfer-account-menu-open? false
           :transfer-token "USDC"
           :transfer-token-menu-open? false
           :creating? false
@@ -248,6 +249,7 @@
                (assoc-in [:account-context :subaccounts :transfer-amount] "")
                (assoc-in [:account-context :subaccounts :transfer-direction] :deposit)
                (assoc-in [:account-context :subaccounts :transfer-account] :trading)
+               (assoc-in [:account-context :subaccounts :transfer-account-menu-open?] false)
                (assoc-in [:account-context :subaccounts :transfer-token] "USDC")
                (assoc-in [:account-context :subaccounts :transfer-token-menu-open?] false)
                (assoc-in [:account-context :subaccounts :error] nil)))))

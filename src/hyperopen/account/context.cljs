@@ -270,6 +270,7 @@
                  :transfer-amount ""
                  :transfer-direction :deposit
                  :transfer-account :trading
+                 :transfer-account-menu-open? false
                  :transfer-token "USDC"
                  :transfer-token-menu-open? false
                  :creating? false

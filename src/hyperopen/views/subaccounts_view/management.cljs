@@ -1,4 +1,5 @@
-(ns hyperopen.views.subaccounts-view.management)
+(ns hyperopen.views.subaccounts-view.management
+  (:require [hyperopen.views.subaccounts-view.transfer-dropdowns :as transfer-dropdowns]))
 
 (defn- action-button
   [{:keys [data-role label on-click disabled? variant class]}]
@@ -155,135 +156,6 @@
                             class)}]
         children))
 
-(defn- transfer-account-select
-  [{:keys [address subaccounts]}]
-  [:select {:data-role (str "subaccounts-transfer-direction-" address)
-            :value (name (or (:transfer-account subaccounts) :trading))
-            :aria-label "Transfer account"
-            :class ["h-full"
-                    "w-full"
-                    "appearance-none"
-                    "border-0"
-                    "bg-transparent"
-                    "text-sm"
-                    "font-medium"
-                    "text-white"
-                    "outline-none"
-                    "focus:border-0"
-                    "focus:outline-none"
-                    "focus:ring-0"]
-            :style {:border "0"
-                    :box-shadow "none"}
-            :on {:change [[:actions/set-subaccount-form-field
-                           :transfer-account
-                           [:event.target/value]]]}}
-   [:option {:value "trading"} "Trading Account"]
-   [:option {:value "spot"} "Spot Account"]])
-
-(defn- selected-transfer-token
-  [subaccounts transfer-assets]
-  (let [selected (:transfer-token subaccounts)]
-    (or (some (fn [asset]
-                (when (= selected (:token asset))
-                  asset))
-              transfer-assets)
-        (first transfer-assets)
-        {:symbol "USDC"
-         :token "USDC"
-         :available-display "--"})))
-
-(defn- token-option
-  [{:keys [address asset selected?]}]
-  (let [token (:token asset)
-        symbol (:symbol asset)
-        available-display (:available-display asset)]
-    [:button {:type "button"
-              :data-role (str "subaccounts-transfer-token-option-" address "-" token)
-              :role "option"
-              :aria-selected (boolean selected?)
-              :class (into ["flex"
-                            "h-8"
-                            "w-full"
-                            "items-center"
-                            "justify-between"
-                            "gap-3"
-                            "rounded-md"
-                            "px-2"
-                            "text-left"
-                            "text-sm"
-                            "transition-colors"
-                            "focus:outline-none"
-                            "focus:ring-0"
-                            "focus:ring-offset-0"]
-                           (if selected?
-                             ["bg-[#12312e]" "text-[#54d8c6]"]
-                             ["text-[#aab6b9]" "hover:bg-[#122124]" "hover:text-white"]))
-              :on {:click [[:actions/set-subaccount-form-field
-                            :transfer-token
-                            token]]}}
-     [:span {:class ["font-semibold"]} symbol]
-     [:span {:class ["num" "text-xs" "font-medium" "text-[#9aa8ab]"]}
-      available-display]]))
-
-(defn- token-dropdown
-  [{:keys [address subaccounts transfer-assets]}]
-  (let [selected-asset (selected-transfer-token subaccounts transfer-assets)
-        open? (true? (:transfer-token-menu-open? subaccounts))]
-    [:div {:class ["relative" "h-full" "w-full"]}
-     [:button {:type "button"
-               :data-role (str "subaccounts-transfer-token-" address)
-               :aria-label "Transfer token"
-               :aria-haspopup "listbox"
-               :aria-expanded (boolean open?)
-               :class ["flex"
-                       "h-full"
-                       "w-full"
-                       "items-center"
-                       "justify-between"
-                       "gap-2"
-                       "border-0"
-                       "bg-transparent"
-                       "text-left"
-                       "text-sm"
-                       "font-medium"
-                       "text-white"
-                       "outline-none"
-                       "focus:border-0"
-                       "focus:outline-none"
-                       "focus:ring-0"
-                       "focus:ring-offset-0"]
-               :style {:border "0"
-                       :box-shadow "none"}
-               :on {:click [[:actions/set-subaccount-form-field
-                             :transfer-token-menu-open?
-                             (not open?)]]}}
-      [:span (:symbol selected-asset)]
-      [:span {:class ["ml-2" "text-[#9aa8ab]"] :aria-hidden true}
-       (if open? "^" "v")]]
-     (when open?
-       (into
-        [:div {:data-role (str "subaccounts-transfer-token-menu-" address)
-               :role "listbox"
-               :aria-label "Transfer token options"
-               :class ["absolute"
-                       "left-[-0.75rem]"
-                       "right-[-0.75rem]"
-                       "top-[calc(100%+0.75rem)]"
-                       "z-[60]"
-                       "max-h-56"
-                       "overflow-y-auto"
-                       "rounded-md"
-                       "border"
-                       "border-[#263b3f]"
-                       "bg-[#0b1518]"
-                       "p-1"
-                       "shadow-[0_18px_50px_rgba(0,0,0,0.44)]"]}]
-        (for [asset transfer-assets]
-          ^{:key (:token asset)}
-          (token-option {:address address
-                         :asset asset
-                         :selected? (= (:token asset)
-                                       (:token selected-asset))}))))]))
 
 (defn- transfer-direction-summary
   [{:keys [address direction subaccount-name]}]
@@ -340,7 +212,7 @@
   [{:keys [address subaccount-name subaccounts deposit-max withdraw-max transfer-assets class]}]
   (let [direction (or (:transfer-direction subaccounts) :deposit)
         withdrawing? (= :withdraw direction)
-        selected-asset (selected-transfer-token subaccounts transfer-assets)
+        selected-asset (transfer-dropdowns/selected-transfer-token subaccounts transfer-assets)
         max-label (or (:available-display selected-asset)
                       (if withdrawing? withdraw-max deposit-max))
         symbol (or (:symbol selected-asset) "USDC")]
@@ -380,14 +252,13 @@
                                   :subaccount-name subaccount-name})
      [:div {:class ["mt-5" "grid" "gap-3" "sm:grid-cols-2"]}
       (transfer-field-shell
-       {:children [(transfer-account-select {:address address
-                                             :subaccounts subaccounts})
-                   [:span {:class ["ml-2" "text-[#9aa8ab]"] :aria-hidden true} "v"]]})
+       {:children [(transfer-dropdowns/transfer-account-dropdown {:address address
+                                                                  :subaccounts subaccounts})]})
       (transfer-field-shell
        {:class ["relative"]
-        :children [(token-dropdown {:address address
-                                    :subaccounts subaccounts
-                                    :transfer-assets transfer-assets})]})]
+        :children [(transfer-dropdowns/token-dropdown {:address address
+                                                       :subaccounts subaccounts
+                                                       :transfer-assets transfer-assets})]})]
      [:div {:class ["mt-3"]}
       (transfer-field-shell
        {:class ["justify-between" "gap-3"]

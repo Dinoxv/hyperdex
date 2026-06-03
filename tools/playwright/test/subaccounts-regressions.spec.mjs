@@ -102,6 +102,11 @@ async function seedSubaccountsState(page) {
       kwPath("account-context", "subaccounts", "transfer-account"),
       keyword("trading")
     );
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "transfer-account-menu-open?"),
+      false
+    );
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "transfer-token"), "USDC");
     nextState = c.assoc_in(
       nextState,
@@ -267,8 +272,17 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
     await expect(page.locator(`[data-role="subaccounts-transfer-flow-arrow-${subaccountAddress}"]`))
       .toHaveText("->");
 
-    await page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`)
-      .selectOption("spot");
+    const accountTrigger = page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`);
+    await expect(accountTrigger).toHaveAttribute("aria-haspopup", "listbox");
+    await accountTrigger.click();
+    const accountMenu = page.locator(`[data-role="subaccounts-transfer-account-menu-${subaccountAddress}"]`);
+    await expect(accountMenu).toBeVisible();
+    await expect(accountMenu).toContainText("Trading Account");
+    await expect(accountMenu).toContainText("Spot Account");
+    await page.locator(`[data-role="subaccounts-transfer-account-option-${subaccountAddress}-spot"]`).click();
+    await expect(accountTrigger).toContainText("Spot Account");
+    await expect(accountTrigger).toHaveAttribute("aria-expanded", "false");
+
     await page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`).click();
     const tokenMenu = page.locator(`[data-role="subaccounts-transfer-token-menu-${subaccountAddress}"]`);
     await expect(tokenMenu).toBeVisible();

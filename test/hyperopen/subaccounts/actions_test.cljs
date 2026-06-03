@@ -39,6 +39,7 @@
                   :transfer-amount ""
                   :transfer-direction :deposit
                   :transfer-account :trading
+                  :transfer-account-menu-open? false
                   :transfer-token "USDC"
                   :transfer-token-menu-open? false}}})
 
@@ -96,6 +97,7 @@
                                  [[:account-context :subaccounts :transfer-amount] ""]
                                  [[:account-context :subaccounts :transfer-direction] :deposit]
                                  [[:account-context :subaccounts :transfer-account] :trading]
+                                 [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                  [[:account-context :subaccounts :transfer-token] "USDC"]
                                  [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                  [[:account-context :subaccounts :selection-loaded?] false]]]]
@@ -147,14 +149,21 @@
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/set-subaccount-form-field {} "transferDirection" "withdraw")))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-account] :spot]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/set-subaccount-form-field {} "transferAccount" "spot")))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-account-menu-open?] true]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/set-subaccount-form-field {} :transfer-account-menu-open? true)))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-token] "USDH:0xabc"]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/set-subaccount-form-field {} :transfer-token "USDH:0xabc")))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-token-menu-open?] true]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/set-subaccount-form-field {} :transfer-token-menu-open? true)))
   (is (= []
@@ -162,6 +171,7 @@
 
 (deftest toggle-transfer-direction-swaps-master-and-subaccount-sides-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :withdraw]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/toggle-transfer-direction
@@ -169,6 +179,7 @@
                     [:account-context :subaccounts :transfer-direction]
                     :deposit))))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :deposit]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
          (actions/toggle-transfer-direction
@@ -250,6 +261,7 @@
                                 [[:account-context :subaccounts :transfer-amount] ""]
                                 [[:account-context :subaccounts :transfer-direction] :deposit]
                                 [[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token] "USDC"]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]
@@ -259,6 +271,7 @@
                                 [[:account-context :subaccounts :transfer-amount] ""]
                                 [[:account-context :subaccounts :transfer-direction] :deposit]
                                 [[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                 [[:account-context :subaccounts :transfer-token] "USDC"]
                                 [[:account-context :subaccounts :transfer-token-menu-open?] false]
                                 [[:account-context :subaccounts :error] nil]]]]

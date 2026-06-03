@@ -62,6 +62,8 @@
       "transferamount" :transfer-amount
       "transferdirection" :transfer-direction
       "transferaccount" :transfer-account
+      "transferaccountmenuopen?" :transfer-account-menu-open?
+      "transferaccountmenuopen" :transfer-account-menu-open?
       "transfertoken" :transfer-token
       "transfertokenmenuopen?" :transfer-token-menu-open?
       "transfertokenmenuopen" :transfer-token-menu-open?
@@ -89,6 +91,7 @@
   (case field
     :transfer-direction (normalize-transfer-direction value)
     :transfer-account (normalize-transfer-account value)
+    :transfer-account-menu-open? (normalize-boolean value)
     :transfer-token-menu-open? (normalize-boolean value)
     (str (or value ""))))
 
@@ -98,10 +101,18 @@
     [[:effects/save-many (cond-> [[[:account-context :subaccounts field*]
                                     (normalize-form-value field* value)]]
                            (= field* :transfer-account)
+                           (conj [[:account-context :subaccounts :transfer-account-menu-open?] false]
+                                 [[:account-context :subaccounts :transfer-token-menu-open?] false])
+
+                           (= field* :transfer-account-menu-open?)
                            (conj [[:account-context :subaccounts :transfer-token-menu-open?] false])
 
+                           (= field* :transfer-token-menu-open?)
+                           (conj [[:account-context :subaccounts :transfer-account-menu-open?] false])
+
                            (= field* :transfer-token)
-                           (conj [[:account-context :subaccounts :transfer-token-menu-open?] false])
+                           (conj [[:account-context :subaccounts :transfer-account-menu-open?] false]
+                                 [[:account-context :subaccounts :transfer-token-menu-open?] false])
 
                            true
                            (conj [[:account-context :subaccounts :error] nil]))]]
@@ -113,6 +124,7 @@
                  (get-in state [:account-context :subaccounts :transfer-direction]))
         next-direction (if (= :deposit current) :withdraw :deposit)]
     [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] next-direction]
+                          [[:account-context :subaccounts :transfer-account-menu-open?] false]
                           [[:account-context :subaccounts :transfer-token-menu-open?] false]
                           [[:account-context :subaccounts :error] nil]]]]))
 
@@ -242,6 +254,7 @@
                             [[:account-context :subaccounts :transfer-amount] ""]
                             [[:account-context :subaccounts :transfer-direction] :deposit]
                             [[:account-context :subaccounts :transfer-account] :trading]
+                            [[:account-context :subaccounts :transfer-account-menu-open?] false]
                             [[:account-context :subaccounts :transfer-token] "USDC"]
                             [[:account-context :subaccounts :transfer-token-menu-open?] false]
                             [[:account-context :subaccounts :error] nil]]]])))
@@ -252,6 +265,7 @@
                         [[:account-context :subaccounts :transfer-amount] ""]
                         [[:account-context :subaccounts :transfer-direction] :deposit]
                         [[:account-context :subaccounts :transfer-account] :trading]
+                        [[:account-context :subaccounts :transfer-account-menu-open?] false]
                         [[:account-context :subaccounts :transfer-token] "USDC"]
                         [[:account-context :subaccounts :transfer-token-menu-open?] false]
                         [[:account-context :subaccounts :error] nil]]]])
