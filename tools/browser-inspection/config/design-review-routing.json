@@ -198,6 +198,22 @@
         "/hyperopen/portfolio/hyperopen/workbench/scenes/api/api_wallets_scenes.cljs"
       ],
       "nativeControlAllowlist": []
+    },
+    {
+      "id": "subaccounts-route",
+      "route": "/subAccounts",
+      "url": "http://localhost:8080/subAccounts",
+      "selectors": [
+        "[data-parity-id='subaccounts-root']",
+        "[data-role='subaccounts-console']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/exec-plans/completed/2026-06-03-hyperliquid-subaccounts.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
     }
   ],
   "rules": [
@@ -309,6 +325,16 @@
       "id": "api-wallets",
       "glob": "src/hyperopen/views/api_wallets_view.cljs",
       "targets": ["api-wallets-route"]
+    },
+    {
+      "id": "subaccounts",
+      "glob": "src/hyperopen/views/subaccounts_view.cljs",
+      "targets": ["subaccounts-route"]
+    },
+    {
+      "id": "subaccounts-management",
+      "glob": "src/hyperopen/views/subaccounts_view/**",
+      "targets": ["subaccounts-route"]
     }
   ]
 }

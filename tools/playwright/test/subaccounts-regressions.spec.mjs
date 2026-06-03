@@ -146,15 +146,39 @@ async function readTransferGeometry(page) {
     const rowRect = row.getBoundingClientRect();
     const popoverRect = popover.getBoundingClientRect();
     const amountRect = amount.getBoundingClientRect();
+    const consoleNode = document.querySelector(`[data-role="subaccounts-console"]`);
+    const direction = document.querySelector(
+      `[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`
+    );
+    const token = document.querySelector(
+      `[data-role="subaccounts-transfer-token-${subaccountAddress}"]`
+    );
+    const readBorderWidths = (node) => {
+      const styles = window.getComputedStyle(node);
+      return {
+        top: styles.borderTopWidth,
+        right: styles.borderRightWidth,
+        bottom: styles.borderBottomWidth,
+        left: styles.borderLeftWidth
+      };
+    };
     const viewportWidth = window.innerWidth;
 
     return {
+      popoverInsideRow: row.contains(popover),
+      popoverInsideConsole: consoleNode ? consoleNode.contains(popover) : null,
       rowHeight: rowRect.height,
+      rowBottom: rowRect.bottom,
       popoverWidth: popoverRect.width,
       popoverLeft: popoverRect.left,
       popoverRight: popoverRect.right,
+      popoverTop: popoverRect.top,
+      popoverBottom: popoverRect.bottom,
       amountHeight: amountRect.height,
       amountWidth: amountRect.width,
+      directionBorders: readBorderWidths(direction),
+      tokenBorders: readBorderWidths(token),
+      amountBorders: readBorderWidths(amount),
       viewportWidth
     };
   }, subaccountAddress);
@@ -188,12 +212,19 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
       .toContainText(/^MAX: [0-9,.]+(?:\.\d+)? USDC$/);
 
     const geometry = await readTransferGeometry(page);
+    expect(geometry.popoverInsideRow).toBe(false);
+    expect(geometry.popoverInsideConsole).toBe(false);
     expect(geometry.rowHeight).toBeLessThanOrEqual(96);
     expect(geometry.popoverWidth).toBeLessThanOrEqual(Math.min(width * 0.92, 520) + 2);
     expect(geometry.popoverLeft).toBeGreaterThanOrEqual(-1);
     expect(geometry.popoverRight).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+    expect(geometry.popoverTop).toBeGreaterThanOrEqual(-1);
+    expect(geometry.popoverTop).toBeGreaterThanOrEqual(geometry.rowBottom);
     expect(geometry.amountHeight).toBeGreaterThanOrEqual(20);
     expect(geometry.amountWidth).toBeGreaterThan(80);
+    expect(Object.values(geometry.directionBorders)).toEqual(["0px", "0px", "0px", "0px"]);
+    expect(Object.values(geometry.tokenBorders)).toEqual(["0px", "0px", "0px", "0px"]);
+    expect(Object.values(geometry.amountBorders)).toEqual(["0px", "0px", "0px", "0px"]);
 
     await page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`)
       .selectOption("withdraw");

@@ -240,10 +240,15 @@
                                  :active? selected?
                                  :on-click [[:actions/select-subaccount address]]})
        (management/row-controls {:address address
-                                 :subaccount-name name
-                                 :deposit-max (format-usdc-amount master-transfer-max)
-                                 :withdraw-max (format-usdc-amount perps-value)
                                  :subaccounts subaccounts})]]]))
+
+(defn- active-transfer-row
+  [rows active-address]
+  (when (seq active-address)
+    (some (fn [row]
+            (when (= active-address (row-address row))
+              row))
+          rows)))
 
 (defn- subaccounts-section
   [{:keys [rows selected-address status error subaccounts master-transfer-max]}]
@@ -282,6 +287,7 @@
         selected-master? (nil? selected-address)
         status (:status subaccounts)
         error (:error subaccounts)
+        active-transfer (active-transfer-row rows (:transferring-address subaccounts))
         master-perps-value (account-value {:clearinghouse-state (get-in state [:webdata2 :clearinghouseState])})
         master-spot-value (spot-account-value {:spot-state (get-in state [:spot :clearinghouse-state])})]
     [:div {:class ["app-shell-gutter" "flex" "min-h-[calc(100vh-4rem)]" "w-full" "flex-col" "gap-5" "pt-8" "pb-16"]
@@ -311,7 +317,16 @@
                              :status status
                              :error error
                              :master-transfer-max master-perps-value
-                             :subaccounts subaccounts})]]]))
+                             :subaccounts subaccounts})]
+      (when active-transfer
+        (let [address (row-address active-transfer)
+              perps-value (account-value active-transfer)]
+          (management/transfer-popover-layer
+           {:address address
+            :subaccount-name (row-name active-transfer)
+            :deposit-max (format-usdc-amount master-perps-value)
+            :withdraw-max (format-usdc-amount perps-value)
+            :subaccounts subaccounts})))]]))
 
 (defn ^:export route-view
   [state]
