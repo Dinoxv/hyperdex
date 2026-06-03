@@ -81,10 +81,13 @@
           str))
 
 (defn- record-response-call!
-  [paths matched-path response defaulted?]
+  [paths matched-path response defaulted? request]
   (swap! debug-exchange-simulator-calls conj
          (cond-> {:paths (vec paths)
                   :matchedPath matched-path}
+           (some? request)
+           (assoc :request request)
+
            (some? response)
            (assoc :responseStatus (response-status response))
 
@@ -135,12 +138,14 @@
                  (js/Promise.resolve (js/JSON.stringify (clj->js payload))))}))
 
 (defn simulated-fetch-response
-  [paths]
-  (when (some? @debug-exchange-simulator)
-    (let [{:keys [path response defaulted?]} (first-response! paths)]
-      (record-response-call! paths path response defaulted?)
-      (when response
-        (if-let [reject-message (or (:reject-message response)
-                                    (:rejectMessage response))]
-          (js/Promise.reject (js/Error. (str reject-message)))
-          (js/Promise.resolve (response-like response)))))))
+  ([paths]
+   (simulated-fetch-response paths nil))
+  ([paths request]
+   (when (some? @debug-exchange-simulator)
+     (let [{:keys [path response defaulted?]} (first-response! paths)]
+       (record-response-call! paths path response defaulted? request)
+       (when response
+         (if-let [reject-message (or (:reject-message response)
+                                     (:rejectMessage response))]
+           (js/Promise.reject (js/Error. (str reject-message)))
+           (js/Promise.resolve (response-like response))))))))

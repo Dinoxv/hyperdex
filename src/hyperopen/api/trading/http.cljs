@@ -129,14 +129,16 @@
      (maybe-assert-signed-exchange-payload! payload action)
      (or (debug-exchange-simulator/simulated-fetch-response
           [[:signedActions (:type action)]
-           [:signedActions :default]])
+           [:signedActions :default]]
+          payload)
          (json-post! exchange-url payload)))))
 
 (defn post-info!
   [body]
   (or (debug-exchange-simulator/simulated-fetch-response
        [[:info (keyword (str (:type body)))]
-        [:info :default]])
+        [:info :default]]
+       body)
       (json-post! info-url body)))
 
 (defn fetch-user-role!

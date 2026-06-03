@@ -189,6 +189,30 @@
                       (simulator/clear!)
                       (done)))))))
 
+(deftest simulated-fetch-records-request-payload-when-provided-test
+  (async done
+    (let [paths [[:signedActions "order"]]
+          request {:action {:type "order"}
+                   :nonce 1700000000000
+                   :vaultAddress "0xabc"}]
+      (simulator/install!
+       {:signedActions {"order" {:status "ok"}}})
+      (-> (simulator/simulated-fetch-response paths request)
+          (.then read-json)
+          (.then (fn [body]
+                   (is (= {:status "ok"} body))
+                   (is (= [{:paths paths
+                            :matchedPath [:signedActions "order"]
+                            :request request
+                            :responseStatus "ok"
+                            :remainingResponses nil}]
+                          (:calls (simulator/snapshot))))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))))
+          (.finally (fn []
+                      (simulator/clear!)
+                      (done)))))))
+
 (deftest scalar-response-entry-is-returned-as-json-payload-test
   (async done
     (simulator/install! {:custom {:ok true}})

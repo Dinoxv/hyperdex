@@ -256,6 +256,9 @@
                             (is (= [{:paths [[:signedActions "scheduleCancel"]
                                              [:signedActions :default]]
                                      :matchedPath [:signedActions "scheduleCancel"]
+                                     :request {:action action
+                                               :nonce 1700000007777
+                                               :signature signature}
                                      :responseStatus "ok"
                                      :remainingResponses nil
                                      :defaulted true}]

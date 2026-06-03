@@ -700,6 +700,92 @@ async function seedReadyTradingSession(page, options = {}) {
   });
 }
 
+async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress }) {
+  await page.evaluate(
+    ({ ownerAddress: nextOwnerAddress, subaccountAddress: nextSubaccountAddress }) => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+
+      if (!c || !store) {
+        throw new Error("Hyperopen store or cljs core unavailable");
+      }
+
+      const keyword = c.keyword;
+      const kwPath = (...segments) =>
+        c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+      const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+      const rows = c.js__GT_clj(
+        [
+          {
+            name: "Desk",
+            master: String(nextOwnerAddress).toLowerCase(),
+            subAccountUser: String(nextSubaccountAddress).toLowerCase(),
+            clearinghouseState: {
+              marginSummary: { accountValue: "1000", totalMarginUsed: "0" },
+              withdrawable: "1000",
+              assetPositions: []
+            },
+            spotState: { balances: [] }
+          }
+        ],
+        opts
+      );
+
+      let nextState = c.deref(store);
+      nextState = c.assoc_in(
+        nextState,
+        kwPath("account-context", "subaccounts", "rows"),
+        rows
+      );
+      nextState = c.assoc_in(
+        nextState,
+        kwPath("account-context", "subaccounts", "status"),
+        keyword("success")
+      );
+      nextState = c.assoc_in(
+        nextState,
+        kwPath("account-context", "subaccounts", "loaded-for-owner"),
+        String(nextOwnerAddress).toLowerCase()
+      );
+      nextState = c.assoc_in(
+        nextState,
+        kwPath("account-context", "subaccounts", "selected-address"),
+        null
+      );
+      c.reset_BANG_(store, nextState);
+    },
+    { ownerAddress, subaccountAddress }
+  );
+}
+
+async function fillLimitOrderForm(page) {
+  await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
+  await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
+  await dispatch(page, [":actions/set-order-size-input-mode", ":base"]);
+  await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
+  await dispatch(page, [":actions/update-order-form", [":price"], "100"]);
+  await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
+  await dispatch(page, [":actions/set-order-size-display", "1"]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+}
+
+function signedActionRequests(snapshot, actionType) {
+  return (snapshot?.calls ?? [])
+    .map((call) => call?.request)
+    .filter((request) => request?.action?.type === actionType);
+}
+
+async function selectHeaderAccountTarget(page, optionDataRole) {
+  const option = page.locator(`[data-role="${optionDataRole}"]`);
+
+  if (!(await option.isVisible())) {
+    await page.locator('[data-role="header-account-target-trigger"]').click();
+    await expect(option).toBeVisible();
+  }
+
+  await option.click();
+}
+
 async function setTradingConfirmations(page, { openOrders, closePosition } = {}) {
   if (typeof openOrders === "boolean") {
     await dispatch(page, [":actions/set-confirm-open-orders-enabled", openOrders]);
@@ -2477,6 +2563,113 @@ test("order submit and cancel gating uses simulator-backed assertions @regressio
     },
     { args: { actionId: ":actions/cancel-order" } }
   );
+});
+
+test("header account selector routes subaccount order payloads through vaultAddress @smoke @regression", async ({
+  page
+}) => {
+  const ownerAddress = "0x1111111111111111111111111111111111111111";
+  const subaccountAddress = "0x2222222222222222222222222222222222222222";
+
+  await visitRoute(page, "/trade");
+  await freezeAccountSurfaceSync(page, ownerAddress);
+  await debugCall(page, "installExchangeSimulator", {
+    signedActions: {
+      default: {
+        responses: Array.from({ length: 12 }, () => ({ status: "ok" }))
+      }
+    },
+    info: {
+      frontendOpenOrders: { responses: [[], [], [], []] },
+      clearinghouseState: {
+        responses: [
+          { marginSummary: { accountValue: "1000" }, assetPositions: [] },
+          { marginSummary: { accountValue: "1000" }, assetPositions: [] },
+          { marginSummary: { accountValue: "1000" }, assetPositions: [] },
+          { marginSummary: { accountValue: "1000" }, assetPositions: [] }
+        ]
+      },
+      historicalOrders: { responses: [[], [], [], []] },
+      perpDexs: { responses: [[], [], [], []] }
+    }
+  });
+  await seedReadyTradingSession(page, {
+    walletAddress: ownerAddress,
+    privateKey: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  });
+  await seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress });
+  await setTradingConfirmations(page, { openOrders: false });
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+
+  const trigger = page.locator('[data-role="header-account-target-trigger"]');
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toContainText("Master");
+  await selectHeaderAccountTarget(
+    page,
+    `header-account-target-option-${subaccountAddress}`
+  );
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+  await expect(trigger).toContainText("Desk");
+
+  await fillLimitOrderForm(page);
+  await dispatch(page, [":actions/submit-order"]);
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+  await dispatch(page, [":actions/cancel-order", { coin: "BTC", oid: 101 }]);
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+        return {
+          orderVaults: signedActionRequests(snapshot, "order").map(
+            (request) => request.vaultAddress ?? null
+          ),
+          cancelVaults: signedActionRequests(snapshot, "cancel").map(
+            (request) => request.vaultAddress ?? null
+          )
+        };
+      },
+      { timeout: 10_000 }
+    )
+    .toMatchObject({
+      orderVaults: expect.arrayContaining([subaccountAddress]),
+      cancelVaults: expect.arrayContaining([subaccountAddress])
+    });
+
+  await selectHeaderAccountTarget(page, "header-account-target-option-master");
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+  await expect(trigger).toContainText("Master");
+
+  const beforeMasterSnapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+  const orderCountBeforeMaster = signedActionRequests(beforeMasterSnapshot, "order").length;
+  const cancelCountBeforeMaster = signedActionRequests(beforeMasterSnapshot, "cancel").length;
+
+  await fillLimitOrderForm(page);
+  await dispatch(page, [":actions/submit-order"]);
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+  await dispatch(page, [":actions/cancel-order", { coin: "BTC", oid: 102 }]);
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+        return {
+          masterOrderVaults: signedActionRequests(snapshot, "order")
+            .slice(orderCountBeforeMaster)
+            .map((request) => request.vaultAddress ?? null),
+          masterCancelVaults: signedActionRequests(snapshot, "cancel")
+            .slice(cancelCountBeforeMaster)
+            .map((request) => request.vaultAddress ?? null)
+        };
+      },
+      { timeout: 10_000 }
+    )
+    .toEqual({
+      masterOrderVaults: [null],
+      masterCancelVaults: [null]
+    });
 });
 
 test("order submit confirmation renders in-app instead of opening a browser dialog @regression", async ({

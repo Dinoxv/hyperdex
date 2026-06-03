@@ -463,6 +463,7 @@
             [hyperopen.views.funding-comparison.vm-test]
             [hyperopen.views.funding-modal-accessibility-test]
             [hyperopen.views.funding-modal-test]
+            [hyperopen.views.header-account-selector-test]
             [hyperopen.views.header-settings-view-test]
             [hyperopen.views.header-view-test]
             [hyperopen.views.header.vm-test]
@@ -1143,6 +1144,7 @@
              'hyperopen.views.funding-comparison.vm-test
              'hyperopen.views.funding-modal-accessibility-test
              'hyperopen.views.funding-modal-test
+             'hyperopen.views.header-account-selector-test
              'hyperopen.views.header-settings-view-test
              'hyperopen.views.header-view-test
              'hyperopen.views.header.vm-test

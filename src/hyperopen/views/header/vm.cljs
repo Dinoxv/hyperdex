@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.views.header.account-selector :as account-selector]
             [hyperopen.views.header.nav :as nav]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.core :as wallet]))
@@ -346,5 +347,6 @@
      :mobile-nav (mobile-nav-vm route)
      :more-nav (more-nav-vm state route)
      :spectate (spectate-vm spectate-active?)
+     :account-selector (account-selector/vm state)
      :wallet (wallet-vm state)
      :settings (settings-vm state)}))
