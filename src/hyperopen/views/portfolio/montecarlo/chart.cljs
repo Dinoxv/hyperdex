@@ -20,6 +20,16 @@
 
 (def ^:private mono-font "\"JetBrains Mono\", ui-monospace, monospace")
 
+(defn- axis-time-label
+  "Compact elapsed-time tick label (the x-axis is calendar time, not a day count
+  — vault points are sparse and irregular)."
+  [y]
+  (cond
+    (<= y 0) "0"
+    (< y (/ 1.0 12)) (str (js/Math.round (* y 365)) "d")
+    (< y 1) (str (js/Math.round (* y 12)) "mo")
+    :else (str (.toFixed y 1) "y")))
+
 (defn- hex->rgba
   [hex a]
   (let [h (subs hex 1)
@@ -55,6 +65,7 @@
         bust-col (or bust-color (:red palette))
         start (get-in result [:meta :start-equity])
         H (get-in result [:meta :horizon])
+        span-years (or (get-in result [:meta :span-years]) 0)
         bust (get-in result [:meta :bust])
         goal (get-in result [:meta :goal])
         progress (if (nil? progress) 1 progress)
@@ -105,13 +116,14 @@
         (set! (.-fillStyle ctx) (:text-3 palette))
         (set! (.-textAlign ctx) "right")
         (.fillText ctx (str (when (>= ret-pct 0) "+") (.toFixed ret-pct 0) "%") (- pad-l 10) y)))
-    ;; x-axis day labels
+    ;; x-axis elapsed-time labels (calendar time, not a day count)
     (set! (.-textAlign ctx) "center")
     (set! (.-textBaseline ctx) "top")
     (dotimes [i 5]
-      (let [t (js/Math.round (* (/ i 4) H))]
+      (let [frac (/ i 4)
+            t (js/Math.round (* frac H))]
         (set! (.-fillStyle ctx) (:text-3 palette))
-        (.fillText ctx (str t "d") (x-of t) (+ pad-t plot-h 8))))
+        (.fillText ctx (axis-time-label (* frac span-years)) (x-of t) (+ pad-t plot-h 8))))
     ;; p5..p95 band
     (.beginPath ctx)
     (doseq [i (range 0 (inc max-i))] (.lineTo ctx (tx i) (y-of (nth p95 i))))

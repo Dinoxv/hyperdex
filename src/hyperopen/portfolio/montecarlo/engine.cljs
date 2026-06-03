@@ -158,11 +158,49 @@
       (.push out (js/Math.round (* (/ g grid) H))))
     out))
 
-(def ^:private default-periods-per-year
-  "Annualization basis. Hyperliquid is a 24/7 market and the rest of the
-  portfolio metrics pipeline annualizes on 365 periods/year, so the Monte Carlo
-  Sharpe/CAGR use the same basis (the React prototype used 252 trading days)."
-  365)
+(defn- ->interval-arrays
+  "Normalize the engine's input into parallel typed arrays of simple returns,
+  log returns and interval durations in years.
+
+  Preferred input is `:intervals` — the irregular history the tearsheet uses,
+  maps of `{:simple-return :log-return :dt-years}` from
+  `hyperopen.portfolio.metrics.history/cumulative-rows->irregular-intervals`, so
+  each step carries its real elapsed time. A legacy `:returns` seq of simple
+  returns is also accepted and treated as one trading day per point
+  (`dt-years = 1/365`), preserving the old daily behavior for any such caller.
+  Steps with a non-positive growth factor or duration are dropped."
+  [intervals returns]
+  (let [day-years (/ 1.0 365.0)
+        src (cond
+              (seq intervals)
+              (mapv (fn [{:keys [simple-return log-return dt-years]}]
+                      (let [s (when (number? simple-return) simple-return)
+                            d (when (and (number? dt-years) (pos? dt-years)) dt-years)
+                            l (cond
+                                (number? log-return) log-return
+                                (and (number? s) (> (+ 1 s) 0)) (js/Math.log (+ 1 s))
+                                :else nil)]
+                        (when (and s d l) [s l d])))
+                    intervals)
+
+              (seq returns)
+              (mapv (fn [r]
+                      (when (and (number? r) (> (+ 1 r) 0))
+                        [r (js/Math.log (+ 1 r)) day-years]))
+                    returns)
+
+              :else [])
+        rows (filterv some? src)
+        n (count rows)
+        simp (js/Float64Array. n)
+        logr (js/Float64Array. n)
+        dt (js/Float64Array. n)]
+    (dotimes [i n]
+      (let [row (nth rows i)]
+        (aset simp i (nth row 0))
+        (aset logr i (nth row 1))
+        (aset dt i (nth row 2))))
+    {:simp simp :logr logr :dt dt :m n}))
 
 (defn- identity-indices
   "An `Int32Array` of the identity permutation `0..n-1` (the original order)."
@@ -187,42 +225,52 @@
     arr))
 
 (defn run
-  "Run the bootstrap Monte Carlo simulation.
+  "Run the Monte Carlo simulation.
 
   Options:
-    :returns          seq of realized daily simple returns (e.g. 0.012 = +1.2%)
+    :intervals        irregular history as maps {:simple-return :log-return
+                      :dt-years} (from metrics.history/cumulative-rows->irregular-intervals);
+                      each step carries its real elapsed time, so Sharpe/vol/CAGR
+                      are annualized by elapsed time, matching the tearsheet
+    :returns          legacy alternative: simple returns, treated as daily points
     :method           :bootstrap (default, with replacement over a horizon) or
                       :shuffle (QuantStats permutation; length = sample size)
     :sims             number of simulated paths (default 1000)
-    :horizon          forecast length in days (default 90); ignored for :shuffle
-                      and clamped to the sample size for :bootstrap
+    :horizon          number of resampled steps for :bootstrap (the caller derives
+                      it from a calendar span); ignored for :shuffle (uses the full
+                      history); clamped to the sample size
     :bust             drawdown threshold counted as a bust, negative (default -0.3)
     :goal             total-return threshold counted as a goal (default 0.5)
     :seed             RNG seed (default 42)
     :start-equity     starting equity for ending-value scaling (default 1)
-    :periods-per-year annualization basis for Sharpe/CAGR (default 365)
+    :rf               annual risk-free rate for Sharpe (default 0)
 
-  Returns a map with `:meta`, `:draw-paths` (capped sample of equity paths as
-  Float64Arrays), `:band` (p5/p25/p50/p75/p95 at each `:times` grid point),
-  `:terminal`/`:maxdd`/`:sharpe`/`:cagr`/`:vol` distribution maps, and
-  `:bust-prob`/`:goal-prob`."
-  [{:keys [returns sims horizon bust goal seed start-equity periods-per-year method]
+  Returns a map with `:meta` (including `:total-years`, `:ppy-eff`,
+  `:span-years`), `:draw-paths`, `:band`, `:terminal`/`:maxdd`/`:sharpe`/
+  `:cagr`/`:vol` distribution maps, and `:bust-prob`/`:goal-prob`."
+  [{:keys [intervals returns sims horizon bust goal seed start-equity rf method]
     :or {sims 1000 horizon 90 bust -0.3 goal 0.5 seed 42 start-equity 1
-         periods-per-year default-periods-per-year method :bootstrap}}]
-  (let [ret (js/Float64Array. (into-array returns))
-        m (.-length ret)
+         rf 0 method :bootstrap}}]
+  (let [{:keys [simp logr dt m]} (->interval-arrays intervals returns)
         shuffle? (= method :shuffle)
+        realized-years (loop [i 0 acc 0.0]
+                         (if (< i m) (recur (inc i) (+ acc (aget dt i))) acc))
+        ppy-eff (if (pos? realized-years) (/ m realized-years) 0)
+        rf-log (if (and (number? rf) (> (+ 1 rf) 0)) (js/Math.log (+ 1 rf)) 0)
         ;; :shuffle reorders the realized history, so its length is the history
-        ;; length (no forecast horizon). :bootstrap clamps to the sample size so
-        ;; it can never compound more days than were observed — the fix for a
-        ;; short-history vault reporting a P5 "worst case" above its own reality.
+        ;; length. :bootstrap clamps the step count to the sample size so it can
+        ;; never resample more than the realized calendar span (the anti-inflation
+        ;; guarantee, now expressed in time via the caller's step derivation).
         H (cond
             (zero? m) horizon
             shuffle? m
             :else (min horizon m))
+        ;; Calendar time the simulated paths represent, for the axis and labels.
+        span-years (cond
+                     (zero? m) 0
+                     shuffle? realized-years
+                     :else (* H (/ realized-years m)))
         rng (mulberry32 seed)
-        ppy periods-per-year
-        ann (js/Math.sqrt ppy)
         grid-idx (grid-indices H)
         grid-n (.-length grid-idx)
         cols (vec (repeatedly grid-n #(js/Float64Array. sims)))
@@ -238,7 +286,8 @@
     (if (zero? m)
       ;; No realized returns to resample from — return an empty/degenerate run.
       {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed :method method
-              :start-equity start-equity :periods-per-year ppy :sample-size 0}
+              :start-equity start-equity :rf rf :sample-size 0
+              :total-years 0 :ppy-eff 0 :span-years 0}
        :draw-paths [] :times (vec grid-idx)
        :band {:p5 [] :p25 [] :p50 [] :p75 [] :p95 []}
        :terminal (dist-stats []) :maxdd (dist-stats [])
@@ -262,12 +311,15 @@
                   ;; tracking peak/worst-drawdown, and filling grid columns.
                   result
                   (loop [t 1 equity 1.0 peak 1.0 worst-dd 0.0
-                         sum-r 0.0 sum-r2 0.0 gp gp0]
+                         acc-a 0.0 acc-b 0.0 acc-c 0.0 gp gp0]
                     (if (> t H)
-                      [equity worst-dd sum-r sum-r2]
-                      (let [r (if shuffle?
-                                (aget ret (aget perm (dec t)))
-                                (aget ret (bit-or 0 (* (rng) m))))
+                      [equity worst-dd acc-a acc-b acc-c]
+                      (let [idx (if shuffle?
+                                  (aget perm (dec t))
+                                  (bit-or 0 (* (rng) m)))
+                            r (aget simp idx)
+                            lg (aget logr idx)
+                            d (aget dt idx)
                             equity* (* equity (+ 1 r))
                             peak* (if (> equity* peak) equity* peak)
                             dd (- (/ equity* peak*) 1)
@@ -280,32 +332,49 @@
                                       (do (aset (nth cols gp) s scaled)
                                           (recur (inc gp)))
                                       gp))]
+                          ;; A = Σ log²/dt, B = Σ log, C = Σ dt — the one-pass
+                          ;; moments for elapsed-time (irregular) annualization.
                           (recur (inc t) equity* peak* worst*
-                                 (+ sum-r r) (+ sum-r2 (* r r)) gp*)))))
-                  [equity worst-dd sum-r sum-r2] result
-                  mean (/ sum-r H)
-                  sd (js/Math.sqrt (max 1e-12 (- (/ sum-r2 H) (* mean mean))))
-                  ;; Sharpe over the full step set is order-invariant, so a pure
-                  ;; shuffle alone would make it constant. QuantStats' montecarlo_sharpe
-                  ;; (stats.py) instead derives each path's returns via
-                  ;; cumret.pct_change().dropna(), which drops the first day — so its
-                  ;; Sharpe is a leave-one-out over the returns after slot 0, and the
-                  ;; spread is purely which day is dropped. We mirror that for :shuffle
-                  ;; so the distribution matches QuantStats; :bootstrap keeps the
-                  ;; genuine full-path Sharpe (each path is a distinct resample).
-                  sharpe-val (if shuffle?
-                               (let [r0 (aget ret (aget perm 0))
-                                     k (max 1 (dec H))
-                                     mean* (/ (- sum-r r0) k)
-                                     var* (max 1e-12 (- (/ (- sum-r2 (* r0 r0)) k)
-                                                        (* mean* mean*)))]
-                                 (* (/ mean* (js/Math.sqrt var*)) ann))
-                               (* (/ mean sd) ann))]
+                                 (+ acc-a (/ (* lg lg) d)) (+ acc-b lg) (+ acc-c d) gp*)))))
+                  [equity worst-dd acc-a acc-b acc-c] result
+                  ;; Elapsed-time (irregular) annualization, identical to the
+                  ;; tearsheet's interval math (returns/sharpe-irregular,
+                  ;; volatility-ann-irregular, interval-cagr): drift is log-return
+                  ;; per year and the variance is a per-year rate, so Sharpe/vol/
+                  ;; CAGR are already annualized with no periods-per-year guess.
+                  ;; var-rate = (Σlog²/dt − (Σlog)²/Σdt)/(n−1), the one-pass form
+                  ;; of Σ(residual²/dt)/(n−1) with residual = log − drift·dt.
+                  drift (if (pos? acc-c) (/ acc-b acc-c) 0)
+                  var-rate (if (> H 1)
+                             (max 0 (/ (- acc-a (/ (* acc-b acc-b) acc-c)) (dec H)))
+                             0)
+                  vol* (js/Math.sqrt var-rate)
+                  cagr* (- (js/Math.exp drift) 1)
+                  sharpe-full (if (pos? vol*) (/ (- drift rf-log) vol*) 0)
+                  ;; QuantStats montecarlo_sharpe drops the first observation
+                  ;; (cumret.pct_change().dropna()); generalize to "drop the first
+                  ;; interval of this permutation" so the shuffle Sharpe shows the
+                  ;; same leave-one-out distribution, now correctly annualized.
+                  sharpe-val (if (and shuffle? (> H 1))
+                               (let [i0 (aget perm 0)
+                                     a0 (aget logr i0)
+                                     d0 (aget dt i0)
+                                     a' (- acc-a (/ (* a0 a0) d0))
+                                     b' (- acc-b a0)
+                                     c' (- acc-c d0)
+                                     k' (dec H)
+                                     drift' (if (pos? c') (/ b' c') 0)
+                                     var' (if (> k' 1)
+                                            (max 0 (/ (- a' (/ (* b' b') c')) (dec k')))
+                                            0)
+                                     vol' (js/Math.sqrt var')]
+                                 (if (pos? vol') (/ (- drift' rf-log) vol') 0))
+                               sharpe-full)]
               (aset terminal s (- equity 1))
               (aset maxdd s worst-dd)
               (aset sharpe s sharpe-val)
-              (aset cagr s (- (js/Math.pow equity (/ ppy H)) 1))
-              (aset vol s (* sd ann))
+              (aset cagr s cagr*)
+              (aset vol s vol*)
               (when (<= worst-dd bust) (vswap! busts inc))
               (when (>= (- equity 1) goal) (vswap! goals inc))
               (when keep-path? (conj! draw-paths path)))))
@@ -323,7 +392,8 @@
                     {:p5 [] :p25 [] :p50 [] :p75 [] :p95 []}
                     (range grid-n))]
           {:meta {:sims sims :horizon H :bust bust :goal goal :seed seed :method method
-                  :start-equity start-equity :periods-per-year ppy :sample-size m}
+                  :start-equity start-equity :rf rf :sample-size m
+                  :total-years realized-years :ppy-eff ppy-eff :span-years span-years}
            :draw-paths (persistent! draw-paths)
            :band band
            :times (vec grid-idx)

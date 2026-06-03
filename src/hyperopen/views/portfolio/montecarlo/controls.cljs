@@ -10,24 +10,32 @@
   The dispatched action ids and data-role prefix arrive via the model's
   `:chrome`, so the portfolio and vault surfaces share this strip while keeping
   independent control state."
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [hyperopen.views.portfolio.montecarlo.format :as fmt]))
 
 (defn- method-label
   [m]
   (case m :shuffle "Sequence risk" :bootstrap "Forecast" (name m)))
 
+(defn- months-label
+  [m]
+  (if (< m 12) (str m "M") (str (/ m 12) "Y")))
+
 (defn- segmented
-  [{:keys [control value options fmt set-action data-role-prefix]}]
+  [{:keys [control value options fmt set-action data-role-prefix disabled?]}]
   [:div {:class ["mc-seg"]
          :data-role (str data-role-prefix "-seg-" (name control))}
    (for [opt options]
-     ^{:key (str opt)}
-     [:button {:type "button"
-               :class (into ["mc-seg-btn"]
-                            (when (= opt value) ["mc-seg-btn-on"]))
-               :aria-pressed (= opt value)
-               :on {:click [[set-action control opt]]}}
-      (fmt opt)])])
+     (let [off? (boolean (and disabled? (disabled? opt)))]
+       ^{:key (str opt)}
+       [:button (cond-> {:type "button"
+                         :class (into ["mc-seg-btn"]
+                                      (concat (when (= opt value) ["mc-seg-btn-on"])
+                                              (when off? ["mc-seg-btn-off"])))
+                         :aria-pressed (= opt value)}
+                  off? (assoc :disabled true)
+                  (not off?) (assoc :on {:click [[set-action control opt]]}))
+        (fmt opt)]))])
 
 (defn- stepper
   [{:keys [control value suffix step set-action data-role-prefix]}]
@@ -57,12 +65,13 @@
    control-node])
 
 (defn controls-bar
-  [{:keys [controls sims-options horizon-options method-options sample-size chrome]}]
+  [{:keys [controls sims-options horizon-options method-options sample-size total-years chrome]}]
   (let [{:keys [method sims horizon bust goal seed]} controls
         {:keys [set-control-action rerun-action data-role-prefix]} chrome
         base {:set-action set-control-action :data-role-prefix data-role-prefix}
         shuffle? (= method :shuffle)
-        eff-horizon (min horizon (max 1 sample-size))]
+        yrs (or total-years 0)
+        target-years (min (/ horizon 12) yrs)]
     [:div {:class ["mc-card" "mc-controls"]
            :data-role (str data-role-prefix "-controls")}
      (field "Method"
@@ -80,7 +89,9 @@
               (segmented (merge base {:control :horizon
                                       :value horizon
                                       :options horizon-options
-                                      :fmt (fn [v] (str v "d"))}))))
+                                      :fmt months-label
+                                      ;; can't forecast more calendar time than observed
+                                      :disabled? (fn [m] (> (/ m 12) yrs))}))))
      (field "Bust threshold (drawdown)"
             (stepper (merge base {:control :bust :value bust :suffix "%" :step 5})))
      (field "Goal (total return)"
@@ -91,8 +102,8 @@
       [:span {:class ["mc-run-status"]
               :data-role (str data-role-prefix "-run-status")}
        (if shuffle?
-         [:span [:b (.toLocaleString (max 0 sample-size))] " trading days · reshuffled"]
-         [:span [:b (.toLocaleString sims)] (str " paths · " eff-horizon "d")])]
+         [:span [:b (.toLocaleString (max 0 sample-size))] " intervals · ~" (fmt/years-label yrs) " · reshuffled"]
+         [:span [:b (.toLocaleString sims)] (str " paths · ~" (fmt/years-label target-years))])]
       [:button {:type "button"
                 :class ["mc-run-btn"]
                 :data-role (str data-role-prefix "-rerun")

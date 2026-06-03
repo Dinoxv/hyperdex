@@ -25,6 +25,17 @@
      (.toFixed v digits)
      "—")))
 
+(defn years-label
+  "Compact elapsed-time label: <1mo / 6mo / 1.8y. The Monte Carlo surface
+  expresses time in calendar units because vault points are sparse and
+  irregularly spaced, not one-per-trading-day."
+  [y]
+  (cond
+    (not (number? y)) "—"
+    (< y (/ 1.0 12)) "<1mo"
+    (< y 1) (str (js/Math.round (* y 12)) "mo")
+    :else (str (.toFixed y 1) "y")))
+
 (defn usd
   "Compact dollar amount: $5.59M / $4.21K / $812."
   [v]

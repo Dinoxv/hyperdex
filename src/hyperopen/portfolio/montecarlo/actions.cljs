@@ -19,8 +19,11 @@
   [250 1000 2500])
 
 (def horizon-options
-  "Selectable forecast horizons in days (segmented control)."
-  [30 90 180 365])
+  "Selectable forecast horizons in MONTHS of calendar time (segmented control).
+  Vault history is sparse and irregularly spaced, so a forecast is expressed in
+  elapsed time, not a count of data points; the view model clamps the chosen
+  span to the realized history and converts it to a resample step count."
+  [3 6 12 24])
 
 (def method-options
   "Selectable simulation methods (segmented control). `:shuffle` is the faithful
@@ -36,7 +39,7 @@
   user clicks Re-run with otherwise-identical (deterministic) inputs."
   {:method :shuffle
    :sims 1000
-   :horizon 90
+   :horizon 12
    :bust -30
    :goal 50
    :seed 42

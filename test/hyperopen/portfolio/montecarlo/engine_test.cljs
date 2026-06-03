@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.montecarlo.engine-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.portfolio.metrics.returns :as returns]
             [hyperopen.portfolio.montecarlo.engine :as engine]))
 
 (defn- approx= [a b tol]
@@ -38,6 +39,50 @@
   (let [h (engine/histogram [] 8)]
     (is (= 8 (count (:counts h))))
     (is (= 0 (reduce + (:counts h))) "empty input is safe")))
+
+;; ---------------------------------------------------------------------------
+;; Elapsed-time (irregular cadence) annualization
+;; ---------------------------------------------------------------------------
+
+(defn- interval [simple dt-years]
+  {:simple-return simple
+   :log-return (js/Math.log (+ 1 simple))
+   :dt-years dt-years})
+
+(defn- varied-intervals [n]
+  (mapv (fn [i]
+          (interval (* 0.05 (- (js/Math.sin i) 0.1))
+                    (/ (+ 5 (mod (* 7 i) 23)) 365.0))) ; irregular 5–27 day gaps
+        (range n)))
+
+(deftest engine-annualizes-cagr-by-elapsed-time-not-point-count-test
+  ;; 20 intervals each 0.1y => 2.0 years total; each +3.526% compounds to ~+100%
+  ;; over those 2 years. The annualized CAGR must be ~2^(1/2)-1 = +41.4%, NOT a
+  ;; count/365 inflation (which would treat 20 points as 20/365 years and explode).
+  (let [per (- (js/Math.pow 2 (/ 1.0 20)) 1)
+        ivals (mapv (fn [_] (interval per 0.1)) (range 20))
+        res (engine/run {:intervals ivals :sims 200 :method :shuffle :seed 5 :start-equity 1})]
+    (is (approx= 2.0 (get-in res [:meta :total-years]) 1e-9)
+        "elapsed time is 2 years, not 20/365")
+    (is (approx= 0.41421 (get-in res [:cagr :p50]) 1e-3)
+        "CAGR is the ~2-year annualized rate, not a point-count inflation")
+    (is (approx= (returns/interval-cagr ivals) (get-in res [:cagr :p50]) 1e-6)
+        "engine CAGR equals the tearsheet interval-cagr")))
+
+(deftest engine-sharpe-vol-cagr-match-tearsheet-irregular-test
+  ;; The Monte Carlo per-path annualized metrics must equal the tearsheet's
+  ;; irregular-interval math on the same intervals (the whole point of the fix).
+  (let [ivals (varied-intervals 80)
+        res (engine/run {:intervals ivals :sims 600 :method :shuffle :seed 13 :start-equity 1})
+        exp-cagr (returns/interval-cagr ivals)
+        exp-vol (returns/volatility-ann-irregular ivals)
+        exp-sharpe (returns/sharpe-irregular ivals 0)]
+    (is (approx= exp-cagr (get-in res [:cagr :p50]) 1e-6) "CAGR matches interval-cagr")
+    (is (approx= exp-vol (get-in res [:vol :p50]) 1e-6) "vol matches volatility-ann-irregular")
+    (is (number? exp-sharpe))
+    (is (< (js/Math.abs (- exp-sharpe (get-in res [:sharpe :median])))
+           (* 0.15 (js/Math.abs exp-sharpe)))
+        "shuffle Sharpe median ≈ tearsheet sharpe-irregular (leave-one-out narrows to it)")))
 
 (deftest histogram-collapses-near-equal-values-test
   ;; Values that differ only by floating-point noise (e.g. a shuffle-invariant

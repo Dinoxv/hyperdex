@@ -76,7 +76,7 @@
            :data-role (str (:data-role-prefix chrome) "-terminal-table")}
      [:table {:class ["mc-pct-table"]}
       [:caption {:class ["mc-caption"]}
-       (str "Terminal outcome · day " (get-in result [:meta :horizon]))]
+       (str "Terminal outcome · ~" (fmt/years-label (get-in result [:meta :span-years])))]
       [:thead
        [:tr
         [:th "Percentile"]
