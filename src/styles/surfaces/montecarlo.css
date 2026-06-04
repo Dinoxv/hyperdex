@@ -318,7 +318,31 @@
 
 .monte-carlo .mc-canvas-wrap { position: relative; padding: 0 8px 8px; }
 .monte-carlo .mc-canvas-host { width: 100%; }
-.monte-carlo .mc-canvas-host canvas { display: block; width: 100%; }
+.monte-carlo .mc-canvas-host canvas { display: block; width: 100%; cursor: crosshair; }
+
+/* hover tooltip on the equity-paths chart (positioned fixed, managed
+   imperatively from the canvas render hook) */
+.monte-carlo .mc-tip {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  background: var(--mc-surface-2);
+  border: 1px solid var(--mc-border-strong);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: var(--mc-mono);
+  font-size: 11px;
+  color: var(--mc-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 100ms ease;
+  white-space: nowrap;
+}
+
+.monte-carlo .mc-tip.show { opacity: 1; transform: none; }
+.monte-carlo .mc-tip-row { display: flex; justify-content: space-between; gap: 16px; }
+.monte-carlo .mc-tip-key { color: var(--mc-text-3); }
 
 /* ---------- side rail ---------- */
 .monte-carlo .mc-rail {
