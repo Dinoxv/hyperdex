@@ -48,6 +48,7 @@ Use this file as the single starting point for what actions this repo provides t
 | `npm run test:websocket` | Websocket-only suite | Websocket runtime/API changes |
 | `npm run mutate:nightly` | Rebuild coverage, run the configured nightly mutation sweep, and write aggregate summaries under `target/mutation/nightly/**` | Overnight hotspot sweeps or local batch mutation audits |
 | `npm run dev` | Watch app and portfolio worker builds alongside Tailwind | Normal frontend development |
+| `npm run dev:kill` | Stop Hyperopen dev server processes explicitly | When a local dev server should be cleaned up manually |
 | `npm run dev:portfolio` | Watch app, Portfolio workbench, and portfolio worker builds alongside Tailwind | When you need the main app and workbench together |
 | `npm run portfolio` | Watch only the Portfolio workbench plus Tailwind | Isolated component workbench iteration |
 | `npm run portfolio:watch` | Watch the dedicated Shadow `:portfolio` target | Workbench-only CLJS compile loop |
