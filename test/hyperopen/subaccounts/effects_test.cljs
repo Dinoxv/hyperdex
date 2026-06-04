@@ -323,7 +323,8 @@
     (let [store (management-store)
           submit-calls (atom [])
           refresh-calls (atom [])
-          dispatch-calls (atom [])]
+          dispatch-calls (atom [])
+          toast-calls (atom [])]
       (-> (effects/transfer-subaccount!
            {:store store
             :request {:sub-account-user subaccount-address
@@ -342,6 +343,8 @@
             :dispatch! (fn [store* ctx effects*]
                          (swap! dispatch-calls conj [store* ctx effects*])
                          nil)
+            :show-toast! (fn [_store kind message]
+                           (swap! toast-calls conj [kind message]))
             :runtime-error-message (fn [err] (str err))})
           (.then (fn [result]
                    (is (= :reloaded result))
@@ -350,6 +353,9 @@
                    (is (= [{:force-refresh? true}] @refresh-calls))
                    (is (= [[store nil [[:effects/api-load-user-data subaccount-address]]]]
                           @dispatch-calls))
+                   (is (= [[:success {:headline "Transfer submitted"
+                                       :subline "1.23 USDC from Master Account to Desk"}]]
+                          @toast-calls))
                    (is (nil? (get-in @store [:account-context :subaccounts :transferring-address])))
                    (is (= "" (get-in @store [:account-context :subaccounts :transfer-amount])))
                    (is (= :deposit
@@ -457,7 +463,8 @@
   (async done
     (let [store (management-store)
           submit-calls (atom [])
-          refresh-calls (atom [])]
+          refresh-calls (atom [])
+          toast-calls (atom [])]
       (-> (effects/transfer-subaccount!
            {:store store
             :request {:sub-account-user subaccount-address
@@ -475,12 +482,17 @@
                                         (select-keys opts [:force-refresh?]))
                                  (js/Promise.resolve :reloaded))
             :dispatch! (fn [_store _ctx _effects] nil)
+            :show-toast! (fn [_store kind message]
+                           (swap! toast-calls conj [kind message]))
             :runtime-error-message (fn [err] (str err))})
           (.then (fn [result]
                    (is (= :reloaded result))
                    (is (= [[store owner-address subaccount-address false "USDH:0xabc" "4.63"]]
                           @submit-calls))
                    (is (= [{:force-refresh? true}] @refresh-calls))
+                   (is (= [[:success {:headline "Transfer submitted"
+                                       :subline "4.63 USDH from Desk to Master Account"}]]
+                          @toast-calls))
                    (is (nil? (get-in @store [:account-context :subaccounts :transferring-address])))
                    (done)))
           (.catch (fn [err]

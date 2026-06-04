@@ -425,7 +425,7 @@
           :transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
           :submit-send-asset! trading-api/submit-send-asset!
           :runtime-error-message agent-runtime/runtime-error-message
-          :dispatch! nxr/dispatch
+          :dispatch! nxr/dispatch :show-toast! show-order-feedback-toast!
           :load-subaccounts! (fn [opts]
                                (subaccounts-effects/load-subaccounts!
                                 (merge (subaccounts-load-deps store)

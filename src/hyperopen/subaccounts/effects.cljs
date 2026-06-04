@@ -259,6 +259,47 @@
   (when-let [address (account-context/effective-account-address @store)]
     (dispatch! store nil [[:effects/api-load-user-data address]])))
 
+(defn- transfer-token-label
+  [token]
+  (let [token* (some-> token str str/trim)]
+    (cond
+      (and (seq token*) (str/includes? token* ":"))
+      (first (str/split token* #":" 2))
+
+      (seq token*)
+      token*
+
+      :else
+      "USDC")))
+
+(defn- subaccount-name-for-address
+  [state address]
+  (let [address* (account-context/normalize-address address)]
+    (or (some (fn [row]
+                (when (= address* (subaccount-row-address row))
+                  (some-> (:name row) str str/trim not-empty)))
+              (get-in state [:account-context :subaccounts :rows]))
+        "Sub-Account")))
+
+(defn- transfer-success-toast
+  [state address is-deposit? amount token]
+  (let [subaccount-name (subaccount-name-for-address state address)
+        from-label (if is-deposit? "Master Account" subaccount-name)
+        to-label (if is-deposit? subaccount-name "Master Account")]
+    {:headline "Transfer submitted"
+     :subline (str amount " " (transfer-token-label token)
+                   " from " from-label " to " to-label)}))
+
+(defn- show-transfer-success-toast!
+  [store show-toast! address is-deposit? amount token]
+  (show-toast! store
+               :success
+               (transfer-success-toast @store
+                                       address
+                                       is-deposit?
+                                       amount
+                                       token)))
+
 (defn- unified-account-mode?
   [state]
   (= :unified
@@ -299,12 +340,14 @@
            transfer-sub-account-spot!
            submit-send-asset!
            dispatch!
+           show-toast!
            runtime-error-message]
     :as deps
     :or {transfer-sub-account! trading-api/transfer-sub-account!
          transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
          submit-send-asset! trading-api/submit-send-asset!
          dispatch! (fn [_store _ctx _effects] nil)
+         show-toast! (fn [_store _kind _message] nil)
          runtime-error-message error-message}}]
   (let [owner (owner-address store)
         address (account-context/normalize-address (:sub-account-user request))
@@ -335,7 +378,15 @@
                    (do
                      (clear-transfer-success! store)
                      (dispatch-active-user-refresh! store dispatch!)
-                     (refresh-subaccounts! deps))
+                     (-> (refresh-subaccounts! deps)
+                         (.then (fn [result]
+                                  (show-transfer-success-toast! store
+                                                                show-toast!
+                                                                address
+                                                                is-deposit?
+                                                                amount
+                                                                token)
+                                  result))))
                    (set-management-error!
                     store
                     [[[:account-context :subaccounts :transferring-address] nil]]
