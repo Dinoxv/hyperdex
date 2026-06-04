@@ -1,6 +1,7 @@
 (ns hyperopen.subaccounts.management
   (:require [clojure.string :as str]
-            [hyperopen.account.context :as account-context]))
+            [hyperopen.account.context :as account-context]
+            [hyperopen.subaccounts.transfer-amount :as transfer-amount]))
 
 (def missing-owner-message
   "Connect your wallet before selecting a subaccount.")
@@ -12,10 +13,13 @@
   "Subaccount name must be 1-16 characters.")
 
 (def invalid-transfer-amount-message
-  "Enter a positive USDC amount with at most 6 decimal places.")
+  transfer-amount/invalid-transfer-amount-message)
 
 (def invalid-spot-transfer-amount-message
-  "Enter a positive spot amount.")
+  transfer-amount/invalid-spot-transfer-amount-message)
+
+(def missing-spot-transfer-precision-message
+  transfer-amount/missing-spot-transfer-precision-message)
 
 (def invalid-spot-transfer-token-message
   "Select a spot asset to transfer.")
@@ -168,17 +172,7 @@
 
 (defn parse-usdc-amount->micros
   [value]
-  (let [amount-text (str/trim (str (or value "")))]
-    (when (re-matches #"^\d+(?:\.\d{0,6})?$" amount-text)
-      (let [[whole frac] (str/split amount-text #"\." 2)
-            micros-text (str whole
-                             (subs (str (or frac "") "000000") 0 6))
-            parsed (js/parseInt micros-text 10)]
-        (when (and (number? parsed)
-                   (not (js/isNaN parsed))
-                   (pos? parsed)
-                   (<= parsed js/Number.MAX_SAFE_INTEGER))
-          parsed)))))
+  (transfer-amount/parse-usdc-amount->micros value))
 
 (defn- invalid-owner-effect
   []
@@ -280,17 +274,6 @@
                         [[:account-context :subaccounts :transfer-token-menu-open?] false]
                         [[:account-context :subaccounts :error] nil]]]])
 
-(defn- valid-spot-amount?
-  [value]
-  (boolean
-   (let [amount-text (str/trim (str (or value "")))]
-     (when (re-matches #"^\d+(?:\.\d+)?$" amount-text)
-       (let [parsed (js/Number amount-text)]
-         (and (number? parsed)
-              (not (js/isNaN parsed))
-              (js/isFinite parsed)
-              (pos? parsed)))))))
-
 (defn- normalize-transfer-token
   [value]
   (some-> value str str/trim not-empty))
@@ -302,46 +285,32 @@
         row (owned-subaccount-row state owner-address address*)
         amount-text (str (or (get-in state [:account-context :subaccounts :transfer-amount])
                              ""))
-        usd (parse-usdc-amount->micros amount-text)
         direction (normalize-transfer-direction
                    (get-in state [:account-context :subaccounts :transfer-direction]))
         account-kind (effective-transfer-account
                       state
                       (get-in state [:account-context :subaccounts :transfer-account]))
         transfer-token (normalize-transfer-token
-                        (get-in state [:account-context :subaccounts :transfer-token]))]
+                        (get-in state [:account-context :subaccounts :transfer-token]))
+        amount-result (transfer-amount/normalize-transfer-amount
+                       state
+                       {:subaccount-address address*
+                        :account-kind account-kind
+                        :direction direction
+                        :token transfer-token
+                        :amount-text amount-text})]
     (cond
       (not (seq owner-address)) (invalid-owner-effect)
       (not row) (invalid-row-effect)
-      (= :spot account-kind)
-      (cond
-        (not (valid-spot-amount? amount-text))
-        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
-                              [[:account-context :subaccounts :error]
-                               invalid-spot-transfer-amount-message]]]]
-
-        (not transfer-token)
-        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
-                              [[:account-context :subaccounts :error]
-                               invalid-spot-transfer-token-message]]]]
-
-        :else
-        [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
-                              [[:account-context :subaccounts :error] nil]]]
-         [:effects/api-transfer-subaccount {:sub-account-user address*
-                                            :is-deposit (= :deposit direction)
-                                            :amount amount-text
-                                            :account-kind :spot
-                                            :token transfer-token}]])
-
-      (not usd)
+      (not (:ok? amount-result))
       [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
                             [[:account-context :subaccounts :error]
-                             invalid-transfer-amount-message]]]]
+                             (:message amount-result)]]]]
+
       :else
       [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
                             [[:account-context :subaccounts :error] nil]]]
-       [:effects/api-transfer-subaccount {:sub-account-user address*
-                                          :is-deposit (= :deposit direction)
-                                          :usd usd
-                                          :amount amount-text}]])))
+       [:effects/api-transfer-subaccount
+        (assoc (:payload amount-result)
+               :sub-account-user address*
+               :is-deposit (= :deposit direction))]])))

@@ -115,6 +115,114 @@
             :path-values [[[:order-form-runtime :error] nil]]}]
           {:phase :test}))))
 
+(deftest assert-effect-args-validates-normalized-subaccount-transfer-shapes-test
+  (let [create-payload {:name "Desk"}
+        rename-payload {:sub-account-user "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                        :name "Ops"}
+        trading-payload {:sub-account-user "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                         :is-deposit true
+                         :account-kind :trading
+                         :token "USDC"
+                         :amount "1.23"
+                         :amount-display "1.23"
+                         :amount-units "1230000"
+                         :amount-decimals 6
+                         :usd 1230000}
+        spot-payload {:sub-account-user "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+                      :is-deposit false
+                      :account-kind :spot
+                      :token "USDH:0xabc"
+                      :token-symbol "USDH"
+                      :amount "2.5"
+                      :amount-display "2.5"
+                      :amount-units "2500000"
+                      :amount-decimals 6}]
+    (is (= [create-payload]
+           (contracts/assert-effect-args!
+            :effects/api-create-subaccount
+            [create-payload]
+            {:phase :test})))
+    (is (= [rename-payload]
+           (contracts/assert-effect-args!
+            :effects/api-rename-subaccount
+            [rename-payload]
+            {:phase :test})))
+    (is (= [trading-payload]
+           (contracts/assert-effect-args!
+            :effects/api-transfer-subaccount
+            [trading-payload]
+            {:phase :test})))
+    (is (= [spot-payload]
+           (contracts/assert-effect-args!
+            :effects/api-transfer-subaccount
+            [spot-payload]
+            {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(dissoc spot-payload :amount-units)]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc spot-payload :amount-units 2500000)]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc spot-payload :amount "1e6")]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc spot-payload :amount "1" :amount-units "999")]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc spot-payload :amount "1.234"
+                               :amount-units "123"
+                               :amount-decimals 2)]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc spot-payload :amount "02.500000")]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc trading-payload :usd "1230000")]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc trading-payload :amount "1.24")]
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"effect request"
+         (contracts/assert-effect-args!
+          :effects/api-transfer-subaccount
+          [(assoc trading-payload :amount-display "1.2300")]
+          {:phase :test})))))
+
 (deftest assert-effect-args-accepts-portfolio-optimizer-execution-plan-test
   (let [plan {:scenario-id "scn_01"
               :status :ready

@@ -1,7 +1,8 @@
 (ns hyperopen.subaccounts.actions
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
-            [hyperopen.subaccounts.management :as management]))
+            [hyperopen.subaccounts.management :as management]
+            [hyperopen.subaccounts.transfer-amount :as transfer-amount]))
 
 (def canonical-route
   "/subAccounts")
@@ -85,7 +86,7 @@
 (def open-create-popover management/open-create-popover)
 (def close-create-popover management/close-create-popover)
 (def copy-subaccount-address management/copy-subaccount-address)
-(def parse-usdc-amount->micros management/parse-usdc-amount->micros)
+(def parse-usdc-amount->micros transfer-amount/parse-usdc-amount->micros)
 (def submit-create-subaccount management/submit-create-subaccount)
 (def start-rename-subaccount management/start-rename-subaccount)
 (def cancel-rename-subaccount management/cancel-rename-subaccount)

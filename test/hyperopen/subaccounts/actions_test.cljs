@@ -41,7 +41,13 @@
                   :transfer-account :trading
                   :transfer-account-menu-open? false
                   :transfer-token "USDC"
-                  :transfer-token-menu-open? false}}})
+                  :transfer-token-menu-open? false}}
+   :spot {:meta {:tokens [{:name "USDH"
+                           :token "USDH:0xabc"
+                           :weiDecimals 6}
+                          {:name "MEOW"
+                           :token "MEOW:0xdef"
+                           :weiDecimals 2}]}}})
 
 (deftest parse-subaccounts-route-supports-hyperliquid-casing-test
   (is (= "/subAccounts" actions/canonical-route))
@@ -292,7 +298,12 @@
           [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
                                              :is-deposit true
                                              :usd 1230000
-                                             :amount "1.23"}]]
+                                             :amount "1.23"
+                                             :amount-display "1.23"
+                                             :amount-units "1230000"
+                                             :amount-decimals 6
+                                             :account-kind :trading
+                                             :token "USDC"}]]
          (actions/submit-transfer-subaccount
           (-> (base-management-state)
               (assoc-in [:account-context :subaccounts :transfer-amount] "1.23")
@@ -304,7 +315,12 @@
           [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
                                              :is-deposit false
                                              :usd 1
-                                             :amount "0.000001"}]]
+                                             :amount "0.000001"
+                                             :amount-display "0.000001"
+                                             :amount-units "1"
+                                             :amount-decimals 6
+                                             :account-kind :trading
+                                             :token "USDC"}]]
          (actions/submit-transfer-subaccount
           (-> (base-management-state)
               (assoc-in [:account-context :subaccounts :transfer-amount] "0.000001")
@@ -316,13 +332,36 @@
           [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
                                              :is-deposit true
                                              :amount "2.5"
+                                             :amount-display "2.5"
+                                             :amount-units "2500000"
+                                             :amount-decimals 6
                                              :account-kind :spot
-                                             :token "USDH:0xabc"}]]
+                                             :token "USDH:0xabc"
+                                             :token-symbol "USDH"}]]
          (actions/submit-transfer-subaccount
           (-> (base-management-state)
               (assoc-in [:account-context :subaccounts :transfer-amount] "2.5")
               (assoc-in [:account-context :subaccounts :transfer-account] :spot)
               (assoc-in [:account-context :subaccounts :transfer-token] "USDH:0xabc"))
+          subaccount-address)))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
+                                [[:account-context :subaccounts :error]
+                                 "Enter a positive spot amount that matches the selected asset precision."]]]]
+         (actions/submit-transfer-subaccount
+          (-> (base-management-state)
+              (assoc-in [:account-context :subaccounts :transfer-amount] "0.001")
+              (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+              (assoc-in [:account-context :subaccounts :transfer-token] "MEOW:0xdef"))
+          subaccount-address)))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
+                                [[:account-context :subaccounts :error]
+                                 "Spot asset precision is unavailable. Refresh balances before transferring."]]]]
+         (actions/submit-transfer-subaccount
+          (-> (base-management-state)
+              (assoc-in [:spot :meta :tokens] [])
+              (assoc-in [:account-context :subaccounts :transfer-amount] "1")
+              (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+              (assoc-in [:account-context :subaccounts :transfer-token] "UNKNOWN:0xaaa"))
           subaccount-address)))
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address]
                                  subaccount-address]
@@ -330,7 +369,12 @@
           [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
                                              :is-deposit true
                                              :usd 10000000
-                                             :amount "10"}]]
+                                             :amount "10"
+                                             :amount-display "10"
+                                             :amount-units "10000000"
+                                             :amount-decimals 6
+                                             :account-kind :trading
+                                             :token "USDC"}]]
          (actions/submit-transfer-subaccount
           (-> (base-management-state)
               (assoc :account {:mode :unified})

@@ -467,11 +467,10 @@
           toast-calls (atom [])]
       (-> (effects/transfer-subaccount!
            {:store store
-            :request {:sub-account-user subaccount-address
-                      :is-deposit false
-                      :amount "4.63"
-                      :account-kind :spot
-                      :token "USDH:0xabc"}
+            :request {:sub-account-user subaccount-address :is-deposit false
+                      :amount "4.63" :amount-display "4.63" :amount-units "4630000"
+                      :amount-decimals 6 :account-kind :spot
+                      :token "USDH:0xabc" :token-symbol "USDH"}
             :transfer-sub-account-spot! (fn [store* owner address is-deposit? token amount]
                                           (swap! submit-calls conj
                                                  [store* owner address is-deposit? token amount])

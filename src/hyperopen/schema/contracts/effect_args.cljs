@@ -1,5 +1,6 @@
 (ns hyperopen.schema.contracts.effect-args
   (:require [cljs.spec.alpha :as s]
+            [clojure.string :as str]
             [hyperopen.schema.contracts.common :as common]))
 
 (s/def ::order-submit-confirmation-variant
@@ -23,11 +24,150 @@
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
-(s/def ::api-subaccount-management-args (s/tuple map?))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-send-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-withdraw-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-deposit-args (s/tuple ::api-submit-request))
+
+(defn- exact-keys?
+  [payload allowed-keys]
+  (= allowed-keys (set (keys payload))))
+
+(defn- safe-positive-integer?
+  [value]
+  (and (integer? value)
+       (pos? value)
+       (<= value js/Number.MAX_SAFE_INTEGER)))
+
+(defn- positive-integer-string?
+  [value]
+  (and (string? value)
+       (re-matches #"^[1-9]\d*$" value)))
+
+(defn- decimal-amount-string?
+  [value]
+  (and (string? value)
+       (common/non-empty-string? value)
+       (re-matches #"^\d+(?:\.\d*)?$" value)))
+
+(defn- normalized-decimals?
+  [value]
+  (and (integer? value)
+       (<= 0 value 38)))
+
+(defn- strip-leading-zeroes
+  [text]
+  (let [stripped (str/replace (or text "") #"^0+" "")]
+    (if (seq stripped) stripped "0")))
+
+(defn- strip-trailing-zeroes
+  [text]
+  (str/replace (or text "") #"0+$" ""))
+
+(defn- canonical-decimal-text
+  [whole frac]
+  (let [whole* (strip-leading-zeroes whole)
+        frac* (strip-trailing-zeroes frac)]
+    (if (seq frac*)
+      (str whole* "." frac*)
+      whole*)))
+
+(defn- decimal-amount-units
+  [amount decimals]
+  (when (and (decimal-amount-string? amount)
+             (normalized-decimals? decimals))
+    (let [[whole frac] (str/split amount #"\." 2)
+          frac* (or frac "")]
+      (when (<= (count frac*) decimals)
+        (let [frac-padded (subs (str frac* (apply str (repeat decimals "0")))
+                                0
+                                decimals)
+              units (strip-leading-zeroes (str (strip-leading-zeroes whole)
+                                               frac-padded))]
+          (when (not= "0" units)
+            {:canonical (canonical-decimal-text whole frac*)
+             :units units}))))))
+
+(defn- normalized-amount-consistent?
+  [payload {:keys [require-canonical?]}]
+  (when-let [{:keys [canonical units]} (decimal-amount-units
+                                        (:amount payload)
+                                        (:amount-decimals payload))]
+    (and (= (:amount-display payload) (:amount payload))
+         (= (:amount-units payload) units)
+         (or (not require-canonical?)
+             (= (:amount payload) canonical)))))
+
+(defn- subaccount-create-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload #{:name})
+       (common/non-empty-string? (:name payload))))
+
+(defn- subaccount-rename-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload #{:sub-account-user :name})
+       (common/non-empty-string? (:sub-account-user payload))
+       (common/non-empty-string? (:name payload))))
+
+(defn- trading-transfer-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload
+                    #{:sub-account-user
+                      :is-deposit
+                      :account-kind
+                      :token
+                      :amount
+                      :amount-display
+                      :amount-units
+                      :amount-decimals
+                      :usd})
+       (common/non-empty-string? (:sub-account-user payload))
+       (boolean? (:is-deposit payload))
+       (= :trading (:account-kind payload))
+       (= "USDC" (:token payload))
+       (decimal-amount-string? (:amount payload))
+       (decimal-amount-string? (:amount-display payload))
+       (positive-integer-string? (:amount-units payload))
+       (= 6 (:amount-decimals payload))
+       (safe-positive-integer? (:usd payload))
+       (= (:amount-units payload) (str (:usd payload)))
+       (normalized-amount-consistent? payload {:require-canonical? false})))
+
+(defn- spot-transfer-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload
+                    #{:sub-account-user
+                      :is-deposit
+                      :account-kind
+                      :token
+                      :token-symbol
+                      :amount
+                      :amount-display
+                      :amount-units
+                      :amount-decimals})
+       (common/non-empty-string? (:sub-account-user payload))
+       (boolean? (:is-deposit payload))
+       (= :spot (:account-kind payload))
+       (common/non-empty-string? (:token payload))
+       (common/non-empty-string? (:token-symbol payload))
+       (decimal-amount-string? (:amount payload))
+       (decimal-amount-string? (:amount-display payload))
+       (positive-integer-string? (:amount-units payload))
+       (normalized-decimals? (:amount-decimals payload))
+       (normalized-amount-consistent? payload {:require-canonical? true})))
+
+(defn- subaccount-transfer-request?
+  [payload]
+  (or (trading-transfer-request? payload)
+      (spot-transfer-request? payload)))
+
+(s/def ::api-create-subaccount-args (s/tuple subaccount-create-request?))
+(s/def ::api-rename-subaccount-args (s/tuple subaccount-rename-request?))
+(s/def ::api-transfer-subaccount-args (s/tuple subaccount-transfer-request?))
 
 (defn- fetch-asset-selector-markets-args?
   [args]
@@ -115,9 +255,9 @@
    :effects/sync-active-asset-funding-predictability ::common/coin-args
    :effects/api-load-api-wallets ::common/no-args
    :effects/api-load-subaccounts ::common/no-args
-   :effects/api-create-subaccount ::api-subaccount-management-args
-   :effects/api-rename-subaccount ::api-subaccount-management-args
-   :effects/api-transfer-subaccount ::api-subaccount-management-args
+   :effects/api-create-subaccount ::api-create-subaccount-args
+   :effects/api-rename-subaccount ::api-rename-subaccount-args
+   :effects/api-transfer-subaccount ::api-transfer-subaccount-args
    :effects/generate-api-wallet ::common/no-args
    :effects/api-authorize-api-wallet ::common/no-args
    :effects/api-remove-api-wallet ::common/no-args

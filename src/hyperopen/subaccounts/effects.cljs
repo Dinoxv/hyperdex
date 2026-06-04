@@ -357,6 +357,7 @@
         usd (:usd request)
         token (:token request)
         amount (:amount request)
+        amount-display (or (:amount-display request) amount)
         submit! (cond
                   spot?
                   (transfer-sub-account-spot! store owner address is-deposit? token amount)
@@ -384,7 +385,7 @@
                                                                 show-toast!
                                                                 address
                                                                 is-deposit?
-                                                                amount
+                                                                amount-display
                                                                 token)
                                   result))))
                    (set-management-error!

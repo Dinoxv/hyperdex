@@ -357,6 +357,7 @@
             [hyperopen.state.trading.validation-and-scale-test]
             [hyperopen.subaccounts.actions-test]
             [hyperopen.subaccounts.effects-test]
+            [hyperopen.subaccounts.transfer-amount-test]
             [hyperopen.system-test]
             [hyperopen.telemetry-test]
             [hyperopen.telemetry.console-preload-debug-api-test]
@@ -1039,6 +1040,7 @@
              'hyperopen.state.trading.validation-and-scale-test
              'hyperopen.subaccounts.actions-test
              'hyperopen.subaccounts.effects-test
+             'hyperopen.subaccounts.transfer-amount-test
              'hyperopen.system-test
              'hyperopen.telemetry-test
              'hyperopen.telemetry.console-preload-debug-api-test
