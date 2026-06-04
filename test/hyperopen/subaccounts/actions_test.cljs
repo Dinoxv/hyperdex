@@ -169,6 +169,16 @@
   (is (= []
          (actions/set-subaccount-form-field {} :unknown "value"))))
 
+(deftest unified-subaccount-transfer-account-selection-stays-on-trading-test
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]
+         (actions/set-subaccount-form-field
+          (assoc (base-management-state) :account {:mode :unified})
+          "transferAccount"
+          "spot"))))
+
 (deftest toggle-transfer-direction-swaps-master-and-subaccount-sides-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :transfer-direction] :withdraw]
                                 [[:account-context :subaccounts :transfer-account-menu-open?] false]
@@ -311,6 +321,20 @@
          (actions/submit-transfer-subaccount
           (-> (base-management-state)
               (assoc-in [:account-context :subaccounts :transfer-amount] "2.5")
+              (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+              (assoc-in [:account-context :subaccounts :transfer-token] "USDH:0xabc"))
+          subaccount-address)))
+  (is (= [[:effects/save-many [[[:account-context :subaccounts :transferring-address]
+                                 subaccount-address]
+                                [[:account-context :subaccounts :error] nil]]]
+          [:effects/api-transfer-subaccount {:sub-account-user subaccount-address
+                                             :is-deposit true
+                                             :usd 10000000
+                                             :amount "10"}]]
+         (actions/submit-transfer-subaccount
+          (-> (base-management-state)
+              (assoc :account {:mode :unified})
+              (assoc-in [:account-context :subaccounts :transfer-amount] "10")
               (assoc-in [:account-context :subaccounts :transfer-account] :spot)
               (assoc-in [:account-context :subaccounts :transfer-token] "USDH:0xabc"))
           subaccount-address)))

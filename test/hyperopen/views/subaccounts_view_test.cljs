@@ -218,3 +218,42 @@
            (get-in transfer-trading-option [1 :on :click])))
     (is (= [[:actions/submit-transfer-subaccount other-subaccount-address]]
            (get-in transfer-submit [1 :on :click])))))
+
+(deftest unified-subaccounts-transfer-popover-offers-trading-account-only-test
+  (let [view-node (view/subaccounts-view
+                   (-> (base-state)
+                       (assoc :account {:mode :unified})
+                       (assoc-in [:spot :clearinghouse-state :balances]
+                                 [{:coin "USDC"
+                                   :available "301.12859"
+                                   :total "301.12859"
+                                   :hold "0"}
+                                  {:coin "USDH"
+                                   :token "USDH:0xabc"
+                                   :total "8.25"}])
+                       (assoc-in [:webdata2 :clearinghouseState]
+                                 {:withdrawable "0.01"
+                                  :marginSummary {:accountValue "999.99"
+                                                  :totalMarginUsed "0"}})
+                       (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+                       (assoc-in [:account-context :subaccounts :transfer-account-menu-open?] true)
+                       (assoc-in [:account-context :subaccounts :transferring-address] subaccount-address)))
+        transfer-direction (hiccup/find-by-data-role view-node
+                                                     (str "subaccounts-transfer-direction-" subaccount-address))
+        transfer-account-menu (hiccup/find-by-data-role view-node
+                                                        (str "subaccounts-transfer-account-menu-" subaccount-address))
+        transfer-spot-option (hiccup/find-by-data-role view-node
+                                                       (str "subaccounts-transfer-account-option-"
+                                                            subaccount-address
+                                                            "-spot"))
+        transfer-max (hiccup/find-by-data-role view-node
+                                               (str "subaccounts-transfer-max-" subaccount-address))]
+    (is (contains? (set (hiccup/collect-strings transfer-direction))
+                   "Trading Account"))
+    (is (contains? (set (hiccup/collect-strings transfer-account-menu))
+                   "Trading Account"))
+    (is (not (contains? (set (hiccup/collect-strings transfer-account-menu))
+                        "Spot Account")))
+    (is (nil? transfer-spot-option))
+    (is (contains? (set (hiccup/collect-strings transfer-max))
+                   "MAX: 301.12859 USDC"))))

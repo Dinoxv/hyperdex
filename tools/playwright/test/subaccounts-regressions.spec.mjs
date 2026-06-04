@@ -1,11 +1,94 @@
 import { expect, test } from "@playwright/test";
-import { visitRoute, waitForIdle } from "../support/hyperopen.mjs";
+import { debugCall, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
 const ownerAddress = "0x1234567890abcdef1234567890abcdef12345678";
 const subaccountAddress = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
 
-async function seedSubaccountsState(page) {
-  await page.evaluate(({ ownerAddress: owner, subaccountAddress: sub }) => {
+async function seedAccountSurface(page, options = {}) {
+  await page.evaluate(({ accountMode }) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const webdata2 = c.js__GT_clj(
+      {
+        clearinghouseState: {
+          marginSummary: {
+            accountValue: "300.61686499"
+          }
+        }
+      },
+      opts
+    );
+    const spot = c.js__GT_clj(
+      {
+        "clearinghouse-state": {
+          balances: [
+            {
+              coin: "USDC",
+              total: "358.56"
+            },
+            {
+              coin: "USDH",
+              token: "USDH:0xabc",
+              total: "8.28"
+            },
+            {
+              coin: "STAR",
+              token: "STAR:0x456",
+              total: "0"
+            }
+          ]
+        }
+      },
+      opts
+    );
+    const spotBalances = c.js__GT_clj(
+      [
+        {
+          coin: "USDC",
+          total: "358.56"
+        },
+        {
+          coin: "USDH",
+          token: "USDH:0xabc",
+          total: "8.28"
+        },
+        {
+          coin: "STAR",
+          token: "STAR:0x456",
+          total: "0"
+        }
+      ],
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, kwPath("account", "mode"), keyword(accountMode));
+    nextState = c.assoc_in(nextState, kwPath("webdata2"), webdata2);
+    nextState = c.assoc_in(nextState, kwPath("spot"), spot);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("spot", "clearinghouse-state", "balances"),
+      spotBalances
+    );
+    c.reset_BANG_(store, nextState);
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  }, { accountMode: options.accountMode ?? "classic" });
+}
+
+async function seedSubaccountsState(page, options = {}) {
+  await page.evaluate(({ ownerAddress: owner, subaccountAddress: sub, accountMode }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -78,9 +161,29 @@ async function seedSubaccountsState(page) {
       },
       opts
     );
+    const spotBalances = c.js__GT_clj(
+      [
+        {
+          coin: "USDC",
+          total: "358.56"
+        },
+        {
+          coin: "USDH",
+          token: "USDH:0xabc",
+          total: "8.28"
+        },
+        {
+          coin: "STAR",
+          token: "STAR:0x456",
+          total: "0"
+        }
+      ],
+      opts
+    );
 
     let nextState = c.deref(store);
     nextState = c.assoc_in(nextState, kwPath("wallet", "address"), owner);
+    nextState = c.assoc_in(nextState, kwPath("account", "mode"), keyword(accountMode));
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "rows"), rows);
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "status"), keyword("loaded"));
     nextState = c.assoc_in(
@@ -115,14 +218,20 @@ async function seedSubaccountsState(page) {
     );
     nextState = c.assoc_in(nextState, kwPath("webdata2"), webdata2);
     nextState = c.assoc_in(nextState, kwPath("spot"), spot);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("spot", "clearinghouse-state", "balances"),
+      spotBalances
+    );
 
     c.reset_BANG_(store, nextState);
     const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
     if (typeof renderApp === "function") {
       renderApp(c.deref(store));
     }
-  }, { ownerAddress, subaccountAddress });
+  }, { ownerAddress, subaccountAddress, accountMode: options.accountMode ?? "classic" });
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedAccountSurface(page, { accountMode: options.accountMode ?? "classic" });
 }
 
 async function interceptSubaccountsApi(page) {
@@ -297,4 +406,119 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
     await page.locator(`[data-role="subaccounts-transfer-close-${subaccountAddress}"]`).click();
     await expect(popover).toHaveCount(0);
   }
+});
+
+test("subaccounts transfer uses trading-only controls for unified accounts @regression", async ({ page }) => {
+  await interceptSubaccountsApi(page);
+
+  await page.setViewportSize({ width: 768, height: 720 });
+  await visitRoute(page, "/subAccounts");
+  await seedSubaccountsState(page, { accountMode: "unified" });
+
+  await page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`).click();
+  await seedAccountSurface(page, { accountMode: "unified" });
+
+  const accountTrigger = page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`);
+  await expect(accountTrigger).toBeVisible();
+  await expect(accountTrigger).toContainText("Trading Account");
+  await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
+    .toContainText("MAX: 358.56 USDC");
+
+  await accountTrigger.click();
+
+  const accountMenu = page.locator(`[data-role="subaccounts-transfer-account-menu-${subaccountAddress}"]`);
+  await expect(accountMenu).toBeVisible();
+  await expect(accountMenu).toContainText("Trading Account");
+  await expect(page.locator(`[data-role="subaccounts-transfer-account-option-${subaccountAddress}-spot"]`))
+    .toHaveCount(0);
+
+  await page.locator(`[data-role="subaccounts-transfer-token-${subaccountAddress}"]`).click();
+  const tokenMenu = page.locator(`[data-role="subaccounts-transfer-token-menu-${subaccountAddress}"]`);
+  await expect(tokenMenu).toBeVisible();
+  await expect(tokenMenu).toContainText("USDC");
+  await expect(page.locator(`[data-role="subaccounts-transfer-token-option-${subaccountAddress}-USDH:0xabc"]`))
+    .toHaveCount(0);
+});
+
+test("unified subaccounts transfer submits sendAsset instead of subAccountTransfer @regression", async ({
+  page
+}) => {
+  const signature = `0x${"a".repeat(64)}${"b".repeat(64)}1c`;
+
+  await interceptSubaccountsApi(page);
+  await visitRoute(page, "/subAccounts");
+  await debugCall(page, "installWalletSimulator", {
+    accounts: [ownerAddress],
+    requestAccounts: [ownerAddress],
+    chainId: "0xa4b1",
+    typedDataSignature: signature
+  });
+  await debugCall(page, "installExchangeSimulator", {
+    signedActions: {
+      sendAsset: {
+        responses: [{ status: "ok", response: { type: "default" } }]
+      },
+      subAccountTransfer: {
+        responses: [
+          { status: "err", response: "Action disabled when unified account is active" }
+        ]
+      }
+    },
+    info: {
+      subAccounts: {
+        responses: [
+          [
+            {
+              name: "test",
+              master: ownerAddress.toLowerCase(),
+              subAccountUser: subaccountAddress.toLowerCase(),
+              clearinghouseState: { marginSummary: { accountValue: "0" } },
+              spotState: { balances: [] }
+            }
+          ]
+        ]
+      }
+    }
+  });
+  await seedSubaccountsState(page, { accountMode: "unified" });
+
+  await page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`).click();
+  await seedAccountSurface(page, { accountMode: "unified" });
+  await page.locator(`[data-role="subaccounts-transfer-amount-${subaccountAddress}"]`).fill("1.23");
+  await page.locator(`[data-role="subaccounts-transfer-submit-${subaccountAddress}"]`).click();
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 8_000, pollMs: 50 });
+
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+        return (snapshot?.calls ?? [])
+          .map((call) => call?.request)
+          .filter((request) => request?.action?.type);
+      },
+      { timeout: 10_000 }
+    )
+    .toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: expect.objectContaining({
+            type: "sendAsset",
+            destination: subaccountAddress,
+            sourceDex: "spot",
+            destinationDex: "spot",
+            token: "USDC:0x6d1e7cde53ba9467b783cb7c530ce054",
+            amount: "1.23",
+            fromSubAccount: ""
+          })
+        })
+      ])
+    );
+
+  const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+  const submittedRequests = (snapshot?.calls ?? [])
+    .map((call) => call?.request)
+    .filter((request) => request?.action?.type);
+  const submittedTypes = submittedRequests.map((request) => request.action.type);
+  expect(submittedTypes).not.toContain("subAccountTransfer");
+  expect(submittedRequests.some((request) => Object.hasOwn(request, "vaultAddress"))).toBe(false);
 });

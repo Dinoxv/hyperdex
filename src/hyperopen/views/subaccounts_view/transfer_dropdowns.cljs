@@ -3,22 +3,24 @@
 (defn- dropdown-chevron
   [open?]
   [:svg {:class (into ["pointer-events-none"
-                       "h-3.5"
-                       "w-3.5"
+                       "h-3"
+                       "w-3"
                        "shrink-0"
-                       "text-[#9aa8ab]"
+                       "text-[#54d8c6]"
                        "transition-transform"
                        "duration-150"
                        "ease-out"]
                       (if open?
                         ["rotate-180"]
                         ["rotate-0"]))
-         :viewBox "0 0 20 20"
-         :fill "currentColor"
+         :viewBox "0 0 12 12"
+         :fill "none"
+         :stroke "currentColor"
+         :stroke-width "1.5"
+         :stroke-linecap "round"
+         :stroke-linejoin "round"
          :aria-hidden true}
-   [:path {:fill-rule "evenodd"
-           :clip-rule "evenodd"
-           :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]])
+   [:path {:d "M3.25 4.75 6 7.5l2.75-2.75"}]])
 
 (defn- transfer-account-option
   [{:keys [address value label selected?]}]
@@ -48,12 +50,16 @@
    label])
 
 (defn transfer-account-dropdown
-  [{:keys [address subaccounts]}]
-  (let [selected (or (:transfer-account subaccounts) :trading)
+  [{:keys [address subaccounts unified-account?]}]
+  (let [selected (if unified-account?
+                   :trading
+                   (or (:transfer-account subaccounts) :trading))
         selected-label (if (= :spot selected) "Spot Account" "Trading Account")
         open? (true? (:transfer-account-menu-open? subaccounts))
-        options [{:value :trading :label "Trading Account"}
-                 {:value :spot :label "Spot Account"}]]
+        options (if unified-account?
+                  [{:value :trading :label "Trading Account"}]
+                  [{:value :trading :label "Trading Account"}
+                   {:value :spot :label "Spot Account"}])]
     [:div {:class ["relative" "h-full" "w-full"]}
      [:button {:type "button"
                :data-role (str "subaccounts-transfer-direction-" address)

@@ -259,22 +259,75 @@
   (when-let [address (account-context/effective-account-address @store)]
     (dispatch! store nil [[:effects/api-load-user-data address]])))
 
+(defn- unified-account-mode?
+  [state]
+  (= :unified
+     (some-> (get-in state [:account :mode])
+             name
+             str/lower-case
+             keyword)))
+
+(def ^:private hyperliquid-mainnet-usdc-token
+  "USDC:0x6d1e7cde53ba9467b783cb7c530ce054")
+
+(def ^:private unified-transfer-dex
+  "spot")
+
+(defn- unified-send-asset-token
+  [token]
+  (let [token* (some-> token str str/trim)]
+    (cond
+      (and (seq token*) (str/includes? token* ":")) token*
+      (= "USDC" (some-> token* str/upper-case)) hyperliquid-mainnet-usdc-token
+      (seq token*) token*
+      :else hyperliquid-mainnet-usdc-token)))
+
+(defn- unified-send-asset-action
+  [owner address is-deposit? token amount]
+  {:type "sendAsset"
+   :destination (if is-deposit? address owner)
+   :sourceDex unified-transfer-dex
+   :destinationDex unified-transfer-dex
+   :token (unified-send-asset-token token)
+   :amount (str amount)
+   :fromSubAccount (if is-deposit? "" address)})
+
 (defn transfer-subaccount!
-  [{:keys [store request transfer-sub-account! transfer-sub-account-spot! dispatch! runtime-error-message]
+  [{:keys [store
+           request
+           transfer-sub-account!
+           transfer-sub-account-spot!
+           submit-send-asset!
+           dispatch!
+           runtime-error-message]
     :as deps
     :or {transfer-sub-account! trading-api/transfer-sub-account!
          transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
+         submit-send-asset! trading-api/submit-send-asset!
          dispatch! (fn [_store _ctx _effects] nil)
          runtime-error-message error-message}}]
   (let [owner (owner-address store)
         address (account-context/normalize-address (:sub-account-user request))
         is-deposit? (boolean (:is-deposit request))
         spot? (= :spot (:account-kind request))
+        unified? (unified-account-mode? @store)
         usd (:usd request)
         token (:token request)
         amount (:amount request)
-        submit! (if spot?
+        submit! (cond
+                  spot?
                   (transfer-sub-account-spot! store owner address is-deposit? token amount)
+
+                  unified?
+                  (submit-send-asset! store
+                                      owner
+                                      (unified-send-asset-action owner
+                                                                 address
+                                                                 is-deposit?
+                                                                 token
+                                                                 amount))
+
+                  :else
                   (transfer-sub-account! store owner address is-deposit? usd))]
     (-> submit!
         (.then (fn [resp]

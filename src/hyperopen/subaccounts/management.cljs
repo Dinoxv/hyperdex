@@ -81,25 +81,35 @@
     :spot
     :trading))
 
+(defn- unified-account-mode?
+  [state]
+  (= :unified (get-in state [:account :mode])))
+
+(defn- effective-transfer-account
+  [state value]
+  (if (unified-account-mode? state)
+    :trading
+    (normalize-transfer-account value)))
+
 (defn- normalize-boolean
   [value]
   (or (true? value)
       (= "true" (-> value str str/lower-case))))
 
 (defn- normalize-form-value
-  [field value]
+  [state field value]
   (case field
     :transfer-direction (normalize-transfer-direction value)
-    :transfer-account (normalize-transfer-account value)
+    :transfer-account (effective-transfer-account state value)
     :transfer-account-menu-open? (normalize-boolean value)
     :transfer-token-menu-open? (normalize-boolean value)
     (str (or value ""))))
 
 (defn set-subaccount-form-field
-  [_state field value]
+  [state field value]
   (if-let [field* (normalize-form-field field)]
     [[:effects/save-many (cond-> [[[:account-context :subaccounts field*]
-                                    (normalize-form-value field* value)]]
+                                    (normalize-form-value state field* value)]]
                            (= field* :transfer-account)
                            (conj [[:account-context :subaccounts :transfer-account-menu-open?] false]
                                  [[:account-context :subaccounts :transfer-token-menu-open?] false])
@@ -295,7 +305,8 @@
         usd (parse-usdc-amount->micros amount-text)
         direction (normalize-transfer-direction
                    (get-in state [:account-context :subaccounts :transfer-direction]))
-        account-kind (normalize-transfer-account
+        account-kind (effective-transfer-account
+                      state
                       (get-in state [:account-context :subaccounts :transfer-account]))
         transfer-token (normalize-transfer-token
                         (get-in state [:account-context :subaccounts :transfer-token]))]

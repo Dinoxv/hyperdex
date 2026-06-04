@@ -36,7 +36,6 @@
 (def sync-websocket-health-with-runtime! ws-adapters/sync-websocket-health-with-runtime!)
 
 (def sync-websocket-health! ws-adapters/sync-websocket-health!)
-
 (def save common/save)
 
 (def save-many common/save-many)
@@ -424,6 +423,7 @@
           :modify-sub-account! trading-api/modify-sub-account!
           :transfer-sub-account! trading-api/transfer-sub-account!
           :transfer-sub-account-spot! trading-api/transfer-sub-account-spot!
+          :submit-send-asset! trading-api/submit-send-asset!
           :runtime-error-message agent-runtime/runtime-error-message
           :dispatch! nxr/dispatch
           :load-subaccounts! (fn [opts]

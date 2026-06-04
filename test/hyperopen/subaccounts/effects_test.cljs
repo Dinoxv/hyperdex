@@ -368,6 +368,91 @@
                     (is false (str "Unexpected transfer-subaccount success error: " err))
                     (done)))))))
 
+(deftest unified-transfer-subaccount-uses-send-asset-instead-of-l1-transfer-test
+  (async done
+    (let [store (management-store)
+          l1-calls (atom [])
+          send-asset-calls (atom [])
+          refresh-calls (atom [])]
+      (swap! store assoc-in [:account :mode] :unified)
+      (-> (effects/transfer-subaccount!
+           {:store store
+            :request {:sub-account-user subaccount-address
+                      :is-deposit true
+                      :usd 1230000
+                      :amount "1.23"}
+            :transfer-sub-account! (fn [& args]
+                                     (swap! l1-calls conj args)
+                                     (js/Promise.resolve {:status "err"
+                                                          :response "Action disabled when unified account is active"}))
+            :submit-send-asset! (fn [store* owner action]
+                                  (swap! send-asset-calls conj [store* owner action])
+                                  (js/Promise.resolve {:status "ok"
+                                                       :response {:type "default"}}))
+            :load-subaccounts! (fn [opts]
+                                 (swap! refresh-calls conj
+                                        (select-keys opts [:force-refresh?]))
+                                 (js/Promise.resolve :reloaded))
+            :dispatch! (fn [_store _ctx _effects] nil)
+            :runtime-error-message (fn [err] (str err))})
+          (.then (fn [result]
+                   (is (= :reloaded result))
+                   (is (= [] @l1-calls))
+                   (is (= [[store
+                            owner-address
+                            {:type "sendAsset"
+                             :destination subaccount-address
+                             :sourceDex "spot"
+                             :destinationDex "spot"
+                             :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                             :amount "1.23"
+                             :fromSubAccount ""}]]
+                          @send-asset-calls))
+                   (is (= [{:force-refresh? true}] @refresh-calls))
+                   (is (nil? (get-in @store [:account-context :subaccounts :error])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected unified send-asset transfer error: " err))
+                    (done)))))))
+
+(deftest unified-transfer-subaccount-withdraw-uses-subaccount-as-source-test
+  (async done
+    (let [store (management-store)
+          send-asset-calls (atom [])]
+      (swap! store assoc-in [:account :mode] :unified)
+      (-> (effects/transfer-subaccount!
+           {:store store
+            :request {:sub-account-user subaccount-address
+                      :is-deposit false
+                      :usd 2500000
+                      :amount "2.5"}
+            :transfer-sub-account! (fn [& _args]
+                                     (js/Promise.resolve {:status "err"
+                                                          :response "Should not submit L1 transfer"}))
+            :submit-send-asset! (fn [store* owner action]
+                                  (swap! send-asset-calls conj [store* owner action])
+                                  (js/Promise.resolve {:status "ok"
+                                                       :response {:type "default"}}))
+            :load-subaccounts! (fn [_opts]
+                                 (js/Promise.resolve :reloaded))
+            :dispatch! (fn [_store _ctx _effects] nil)
+            :runtime-error-message (fn [err] (str err))})
+          (.then (fn [_result]
+                   (is (= [[store
+                            owner-address
+                            {:type "sendAsset"
+                             :destination owner-address
+                             :sourceDex "spot"
+                             :destinationDex "spot"
+                             :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                             :amount "2.5"
+                             :fromSubAccount subaccount-address}]]
+                          @send-asset-calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected unified send-asset withdraw error: " err))
+                    (done)))))))
+
 (deftest transfer-subaccount-spot-success-submits-token-transfer-test
   (async done
     (let [store (management-store)

@@ -209,7 +209,7 @@
        to-label]]]))
 
 (defn- transfer-popover
-  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max transfer-assets class]}]
+  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max transfer-assets unified-account? class]}]
   (let [direction (or (:transfer-direction subaccounts) :deposit)
         withdrawing? (= :withdraw direction)
         selected-asset (transfer-dropdowns/selected-transfer-token subaccounts transfer-assets)
@@ -252,8 +252,10 @@
                                   :subaccount-name subaccount-name})
      [:div {:class ["mt-5" "grid" "gap-3" "sm:grid-cols-2"]}
       (transfer-field-shell
-       {:children [(transfer-dropdowns/transfer-account-dropdown {:address address
-                                                                  :subaccounts subaccounts})]})
+       {:children [(transfer-dropdowns/transfer-account-dropdown
+                    {:address address
+                     :subaccounts subaccounts
+                     :unified-account? unified-account?})]})
       (transfer-field-shell
        {:class ["relative"]
         :children [(transfer-dropdowns/token-dropdown {:address address
@@ -307,7 +309,7 @@
                      :on-click [[:actions/start-transfer-subaccount address]]})]))
 
 (defn transfer-popover-layer
-  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max transfer-assets]}]
+  [{:keys [address subaccount-name subaccounts deposit-max withdraw-max transfer-assets unified-account?]}]
   (when (seq address)
     [:div {:class ["relative"
                    "z-[40]"
@@ -322,6 +324,7 @@
                         :deposit-max deposit-max
                         :withdraw-max withdraw-max
                         :transfer-assets transfer-assets
+                        :unified-account? unified-account?
                         :class []})]))
 
 (defn row-controls
