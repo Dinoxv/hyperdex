@@ -92,6 +92,7 @@
       (assoc-in [:portfolio :loading?] true)
       (assoc-in [:portfolio :user-fees-loading?] true)
       (assoc-in [:portfolio :user-fees-loading-for-address] spectate-address)
+      (assoc-in [:portfolio :ledger-loading?] true)
       (assoc-in [:portfolio :error] "stale-portfolio-error")
       (assoc-in [:portfolio :user-fees-error] "stale-user-fees-error")
       (assoc-in [:portfolio :user-fees-error-for-address] spectate-address)

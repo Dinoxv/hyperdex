@@ -52,6 +52,7 @@
 	               :loading? true
 	               :user-fees-loading? true
 	               :user-fees-loading-for-address address
+	               :ledger-loading? true
 	               :error "stale-portfolio-error"
 	               :user-fees-error "stale-user-fees-error"
 	               :user-fees-error-for-address address

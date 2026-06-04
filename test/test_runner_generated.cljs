@@ -110,6 +110,7 @@
             [hyperopen.core-bootstrap.wallet-actions-effects-test]
             [hyperopen.core-bootstrap.websocket-diagnostics-test]
             [hyperopen.core-public-actions-test]
+            [hyperopen.domain.account-ledger-test]
             [hyperopen.domain.funding-history-test]
             [hyperopen.domain.market.instrument-test]
             [hyperopen.domain.trading.fees-test]
@@ -783,6 +784,7 @@
              'hyperopen.core-bootstrap.wallet-actions-effects-test
              'hyperopen.core-bootstrap.websocket-diagnostics-test
              'hyperopen.core-public-actions-test
+             'hyperopen.domain.account-ledger-test
              'hyperopen.domain.funding-history-test
              'hyperopen.domain.market.instrument-test
              'hyperopen.domain.trading.fees-test

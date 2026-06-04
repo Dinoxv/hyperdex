@@ -51,6 +51,34 @@ const OPTIMIZER_HLP_VAULT_SUMMARIES = [
   }
 ];
 const OPTIMIZER_RELOAD_SCENARIO_ID = "scn_playwright_tracking_reload";
+const PORTFOLIO_LEDGER_REVIEW_VIEWPORTS = [
+  { width: 375, height: 812 },
+  { width: 768, height: 900 },
+  { width: 1280, height: 900 },
+  { width: 1440, height: 900 }
+];
+const PORTFOLIO_LEDGER_FIXTURE = [
+  {
+    time: 1772460616000,
+    hash: "0xdeposit001",
+    delta: { type: "deposit", usdc: "100.0" }
+  },
+  {
+    time: 1772300494000,
+    hash: "0xvault001",
+    delta: { type: "vaultDeposit", usdc: "10.0" }
+  },
+  {
+    time: 1765148052000,
+    hash: "0xgenesis001",
+    delta: { type: "spotGenesis", token: "HYPE", amount: "2670.03" }
+  },
+  {
+    time: 1765529064000,
+    hash: "0xsend001",
+    delta: { type: "internalTransfer", coin: "HYPE", amount: "1" }
+  }
+];
 const OPTIMIZER_RELOAD_SCENARIO_EDN = `{:schema-version 1
  :id "scn_playwright_tracking_reload"
  :name "QA Tracking Reload"
@@ -367,6 +395,24 @@ async function seedPortfolioWalletAddress(page, address) {
       )
     );
   }, address);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function seedPortfolioLedgerRows(page, rows) {
+  await page.evaluate((payload) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const store = globalThis.hyperopen.system.store;
+    const ledgerRows = c.js__GT_clj(payload, opts);
+    const withRows = c.assoc_in(c.deref(store), path("portfolio", "ledger-updates"), ledgerRows);
+    const withLoading = c.assoc_in(withRows, path("portfolio", "ledger-loading?"), false);
+    const nextState = c.assoc_in(withLoading, path("portfolio", "ledger-error"), null);
+
+    c.reset_BANG_(store, nextState);
+  }, rows);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
@@ -2643,24 +2689,63 @@ test("portfolio funding openers launch the funding modal on real click @regressi
     await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
     await expectOracle(page, "funding-modal", { open: false });
   }
+});
 
+test("portfolio account activity tab renders ledger history @regression", async ({ page }) => {
+  await page.setViewportSize(PORTFOLIO_LEDGER_REVIEW_VIEWPORTS[0]);
+  await visitRoute(page, "/portfolio");
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   await selectAccountTab(page, "deposits-withdrawals");
+  await expect(page.locator("[data-role='account-info-tab-deposits-withdrawals']"))
+    .toHaveText("Account Activity");
+  await seedPortfolioLedgerRows(page, PORTFOLIO_LEDGER_FIXTURE);
 
-  for (const [dataRole, title] of [
-    ["portfolio-funding-action-deposit", "Deposit"],
-    ["portfolio-funding-action-transfer", "Perps <-> Spot"],
-    ["portfolio-funding-action-withdraw", "Withdraw"]
-  ]) {
-    const openButton = page.locator(`[data-role='${dataRole}']`);
+  for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    const table = page.locator("[data-role='portfolio-deposits-withdrawals-table']");
+    await expect(table).toBeVisible();
+    await expect(table).toContainText("Time");
+    await expect(table).toContainText("Status");
+    await expect(table).toContainText("Action");
+    await expect(table).toContainText("Source");
+    await expect(table).toContainText("Destination");
+    await expect(table).toContainText("Account Value Change");
+    await expect(table).toContainText("Fee");
+    await expect(table).toContainText("Deposit");
+    await expect(table).toContainText("Vault Deposit");
+    await expect(table).toContainText("Genesis Distribution");
+    await expect(table).toContainText("Send");
+    await expect(table).toContainText("Arbitrum");
+    await expect(table).toContainText("Trading Account");
+    await expect(table).toContainText("+100 USDC");
+    await expect(table).toContainText("-10 USDC");
+    await expect(table).toContainText("+2670.03 HYPE");
+    await expect(table).toContainText("-1 HYPE");
+    await expect(table.locator("a[aria-label='Open transaction in Hyperliquid explorer']"))
+      .toHaveCount(4);
+    await expect(table.locator("input, select, textarea, button")).toHaveCount(0);
+    await expect(page.locator("[data-role='portfolio-funding-action-deposit']")).toHaveCount(0);
 
-    await expect(openButton).toBeVisible();
-    await openButton.click();
-    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
-    await expectOracle(page, "funding-modal", { open: true, title });
+    const tableMetrics = await table.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        hasBodyHorizontalOverflow:
+          document.documentElement.scrollWidth > window.innerWidth + 1
+      };
+    });
+    expect(tableMetrics.width).toBeGreaterThan(0);
+    expect(tableMetrics.bottom).toBeGreaterThan(tableMetrics.top);
+    expect(tableMetrics.hasBodyHorizontalOverflow).toBe(false);
 
-    await page.locator("[data-role='funding-modal-close']").click();
-    await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
-    await expectOracle(page, "funding-modal", { open: false });
+    const firstExplorerLink = table
+      .locator("a[aria-label='Open transaction in Hyperliquid explorer']")
+      .first();
+    await firstExplorerLink.focus();
+    await expect(firstExplorerLink).toBeFocused();
   }
 });
 

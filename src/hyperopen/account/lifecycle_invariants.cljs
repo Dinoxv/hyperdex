@@ -78,6 +78,7 @@
         (check-path state [:portfolio :loading?] false-or-nil? "false or nil")
         (check-path state [:portfolio :user-fees-loading?] false-or-nil? "false or nil")
         (check-path state [:portfolio :user-fees-loading-for-address] nil? "nil")
+        (check-path state [:portfolio :ledger-loading?] false-or-nil? "false or nil")
         (check-path state [:portfolio :error] nil? "nil")
         (check-path state [:portfolio :user-fees-error] nil? "nil")
         (check-path state [:portfolio :user-fees-error-for-address] nil? "nil")

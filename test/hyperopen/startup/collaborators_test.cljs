@@ -169,7 +169,64 @@
                                     :usdc "3.0"}}]
                           (get-in @store [:portfolio :ledger-updates])))
                    (is (number? (get-in @store [:portfolio :ledger-loaded-at-ms])))
+                   (is (false? (get-in @store [:portfolio :ledger-loading?])))
                    (is (nil? (get-in @store [:portfolio :ledger-error])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest startup-base-deps-fetch-portfolio-uses-empty-ledger-window-fallback-test
+  (async done
+    (let [request-address "0x1111111111111111111111111111111111111111"
+          ledger-calls (atom [])
+          store (atom {:wallet {:address request-address}
+                       :portfolio {}})
+          deps (collaborators/startup-base-deps
+                {:api {:get-request-stats (fn [] {:source :injected})
+                       :request-portfolio! (fn [_address _opts]
+                                             (js/Promise.resolve {:month {:accountValueHistory []
+                                                                          :pnlHistory []}}))
+                       :request-user-non-funding-ledger-updates! (fn [address start-time-ms end-time-ms opts]
+                                                                   (swap! ledger-calls conj [address start-time-ms end-time-ms opts])
+                                                                   (js/Promise.resolve []))}})]
+      (-> ((:fetch-portfolio! deps) store request-address {:priority :high})
+          (.then (fn [_summary]
+                   (let [[address start-time-ms end-time-ms opts] (first @ledger-calls)]
+                     (is (= request-address address))
+                     (is (= 0 start-time-ms))
+                     (is (number? end-time-ms))
+                     (is (pos? end-time-ms))
+                     (is (= {:priority :high} opts)))
+                   (is (= [] (get-in @store [:portfolio :ledger-updates])))
+                   (is (false? (get-in @store [:portfolio :ledger-loading?])))
+                   (is (nil? (get-in @store [:portfolio :ledger-error])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest startup-base-deps-fetch-portfolio-preserves-summary-and-records-ledger-error-test
+  (async done
+    (let [request-address "0x1111111111111111111111111111111111111111"
+          store (atom {:wallet {:address request-address}
+                       :portfolio {:ledger-updates [{:stale true}]}})
+          deps (collaborators/startup-base-deps
+                {:api {:get-request-stats (fn [] {:source :injected})
+                       :request-portfolio! (fn [_address _opts]
+                                             (js/Promise.resolve {:all-time {:accountValueHistory [[1000 "10"]]
+                                                                             :pnlHistory [[1000 "0"]]}}))
+                       :request-user-non-funding-ledger-updates! (fn [& _]
+                                                                   (js/Promise.reject (js/Error. "ledger-fail")))}})]
+      (-> ((:fetch-portfolio! deps) store request-address {:priority :high})
+          (.then (fn [summary]
+                   (is (= {:all-time {:accountValueHistory [[1000 "10"]]
+                                      :pnlHistory [[1000 "0"]]}}
+                          summary))
+                   (is (= summary (get-in @store [:portfolio :summary-by-key])))
+                   (is (= [{:stale true}] (get-in @store [:portfolio :ledger-updates])))
+                   (is (= "ledger-fail" (get-in @store [:portfolio :ledger-error])))
+                   (is (false? (get-in @store [:portfolio :ledger-loading?])))
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))

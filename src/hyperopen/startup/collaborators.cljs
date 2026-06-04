@@ -7,6 +7,7 @@
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.account.history.effects :as account-history-effects]
+            [hyperopen.platform :as platform]
             [hyperopen.runtime.api-effects :as runtime-api-effects]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
             [hyperopen.runtime.state :as runtime-state]
@@ -208,6 +209,17 @@
     (vec rows)
     []))
 
+(defn- portfolio-ledger-time-window
+  [summary-by-key]
+  (let [{:keys [start-time-ms end-time-ms]} (portfolio-summary-time-window summary-by-key)]
+    (if (and (number? start-time-ms)
+             (number? end-time-ms)
+             (<= start-time-ms end-time-ms))
+      {:start-time-ms start-time-ms
+       :end-time-ms end-time-ms}
+      {:start-time-ms 0
+       :end-time-ms (platform/now-ms)})))
+
 (defn- error-text
   [err]
   (or (some-> err .-message)
@@ -228,35 +240,52 @@
            (-> (request-portfolio! address opts)
                (.then (fn [summary-by-key]
                         (let [summary* (or summary-by-key {})
-                              {:keys [start-time-ms end-time-ms]} (portfolio-summary-time-window summary*)]
+                              {:keys [start-time-ms end-time-ms]} (portfolio-ledger-time-window summary*)]
                           (if-not (requested-address-current? store requested-address)
                             summary*
                             (do
                               (swap! store api-projections/apply-portfolio-success summary*)
-                              (if (and (fn? request-user-non-funding-ledger-updates!)
-                                       (number? start-time-ms)
-                                       (number? end-time-ms)
-                                       (<= start-time-ms end-time-ms))
-                                (-> (request-user-non-funding-ledger-updates! address
-                                                                               start-time-ms
-                                                                               end-time-ms
-                                                                               (dissoc (or opts {}) :dedupe-key))
+                              (if (fn? request-user-non-funding-ledger-updates!)
+                                (do
+                                  (swap! store
+                                         (fn [state]
+                                           (if (requested-address-current? store requested-address)
+                                             (-> state
+                                                 (assoc-in [:portfolio :ledger-loading?] true)
+                                                 (assoc-in [:portfolio :ledger-error] nil))
+                                             state)))
+                                  (-> (request-user-non-funding-ledger-updates! address
+                                                                                 start-time-ms
+                                                                                 end-time-ms
+                                                                                 (dissoc (or opts {}) :dedupe-key))
                                     (.then (fn [rows]
                                              (when (requested-address-current? store requested-address)
-                                               (swap! store assoc-in [:portfolio :ledger-updates] (normalize-ledger-updates rows))
-                                               (swap! store assoc-in [:portfolio :ledger-loaded-at-ms] (.now js/Date))
-                                               (swap! store assoc-in [:portfolio :ledger-error] nil))
+                                               (swap! store
+                                                      (fn [state]
+                                                        (-> state
+                                                            (assoc-in [:portfolio :ledger-updates] (normalize-ledger-updates rows))
+                                                            (assoc-in [:portfolio :ledger-loaded-at-ms] (platform/now-ms))
+                                                            (assoc-in [:portfolio :ledger-loading?] false)
+                                                            (assoc-in [:portfolio :ledger-error] nil)))))
                                              summary*))
                                     (.catch (fn [err]
                                               ;; Portfolio summary should remain available even if ledger fetch fails.
                                               (when (requested-address-current? store requested-address)
-                                                (swap! store assoc-in [:portfolio :ledger-error] (error-text err)))
-                                              (js/Promise.resolve summary*))))
+                                                (swap! store
+                                                       (fn [state]
+                                                         (-> state
+                                                             (assoc-in [:portfolio :ledger-loading?] false)
+                                                             (assoc-in [:portfolio :ledger-error] (error-text err))))))
+                                              (js/Promise.resolve summary*)))))
                                 (do
                                   (when (requested-address-current? store requested-address)
-                                    (swap! store assoc-in [:portfolio :ledger-updates] [])
-                                    (swap! store assoc-in [:portfolio :ledger-loaded-at-ms] nil)
-                                    (swap! store assoc-in [:portfolio :ledger-error] nil))
+                                    (swap! store
+                                           (fn [state]
+                                             (-> state
+                                                 (assoc-in [:portfolio :ledger-updates] [])
+                                                 (assoc-in [:portfolio :ledger-loaded-at-ms] nil)
+                                                 (assoc-in [:portfolio :ledger-loading?] false)
+                                                 (assoc-in [:portfolio :ledger-error] nil)))))
                                   (js/Promise.resolve summary*))))))))
                (.catch (apply-error-and-reject-when-current
                         store

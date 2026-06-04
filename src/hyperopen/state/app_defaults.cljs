@@ -182,6 +182,7 @@
    :loading? false
    :user-fees-loading? false
    :user-fees-loading-for-address nil
+   :ledger-loading? false
    :error nil
    :user-fees-error nil
    :user-fees-error-for-address nil

@@ -997,7 +997,7 @@
                                  :user-fees {:dailyUserVlm [[0 1]]}
 	                                 :loading? true
 	                                 :user-fees-loading? true
-	                                 :user-fees-loading-for-address "0xabc"
+	                                 :user-fees-loading-for-address "0xabc" :ledger-loading? true
 	                                 :error "portfolio-error"
 	                                 :user-fees-error "user-fees-error"
 	                                 :user-fees-error-for-address "0xabc"
@@ -1071,7 +1071,7 @@
       (is (nil? (get-in @store [:portfolio :user-fees])))
       (is (false? (get-in @store [:portfolio :loading?])))
 	      (is (false? (get-in @store [:portfolio :user-fees-loading?])))
-	      (is (nil? (get-in @store [:portfolio :user-fees-loading-for-address])))
+	      (is (nil? (get-in @store [:portfolio :user-fees-loading-for-address]))) (is (false? (get-in @store [:portfolio :ledger-loading?])))
 	      (is (nil? (get-in @store [:portfolio :error])))
 	      (is (nil? (get-in @store [:portfolio :user-fees-error])))
 	      (is (nil? (get-in @store [:portfolio :user-fees-error-for-address])))

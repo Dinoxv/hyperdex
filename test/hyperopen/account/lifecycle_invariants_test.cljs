@@ -29,6 +29,7 @@
     (is (contains? paths [:perp-dex-clearinghouse-error]))
     (is (contains? paths [:portfolio :summary-by-key]))
     (is (contains? paths [:portfolio :loading?]))
+    (is (contains? paths [:portfolio :ledger-loading?]))
     (is (contains? paths [:account :mode]))
     (is (thrown-with-msg?
          js/Error
