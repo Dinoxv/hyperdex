@@ -375,8 +375,9 @@
         master-spot-value (spot-account-value {:spot-state master-spot-state})
         master-transfer-max-value (trading-transfer-max state master-perps-value)]
     [:div {:class ["app-shell-gutter" "flex" "min-h-[calc(100vh-4rem)]" "w-full" "flex-col" "gap-5" "pt-8" "pb-16"]
-           :style {:background-color "#002f24"
-                   :background-image "radial-gradient(circle at 88% 112%, transparent 0 21%, rgba(97,222,203,0.13) 21.1% 21.3%, transparent 21.4% 26%, rgba(97,222,203,0.13) 26.1% 26.3%, transparent 26.4% 31%, rgba(97,222,203,0.13) 31.1% 31.3%, transparent 31.4% 36%, rgba(97,222,203,0.13) 36.1% 36.3%, transparent 36.4%)"}
+           :style {:background-color "#061b20"
+                   :background-image "radial-gradient(120% 80% at 15% -10%, rgba(0, 148, 111, 0.24), rgba(6, 30, 34, 0.04) 55%, transparent 70%), radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.10), transparent 35%), radial-gradient(circle at 85% 100%, rgba(0, 212, 170, 0.08), transparent 40%)"
+                   :background-repeat "no-repeat"}
            :data-parity-id "subaccounts-root"}
      [:div {:class ["mx-auto" "flex" "w-full" "max-w-[82rem]" "flex-col" "gap-5"]}
       [:section {:class ["flex" "flex-col" "gap-4" "md:flex-row" "md:items-center" "md:justify-between"]}

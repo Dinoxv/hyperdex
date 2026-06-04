@@ -58,8 +58,12 @@
         other-row (hiccup/find-by-data-role view-node (str "subaccounts-row-" other-subaccount-address))
         select-master (hiccup/find-by-data-role view-node "subaccounts-select-master")
         select-other (hiccup/find-by-data-role view-node (str "subaccounts-select-" other-subaccount-address))
+        root-style (get-in root [1 :style])
         strings (set (hiccup/collect-strings view-node))]
     (is (some? root))
+    (is (= "#061b20" (:background-color root-style)))
+    (is (re-find #"radial-gradient\(120% 80% at 15% -10%" (:background-image root-style)))
+    (is (not (re-find #"88% 112%" (:background-image root-style))))
     (is (contains? strings "Sub-Accounts"))
     (is (contains? strings "Master Account"))
     (is (contains? strings "Perps Account Equity"))
