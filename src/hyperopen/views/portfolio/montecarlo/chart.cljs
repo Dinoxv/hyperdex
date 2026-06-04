@@ -8,7 +8,8 @@
   All animation state (a `requestAnimationFrame` reveal sweep) is kept local to
   the renderer in a per-element holder atom, never in app state, consistent with
   the project's rule that live objects and timers stay out of core state."
-  (:require [hyperopen.portfolio.montecarlo.engine :as engine]))
+  (:require [hyperopen.portfolio.montecarlo.engine :as engine]
+            [hyperopen.views.portfolio.montecarlo.format :as fmt]))
 
 (def ^:private palette
   {:accent "#00d4aa"
@@ -211,7 +212,11 @@
             (set! (.-fillStyle ctx) col)
             (.beginPath ctx)
             (.arc ctx ex y r 0 (* 2 js/Math.PI))
-            (.fill ctx)))))))
+            (.fill ctx)))))
+    ;; Return the pixel↔value geometry so the render hook can stash it for the
+    ;; hover tooltip; the band/times themselves are read back from the holder's
+    ;; spec, only this mapping is per-draw.
+    {:pad-l pad-l :plot-w plot-w :horizon H :start start :span-years span-years}))
 
 ;; ---------------------------------------------------------------------------
 ;; Distribution histogram
@@ -284,6 +289,54 @@
     (.stroke ctx)))
 
 ;; ---------------------------------------------------------------------------
+;; Hover tooltip for the spaghetti chart
+;; ---------------------------------------------------------------------------
+
+(defn- nearest-grid-index
+  "Index of the grid point whose day value is closest to `day`."
+  [times day]
+  (let [n (count times)]
+    (loop [i 1 best 0]
+      (if (< i n)
+        (recur (inc i)
+               (if (< (js/Math.abs (- (nth times i) day))
+                      (js/Math.abs (- (nth times best) day)))
+                 i best))
+        best))))
+
+(defn- tip-row
+  [label value color]
+  (str "<div class=\"mc-tip-row\"><span class=\"mc-tip-key\">" label "</span>"
+       "<span" (if color (str " style=\"color:" color "\"") "") ">" value "</span></div>"))
+
+(defn- show-spaghetti-tip!
+  "Populate and position the tooltip from the pointer event, reading pixel
+  geometry off the canvas and the percentile band off the holder's spec."
+  [canvas tip holder e]
+  (let [{:keys [geo spec]} @holder
+        {:keys [pad-l plot-w horizon start span-years]} geo
+        result (:result spec)
+        times (:times result)
+        band (:band result)]
+    (when (and geo result (seq times) (seq (:p50 band)))
+      (let [rect (.getBoundingClientRect canvas)
+            x (- (.-clientX e) (.-left rect))
+            frac (max 0 (min 1 (/ (- x pad-l) plot-w)))
+            day (js/Math.round (* frac horizon))
+            gi (nearest-grid-index times day)
+            ret (fn [v] (fmt/signed-pct (- (/ v start) 1) 1))
+            elapsed (if (pos? horizon) (* span-years (/ (nth times gi) horizon)) 0)]
+        (set! (.-innerHTML tip)
+              (str (tip-row "Time" (axis-time-label elapsed) nil)
+                   (tip-row "P95" (ret (nth (:p95 band) gi)) "var(--mc-accent)")
+                   (tip-row "Median" (ret (nth (:p50 band) gi)) nil)
+                   (tip-row "P5" (ret (nth (:p5 band) gi)) "var(--mc-red)")))
+        (set! (.. tip -style -left)
+              (str (min (- (.-innerWidth js/window) 150) (+ (.-clientX e) 16)) "px"))
+        (set! (.. tip -style -top) (str (- (.-clientY e) 10) "px"))
+        (.add (.-classList tip) "show")))))
+
+;; ---------------------------------------------------------------------------
 ;; Replicant lifecycle wiring
 ;; ---------------------------------------------------------------------------
 
@@ -296,8 +349,9 @@
         spec (:spec @holder)]
     (letfn [(tick [now]
               (let [p (min 1 (/ (- now t0) dur))
-                    eased (- 1 (js/Math.pow (- 1 p) 3))]
-                (draw-fn canvas (assoc spec :progress eased))
+                    eased (- 1 (js/Math.pow (- 1 p) 3))
+                    geo (draw-fn canvas (assoc spec :progress eased))]
+                (swap! holder assoc :geo geo)
                 (if (< p 1)
                   (swap! holder assoc :raf (js/requestAnimationFrame tick))
                   (swap! holder assoc :raf nil))))]
@@ -305,7 +359,7 @@
 
 (defn- draw-final!
   [canvas draw-fn holder]
-  (draw-fn canvas (assoc (:spec @holder) :progress 1)))
+  (swap! holder assoc :geo (draw-fn canvas (assoc (:spec @holder) :progress 1))))
 
 (defn- render-hook
   "Build a `:replicant/on-render` handler that owns a `<canvas>` child of the
@@ -318,15 +372,24 @@
       :replicant.life-cycle/mount
       (let [canvas (.createElement js/document "canvas")
             holder (atom {:spec spec})
-            on-resize (fn [] (draw-final! canvas draw-fn holder))]
+            on-resize (fn [] (draw-final! canvas draw-fn holder))
+            tip (when (:hover-tooltip? spec) (.createElement js/document "div"))
+            on-move (when tip #(show-spaghetti-tip! canvas tip holder %))
+            on-leave (when tip (fn [_] (.remove (.-classList tip) "show")))]
         (set! (.. canvas -style -display) "block")
         (set! (.. canvas -style -width) "100%")
         (.appendChild node canvas)
         (.addEventListener js/window "resize" on-resize)
+        (when tip
+          (set! (.-className tip) "mc-tip")
+          (.appendChild node tip)
+          (.addEventListener canvas "mousemove" on-move)
+          (.addEventListener canvas "mouseleave" on-leave))
         (if (:animate? spec)
           (start-animation! canvas draw-fn holder)
           (draw-final! canvas draw-fn holder))
-        (remember {:canvas canvas :holder holder :on-resize on-resize}))
+        (remember {:canvas canvas :holder holder :on-resize on-resize
+                   :tip tip :on-move on-move :on-leave on-leave}))
 
       :replicant.life-cycle/update
       (let [{:keys [canvas holder]} memory]
@@ -340,18 +403,23 @@
         (remember memory))
 
       :replicant.life-cycle/unmount
-      (let [{:keys [holder on-resize]} memory]
+      (let [{:keys [canvas holder on-resize tip on-move on-leave]} memory]
         (when (and holder (:raf @holder))
           (js/cancelAnimationFrame (:raf @holder)))
         (when on-resize
-          (.removeEventListener js/window "resize" on-resize)))
+          (.removeEventListener js/window "resize" on-resize))
+        (when (and canvas on-move)
+          (.removeEventListener canvas "mousemove" on-move)
+          (.removeEventListener canvas "mouseleave" on-leave))
+        (when (and tip (.-parentNode tip))
+          (.removeChild (.-parentNode tip) tip)))
 
       nil)))
 
 (defn spaghetti-on-render
   "`:replicant/on-render` handler for the equity-paths chart."
   [spec]
-  (render-hook draw-spaghetti! (assoc spec :animate? true)))
+  (render-hook draw-spaghetti! (assoc spec :animate? true :hover-tooltip? true)))
 
 (defn histogram-on-render
   "`:replicant/on-render` handler for a distribution histogram."
