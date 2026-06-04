@@ -75,7 +75,7 @@
          market-max-leverage
          outcome-market?
          cross-margin-allowed?
-         active-clearinghouse-state-for-market)
+         active-clearinghouse-state-for-market resolved-active-market)
 
 (defn order-form-ui-overrides-from-form
   "Extract UI-owned order-form fields from a normalized working form."
@@ -178,7 +178,7 @@
 (defn market-info
   "Return normalized market info required by order-form selectors."
   [state]
-  (let [market (or (:active-market state) {})
+  (let [market (or (resolved-active-market state) {})
         identity (market-identity state)]
     (assoc identity
            :sz-decimals (or (:szDecimals market) 4)
@@ -191,18 +191,18 @@
 
 (defn market-identity [state]
   (trading-domain/market-identity {:active-asset (:active-asset state)
-                                   :market (:active-market state)}))
+                                   :market (resolved-active-market state)}))
 
 (defn cross-margin-allowed?
   [state]
-  (trading-submit-policy/cross-margin-allowed? (:active-market state)))
+  (trading-submit-policy/cross-margin-allowed? (resolved-active-market state)))
 
 (defn effective-margin-mode
   [state mode]
-  (trading-submit-policy/effective-margin-mode (:active-market state) mode))
+  (trading-submit-policy/effective-margin-mode (resolved-active-market state) mode))
 
 (defn- active-clearinghouse-state [state]
-  (active-clearinghouse-state-for-market state (:active-market state)))
+  (active-clearinghouse-state-for-market state (resolved-active-market state)))
 
 (defn- parse-int-value
   [value]
@@ -264,7 +264,7 @@
 
 (defn- resolve-trading-asset-idx
   [state]
-  (let [active-market (or (:active-market state) {})
+  (let [active-market (or (resolved-active-market state) {})
         active-asset (:active-asset state)
         market-idx (market-asset-id active-market)
         named-dex? (named-dex-market? active-market)]
@@ -313,7 +313,7 @@
   ([state fee-context]
    (trading-context state fee-context nil))
   ([state fee-context form]
-   (let [active-market (or (:active-market state) {})
+   (let [active-market (or (resolved-active-market state) {})
          outcome-side (when (outcome-market? active-market)
                         (selected-outcome-side active-market form))
          active-asset (or (:coin outcome-side)

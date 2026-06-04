@@ -50,6 +50,45 @@
           (is (= expected
                  (contracts/assert-order-request! request {:vector id}))))))))
 
+(deftest market-order-request-resolves-stale-active-market-from-selector-cache-test
+  (let [btc-market {:key "perp:BTC"
+                    :coin "BTC"
+                    :symbol "BTC-USDC"
+                    :market-type :perp
+                    :asset-id 0
+                    :mark 64000
+                    :maxLeverage 50
+                    :szDecimals 4}
+        state {:active-asset "BTC"
+               :active-market {:key "perp:ETH"
+                               :coin "ETH"
+                               :symbol "ETH-USDC"
+                               :market-type :perp
+                               :asset-id 1
+                               :mark 1775
+                               :maxLeverage 25
+                               :szDecimals 4}
+               :asset-selector {:market-by-key {"perp:BTC" btc-market}}
+               :orderbooks {"BTC" {:bids [{:px "63999" :sz "1"}]
+                                   :asks [{:px "64000" :sz "1"}]}}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                               :totalMarginUsed "0"}
+                                               :assetPositions []}}}
+        form (assoc (trading/default-order-form)
+                    :type :market
+                    :side :buy
+                    :size "0.0021"
+                    :slippage "0"
+                    :ui-leverage 20
+                    :margin-mode :cross)
+        prepared (trading/prepare-order-form-for-submit state form)
+        request (trading/build-order-request state (:form prepared))]
+    (is (false? (:market-price-missing? prepared)))
+    (is (= "64000" (get-in prepared [:form :price])))
+    (is (= "Ioc" (get-in request [:action :orders 0 :t :limit :tif])))
+    (is (= 0 (get-in request [:action :orders 0 :a])))
+    (is (= 0 (get-in request [:pre-actions 0 :asset])))))
+
 (deftest build-order-request-preserves-pre-action-key-order-for-signing-test
   (let [state (state-from-command-context standard-vectors/btc-perp-context)
         form {:type :limit
