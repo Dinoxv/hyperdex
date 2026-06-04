@@ -100,7 +100,7 @@
                         :action [[:actions/select-master-account]]})
          :options options}))))
 
-(defn- option-row
+(defn option-row
   [{:keys [action address-label copy-action copy-data-role copy-label data-role kind label name-label selected? value]}]
   ^{:key (str "header-account-target:" value)}
   [:div {:class ["flex"
@@ -159,7 +159,7 @@
              :on {:click copy-action}}
     (icons/wallet-copy-icon)]])
 
-(defn- disconnect-row
+(defn disconnect-row
   [{:keys [action label]}]
   [:button {:type "button"
             :data-role "header-account-target-disconnect"
@@ -178,6 +178,15 @@
                     "focus-visible:bg-white/[0.05]"]
             :on {:click action}}
    label])
+
+(defn render-menu-content
+  [{:keys [disconnect options]}]
+  (when (seq options)
+    (concat
+     (map option-row options)
+     (when disconnect
+       [[:div {:class ["border-t" "border-white/10"]}
+         (disconnect-row disconnect)]]))))
 
 (defn render
   [{:keys [disconnect options trigger-address-label trigger-label] :as selector}]
@@ -225,7 +234,5 @@
                     "shadow-2xl"]
             :data-ui-native-details-panel "true"
             :data-role "header-account-target-menu"}
-      (map option-row options)
-      (when disconnect
-        [:div {:class ["border-t" "border-white/10"]}
-         (disconnect-row disconnect)])]]))
+      (render-menu-content {:disconnect disconnect
+                            :options options})]]))

@@ -139,6 +139,33 @@
     (is (= "201.39 USDC"
            (metric-value-text view-node "Available to Trade")))))
 
+(deftest available-to-trade-uses-selected-subaccount-inline-spot-state-test
+  (let [owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        subaccount-row {:name "Desk"
+                        :master owner-address
+                        :sub-account-user subaccount-address
+                        :spot-state {:balances [{:coin "USDC"
+                                                 :total "15"
+                                                 :hold "0"}]}
+                        :clearinghouse-state {:marginSummary {:accountValue "15"
+                                                              :totalMarginUsed "0"}
+                                             :assetPositions []}}
+        state (-> (base-state {:type :limit :size "0.001" :price "100"})
+                  (assoc :account {:mode :unified})
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC"
+                              :total "0"
+                              :hold "0"}])
+                  (assoc :wallet {:address owner-address})
+                  (assoc :account-context
+                         {:subaccounts
+                          {:selected-address subaccount-address
+                           :rows [subaccount-row]}}))
+        view-node (view/order-form-view state)]
+    (is (= "15.00 USDC"
+           (metric-value-text view-node "Available to Trade")))))
+
 (deftest submit-button-is-disabled-until-required-limit-fields-are-present-test
   (let [disabled-view (view/order-form-view (base-state {:type :limit :size "" :price ""}))
         enabled-view (view/order-form-view (base-state {:type :limit :size "1" :price "100"}))

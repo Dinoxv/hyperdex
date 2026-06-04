@@ -66,8 +66,8 @@
 (deftest header-renders-account-target-menu-with-existing-selection-actions-test
   (let [view (header-view/header-view (state :selected subaccount-address))
         details (hiccup/find-by-data-role view "header-account-target-details")
-        trigger (hiccup/find-by-data-role view "header-account-target-trigger")
-        menu (hiccup/find-by-data-role view "header-account-target-menu")
+        trigger (hiccup/find-by-data-role view "wallet-menu-trigger")
+        menu (hiccup/find-by-data-role view "wallet-menu-panel")
         master-option (hiccup/find-by-data-role
                        view
                        "header-account-target-option-master")
@@ -76,9 +76,9 @@
                            (str "header-account-target-option-"
                                 subaccount-address))
         strings (set (hiccup/collect-strings view))]
-    (is (some? details))
+    (is (nil? details))
     (is (some? trigger))
-    (is (= "Account target" (get-in trigger [1 :aria-label])))
+    (is (= "Connected account" (get-in trigger [1 :aria-label])))
     (is (some? menu))
     (is (contains? strings "Master"))
     (is (contains? strings "Desk"))
@@ -91,6 +91,24 @@
            (get-in subaccount-option [1 :on :click])))
     (is (= "true" (get-in subaccount-option [1 :aria-current])))))
 
+(deftest connected-header-uses-single-wallet-dropdown-for-account-selection-test
+  (let [view (header-view/header-view (state :selected subaccount-address))
+        wallet-details (hiccup/find-by-data-role view "wallet-menu-details")
+        wallet-trigger (hiccup/find-by-data-role view "wallet-menu-trigger")
+        account-details (hiccup/find-by-data-role view "header-account-target-details")
+        wallet-menu (hiccup/find-by-data-role view "wallet-menu-panel")
+        wallet-copy (hiccup/find-by-data-role view "wallet-menu-copy")
+        wallet-disconnect (hiccup/find-by-data-role view "wallet-menu-disconnect")
+        strings (set (hiccup/collect-strings wallet-trigger))]
+    (is (some? wallet-details))
+    (is (some? wallet-trigger))
+    (is (nil? account-details))
+    (is (some? wallet-menu))
+    (is (contains? strings "Sub: Desk"))
+    (is (not (contains? strings (wallet/short-addr subaccount-address))))
+    (is (some? wallet-copy))
+    (is (some? wallet-disconnect))))
+
 (deftest header-renders-account-target-copy-buttons-and-disconnect-test
   (let [view (header-view/header-view (state :selected subaccount-address))
         master-copy (hiccup/find-by-data-role
@@ -99,9 +117,12 @@
         subaccount-copy (hiccup/find-by-data-role
                          view
                          (str "header-account-target-copy-" subaccount-address))
-        disconnect (hiccup/find-by-data-role
-                    view
-                    "header-account-target-disconnect")]
+        account-target-disconnect (hiccup/find-by-data-role
+                                   view
+                                   "header-account-target-disconnect")
+        wallet-disconnect (hiccup/find-by-data-role
+                           view
+                           "wallet-menu-disconnect")]
     (is (some? master-copy))
     (is (= "Copy master account address"
            (get-in master-copy [1 :aria-label])))
@@ -112,6 +133,7 @@
            (get-in subaccount-copy [1 :aria-label])))
     (is (= [[:actions/copy-subaccount-address subaccount-address]]
            (get-in subaccount-copy [1 :on :click])))
-    (is (some? disconnect))
-    (is (= [[:actions/select-master-account]]
-           (get-in disconnect [1 :on :click])))))
+    (is (nil? account-target-disconnect))
+    (is (some? wallet-disconnect))
+    (is (= [[:actions/disconnect-wallet]]
+           (get-in wallet-disconnect [1 :on :click])))))

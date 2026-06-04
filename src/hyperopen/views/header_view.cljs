@@ -1,6 +1,5 @@
 (ns hyperopen.views.header-view
-  (:require [hyperopen.views.header.account-selector :as account-selector]
-            [hyperopen.views.header.navigation :as navigation]
+  (:require [hyperopen.views.header.navigation :as navigation]
             [hyperopen.views.header.settings :as settings]
             [hyperopen.views.header.spectate :as spectate]
             [hyperopen.views.header.vm :as vm]
@@ -62,8 +61,7 @@
                :data-parity-id "header-wallet-control"}
          [:div {:class ["inline-flex" "md:hidden" "lg:inline-flex"]}
           (spectate/render-trigger spectate)]
-         (account-selector/render account-selector)
-         (wallet/render wallet)
+         (wallet/render (assoc wallet :account-selector account-selector))
          [:div {:class ["relative" "flex" "items-center" "gap-1.5" "sm:gap-2"]
                 :data-role "header-settings-toolbar"}
           (settings/render-trigger settings)

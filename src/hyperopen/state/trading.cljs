@@ -226,9 +226,11 @@
 (defn- unwrap-clearinghouse-state
   [clearinghouse-state]
   (let [state* (or clearinghouse-state {})]
-    (if (map? (:clearinghouseState state*))
-      (:clearinghouseState state*)
-      state*)))
+    (if (map? (:clearinghouseState state*)) (:clearinghouseState state*) state*)))
+(defn- selected-subaccount-row-value
+  [state kebab-key camel-key]
+  (when-let [row (account-context/selected-subaccount-row state)]
+    (or (get row kebab-key) (get row camel-key) (get row (name camel-key)))))
 
 (defn- named-dex-clearinghouse-state
   [state dex]
@@ -326,7 +328,9 @@
       :orderbook (get-in state [:orderbooks active-asset])
       :market market*
       :account (:account state)
-      :spot (:spot state)
+      :spot (if-let [spot-state (selected-subaccount-row-value state :spot-state :spotState)]
+              {:clearinghouse-state spot-state}
+              (:spot state))
       :clearinghouse (or (active-clearinghouse-state state) {})})))
 
 (defn market-max-leverage [state]
@@ -362,7 +366,8 @@
     (unwrap-clearinghouse-state
      (if (seq dex)
        (named-dex-clearinghouse-state state dex)
-       (get-in state [:webdata2 :clearinghouseState])))))
+       (or (selected-subaccount-row-value state :clearinghouse-state :clearinghouseState)
+           (get-in state [:webdata2 :clearinghouseState]))))))
 
 (defn position-for-market
   [state active-asset market]

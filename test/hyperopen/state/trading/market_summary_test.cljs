@@ -108,6 +108,52 @@
       (is (= default-fee-quote (:fees summary)))
       (is (= trading/default-max-slippage-pct (:slippage-max summary))))))
 
+(deftest order-summary-uses-selected-subaccount-inline-spot-state-for-unified-availability-test
+  (let [owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        subaccount-row {:name "Desk"
+                        :master owner-address
+                        :sub-account-user subaccount-address
+                        :spot-state {:balances [{:coin "USDC"
+                                                 :total "15"
+                                                 :hold "0"}]}
+                        :clearinghouse-state {:marginSummary {:accountValue "15"
+                                                              :totalMarginUsed "0"}
+                                             :assetPositions []}}
+        state (-> base-state
+                  (assoc :account {:mode :unified})
+                  (assoc-in [:spot :clearinghouse-state :balances]
+                            [{:coin "USDC" :total "0" :hold "0"}])
+                  (assoc-in [:webdata2 :clearinghouseState :withdrawable] "0.03")
+                  (assoc :wallet {:address owner-address})
+                  (assoc :account-context
+                         {:subaccounts
+                          {:selected-address subaccount-address
+                           :rows [subaccount-row]}}))
+        summary (trading/order-summary state (trading/default-order-form))]
+    (is (= 15 (:available-to-trade summary)))))
+
+(deftest order-summary-uses-selected-subaccount-inline-clearinghouse-fallback-test
+  (let [owner-address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        subaccount-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        subaccount-row {:name "Desk"
+                        :master owner-address
+                        :sub-account-user subaccount-address
+                        :clearinghouse-state {:marginSummary {:accountValue "20"
+                                                              :totalMarginUsed "5"}
+                                             :assetPositions []}}
+        state (-> base-state
+                  (assoc :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                                         :totalMarginUsed "950"}
+                                                        :assetPositions []}})
+                  (assoc :wallet {:address owner-address})
+                  (assoc :account-context
+                         {:subaccounts
+                          {:selected-address subaccount-address
+                           :rows [subaccount-row]}}))
+        summary (trading/order-summary state (trading/default-order-form))]
+    (is (= 15 (:available-to-trade summary)))))
+
 (deftest order-summary-computes-perp-fees-from-user-fees-test
   (let [state (-> base-state
                   (assoc :portfolio {:user-fees {:userCrossRate 0.00045

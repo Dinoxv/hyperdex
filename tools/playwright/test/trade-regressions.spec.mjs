@@ -744,7 +744,7 @@ async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress, sel
       nextState = c.assoc_in(
         nextState,
         kwPath("account-context", "subaccounts", "status"),
-        keyword("success")
+        keyword("loaded")
       );
       nextState = c.assoc_in(
         nextState,
@@ -755,6 +755,11 @@ async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress, sel
         nextState,
         kwPath("account-context", "subaccounts", "selected-address"),
         nextSelectedAddress ? String(nextSelectedAddress).toLowerCase() : null
+      );
+      nextState = c.assoc_in(
+        nextState,
+        kwPath("account-context", "subaccounts", "selection-loaded?"),
+        true
       );
       c.reset_BANG_(store, nextState);
 
@@ -788,7 +793,7 @@ async function selectHeaderAccountTarget(page, optionDataRole) {
   const option = page.locator(`[data-role="${optionDataRole}"]`);
 
   if (!(await option.isVisible())) {
-    await page.locator('[data-role="header-account-target-trigger"]').click();
+    await page.locator('[data-role="wallet-menu-trigger"]').click();
     await expect(option).toBeVisible();
   }
 
@@ -796,16 +801,16 @@ async function selectHeaderAccountTarget(page, optionDataRole) {
 }
 
 async function closeHeaderAccountTarget(page) {
-  await page.locator('[data-role="header-account-target-details"]').evaluate((node) => {
+  await page.locator('[data-role="wallet-menu-details"]').evaluate((node) => {
     node.open = false;
   });
 }
 
 async function openHeaderAccountTarget(page) {
-  await page.locator('[data-role="header-account-target-details"]').evaluate((node) => {
+  await page.locator('[data-role="wallet-menu-details"]').evaluate((node) => {
     node.open = true;
   });
-  await expect(page.locator('[data-role="header-account-target-menu"]')).toBeVisible();
+  await expect(page.locator('[data-role="wallet-menu-panel"]')).toBeVisible();
 }
 
 async function headerSubaccountGeometry(page) {
@@ -829,8 +834,8 @@ async function headerSubaccountGeometry(page) {
     return {
       viewportWidth,
       banner: readRect("header-subaccount-active-banner"),
-      trigger: readRect("header-account-target-trigger"),
-      menu: readRect("header-account-target-menu")
+      trigger: readRect("wallet-menu-trigger"),
+      menu: readRect("wallet-menu-panel")
     };
   });
 }
@@ -2629,6 +2634,7 @@ test("header subaccount state stays visible across review widths @regression", a
   await visitRoute(page, "/trade");
   await freezeAccountSurfaceSync(page, ownerAddress);
   await seedReadyTradingSession(page, { walletAddress: ownerAddress });
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
   await seedOwnedSubaccounts(page, {
     ownerAddress,
     subaccountAddress,
@@ -2637,7 +2643,7 @@ test("header subaccount state stays visible across review widths @regression", a
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
   const banner = page.locator('[data-role="header-subaccount-active-banner"]');
-  const trigger = page.locator('[data-role="header-account-target-trigger"]');
+  const trigger = page.locator('[data-role="wallet-menu-trigger"]');
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
@@ -2651,24 +2657,21 @@ test("header subaccount state stays visible across review widths @regression", a
     expect(closedGeometry.banner.right).toBeLessThanOrEqual(viewport.width + 1);
     expect(closedGeometry.banner.height).toBeGreaterThanOrEqual(28);
 
-    if (viewport.width >= 768) {
-      await expect(trigger).toBeVisible();
-      await expect(trigger).toContainText("Sub: Desk");
-      await trigger.click();
-      await expect(page.locator('[data-role="header-account-target-menu"]')).toBeVisible();
-      await expect(page.locator('[data-role="header-account-target-copy-master"]')).toBeVisible();
-      await expect(
-        page.locator(`[data-role="header-account-target-copy-${subaccountAddress}"]`)
-      ).toBeVisible();
-      await expect(page.locator('[data-role="header-account-target-disconnect"]')).toBeVisible();
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText("Sub: Desk");
+    await trigger.click();
+    await expect(page.locator('[data-role="wallet-menu-panel"]')).toBeVisible();
+    await expect(page.locator('[data-role="header-account-target-copy-master"]')).toBeVisible();
+    await expect(
+      page.locator(`[data-role="header-account-target-copy-${subaccountAddress}"]`)
+    ).toBeVisible();
+    await expect(page.locator('[data-role="wallet-menu-disconnect"]')).toBeVisible();
+    await expect(page.locator('[data-role="header-account-target-details"]')).toHaveCount(0);
 
-      const openGeometry = await headerSubaccountGeometry(page);
-      expect(openGeometry.trigger.right).toBeLessThanOrEqual(viewport.width + 1);
-      expect(openGeometry.menu.right).toBeLessThanOrEqual(viewport.width + 1);
-      await closeHeaderAccountTarget(page);
-    } else {
-      await expect(trigger).toBeHidden();
-    }
+    const openGeometry = await headerSubaccountGeometry(page);
+    expect(openGeometry.trigger.right).toBeLessThanOrEqual(viewport.width + 1);
+    expect(openGeometry.menu.right).toBeLessThanOrEqual(viewport.width + 1);
+    await closeHeaderAccountTarget(page);
   }
 });
 
@@ -2716,13 +2719,14 @@ test("header account selector routes subaccount order payloads through vaultAddr
     walletAddress: ownerAddress,
     privateKey: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   });
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
   await seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress });
   await setTradingConfirmations(page, { openOrders: false });
   await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
 
-  const trigger = page.locator('[data-role="header-account-target-trigger"]');
+  const trigger = page.locator('[data-role="wallet-menu-trigger"]');
   await expect(trigger).toBeVisible();
-  await expect(trigger).toContainText("Master");
+  await expect(trigger).toContainText(/0x1111.+1111/);
   await selectHeaderAccountTarget(
     page,
     `header-account-target-option-${subaccountAddress}`
@@ -2742,7 +2746,7 @@ test("header account selector routes subaccount order payloads through vaultAddr
   await expect(
     subaccountCopy
   ).toBeVisible();
-  await expect(page.locator('[data-role="header-account-target-disconnect"]')).toBeVisible();
+  await expect(page.locator('[data-role="wallet-menu-disconnect"]')).toBeVisible();
   await masterCopy.click();
   await subaccountCopy.click();
   await expect
@@ -2777,9 +2781,9 @@ test("header account selector routes subaccount order payloads through vaultAddr
     });
 
   await openHeaderAccountTarget(page);
-  await page.locator('[data-role="header-account-target-disconnect"]').click();
+  await page.locator('[data-role="header-account-target-option-master"]').click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expect(trigger).toContainText("Master");
+  await expect(trigger).toContainText(/0x1111.+1111/);
   await expect(page.locator('[data-role="header-subaccount-active-banner"]')).toHaveCount(0);
 
   const beforeMasterSnapshot = await debugCall(page, "exchangeSimulatorSnapshot");

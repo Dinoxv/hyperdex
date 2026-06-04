@@ -1,5 +1,6 @@
 (ns hyperopen.views.header.wallet
-  (:require [hyperopen.views.header.icons :as icons]))
+  (:require [hyperopen.views.header.account-selector :as account-selector]
+            [hyperopen.views.header.icons :as icons]))
 
 (defn- wallet-copy-feedback-row
   [{:keys [kind message]}]
@@ -61,8 +62,15 @@
            :data-role "wallet-agent-error"}
      message]))
 
+(defn- account-selector-section
+  [selector]
+  (when-let [content (seq (map account-selector/option-row (:options selector)))]
+    [:div {:class ["border-b" "border-white/10"]
+           :data-role "wallet-account-selector-section"}
+     content]))
+
 (defn- wallet-menu
-  [{:keys [agent-error copy-action copy-feedback disconnect-action enable-trading menu-address-label]}]
+  [{:keys [account-selector agent-error copy-action copy-feedback disconnect-action enable-trading menu-address-label]}]
   (let [agent-error-row (wallet-agent-error-row agent-error)
         enable-trading-cta (enable-trading-button enable-trading)]
     [:div {:class ["ui-dropdown-panel"
@@ -81,6 +89,7 @@
                    "z-[260]"]
            :data-ui-native-details-panel "true"
            :data-role "wallet-menu-panel"}
+     (account-selector-section account-selector)
      [:button {:type "button"
                :class ["flex"
                        "w-full"
@@ -127,33 +136,38 @@
       "Disconnect"]]))
 
 (defn- wallet-trigger
-  [{:keys [trigger-label]}]
-  [:summary {:class ["relative"
-                     "z-[170]"
-                     "inline-flex"
-                     "h-9"
-                     "sm:h-10"
-                     "items-center"
-                     "gap-2"
-                     "rounded-xl"
-                     "border"
-                     "border-base-300"
-                     "bg-base-100"
-                     "px-2.5"
-                     "sm:px-3"
-                     "text-xs"
-                     "sm:text-sm"
-                     "text-white"
-                     "transition-colors"
-                     "hover:bg-base-200"
-                     "list-none"
-                     "cursor-pointer"]
-             :data-role "wallet-menu-trigger"
-             :aria-haspopup "menu"}
-   [:span {:class ["num"]} trigger-label]
-   (icons/chevron-down-icon
-    {:class ["h-4" "w-4" "text-gray-300" "transition-transform" "group-open:rotate-180"]
-     :data-role "wallet-menu-chevron"})])
+  [{:keys [account-selector trigger-label]}]
+  (let [active-subaccount (:active-subaccount account-selector)
+        label (if active-subaccount
+                (:trigger-label account-selector)
+                trigger-label)]
+    [:summary {:class ["relative"
+                       "z-[170]"
+                       "inline-flex"
+                       "h-9"
+                       "sm:h-10"
+                       "items-center"
+                       "gap-2"
+                       "rounded-xl"
+                       "border"
+                       "border-base-300"
+                       "bg-base-100"
+                       "px-2.5"
+                       "sm:px-3"
+                       "text-xs"
+                       "sm:text-sm"
+                       "text-white"
+                       "transition-colors"
+                       "hover:bg-base-200"
+                       "list-none"
+                       "cursor-pointer"]
+               :data-role "wallet-menu-trigger"
+               :aria-haspopup "menu"
+               :aria-label "Connected account"}
+     [:span {:class [(if active-subaccount "font-medium" "num")]} label]
+     (icons/chevron-down-icon
+      {:class ["h-4" "w-4" "text-gray-300" "transition-transform" "group-open:rotate-180"]
+       :data-role "wallet-menu-chevron"})]))
 
 (defn- connect-wallet-button
   [{:keys [connect-action connecting?]}]
