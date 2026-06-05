@@ -30,7 +30,7 @@
         shuffle? (= (get-in result [:meta :method]) :shuffle)
         title (if shuffle?
                 (str "Reshuffled  paths · over ~" (fmt/years-label span-years))
-                (str "Simulated equity paths · ~" (fmt/years-label span-years) " forecast"))]
+                (str "Simulated paths · ~" (fmt/years-label span-years) " forecast"))]
     [:div {:class ["mc-card" "mc-chart-card"]}
      [:div {:class ["mc-chart-head"]}
       [:h3 {:class ["mc-chart-title"]} title]
