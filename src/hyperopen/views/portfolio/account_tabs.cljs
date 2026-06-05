@@ -28,6 +28,7 @@
 
 (def ^:private portfolio-account-tab-order
   [:performance-metrics
+   :monte-carlo
    :balances
    :positions
    :open-orders
@@ -36,8 +37,7 @@
    :trade-history
    :order-history
    :twap
-   :outcomes
-   :monte-carlo])
+   :outcomes])
 
 (def ^:private portfolio-account-tab-label-overrides
   {:funding-history "Interest"})
