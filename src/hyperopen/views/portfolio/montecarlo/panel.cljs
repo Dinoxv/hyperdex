@@ -59,17 +59,14 @@
     (if shuffle?
       [:div {:class ["mc-foot"]}
        [:b "Method. "]
-       (str "Each path reorders " (:history-owner chrome) " " sample-size
+       (str "Each path reorders " (:history-owner chrome)
             " realized return intervals (spanning ~" (fmt/years-label total-years)
-            ") into a fresh random sequence (QuantStats' shuffle). Sharpe, volatility and CAGR are "
-            "annualized by each interval's real elapsed time — the same way the Performance Metrics "
+            ") into a fresh random sequence. Sharpe, volatility and CAGR are "
+            "annualized by each interval's real elapsed time the same way the Performance Metrics "
             "tab computes them, so they match the tearsheet rather than assuming one point per day. "
             "The same returns reordered give the same product, so total return and CAGR are identical "
-            "on every path (the CAGR card is a single spike); Sharpe varies only marginally (QuantStats "
-            "drops the first interval); max drawdown is the one quantity that genuinely depends on the "
-            "order. ")
-       [:b "Bust "]
-       (str "counts orderings whose worst peak-to-trough drawdown breaches " bust "%. ")
+            "on every path. ")
+       (str "Bust counts orderings whose worst peak-to-trough drawdown breaches " bust "%. ")
        "Sequence-risk view, not a forward prediction."]
       [:div {:class ["mc-foot"]}
        [:b "Method. "]
