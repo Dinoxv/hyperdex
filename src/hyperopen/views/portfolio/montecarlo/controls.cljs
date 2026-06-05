@@ -21,6 +21,10 @@
   [m]
   (if (< m 12) (str m "M") (str (/ m 12) "Y")))
 
+(defn- observed-horizon-months
+  [yrs]
+  (max 0 (js/Math.round (* (or yrs 0) 12))))
+
 (defn- segmented
   [{:keys [control value options fmt set-action data-role-prefix disabled?]}]
   [:div {:class ["mc-seg"]
@@ -71,6 +75,7 @@
         base {:set-action set-control-action :data-role-prefix data-role-prefix}
         shuffle? (= method :shuffle)
         yrs (or total-years 0)
+        observed-months (observed-horizon-months yrs)
         target-years (min (/ horizon 12) yrs)]
     [:div {:class ["mc-card" "mc-controls"]
            :data-role (str data-role-prefix "-controls")}
@@ -90,8 +95,9 @@
                                       :value horizon
                                       :options horizon-options
                                       :fmt months-label
-                                      ;; can't forecast more calendar time than observed
-                                      :disabled? (fn [m] (> (/ m 12) yrs))}))))
+                                      ;; Compare at month granularity so near-year
+                                      ;; histories do not lock out the 1Y option.
+                                      :disabled? (fn [m] (> m observed-months))}))))
      (field "Bust threshold (drawdown)"
             (stepper (merge base {:control :bust :value bust :suffix "%" :step 5})))
      (field "Goal (total return)"

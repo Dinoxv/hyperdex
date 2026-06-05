@@ -416,6 +416,84 @@ async function seedPortfolioLedgerRows(page, rows) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function stubPortfolioSummaryInfo(page, summaryByRange) {
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "portfolio") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: summaryByRange })
+          });
+          return;
+        }
+        if (payload?.type === "userFees") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ dailyUserVlm: [] })
+          });
+          return;
+        }
+      } catch {
+        // Let non-JSON info requests follow the normal route.
+      }
+    }
+    await route.continue();
+  });
+}
+
+async function seedNearYearMonteCarloForecast(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const row = (timeMs, value) => c.PersistentVector.fromArray([timeMs, value], true);
+    const startMs = Date.UTC(2025, 0, 1);
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const accountRows = [];
+    const pnlRows = [];
+    for (let idx = 0; idx < 53; idx += 1) {
+      const timeMs = startMs + idx * weekMs;
+      accountRows.push(row(timeMs, 10_000 + idx * 20));
+      pnlRows.push(row(timeMs, idx * 10));
+    }
+    const rows = (items) => c.PersistentVector.fromArray(items, true);
+    const summary = c.PersistentArrayMap.fromArray(
+      [
+        kw("accountValueHistory"), rows(accountRows),
+        kw("pnlHistory"), rows(pnlRows)
+      ],
+      true
+    );
+    const summaryByKey = c.PersistentArrayMap.fromArray([kw("all-time"), summary], true);
+    const controls = c.PersistentArrayMap.fromArray(
+      [
+        kw("method"), kw("bootstrap"),
+        kw("sims"), 1000,
+        kw("horizon"), 12,
+        kw("bust"), -30,
+        kw("goal"), 50,
+        kw("seed"), 42,
+        kw("run-nonce"), 0
+      ],
+      true
+    );
+    const store = globalThis.hyperopen.system.store;
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path("portfolio", "summary-by-key"), summaryByKey);
+    nextState = c.assoc_in(nextState, path("portfolio-ui", "summary-time-range"), kw("all-time"));
+    nextState = c.assoc_in(nextState, path("portfolio-ui", "account-info-tab"), kw("monte-carlo"));
+    nextState = c.assoc_in(nextState, path("portfolio-ui", "monte-carlo"), controls);
+    c.reset_BANG_(store, nextState);
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedOptimizerAssetSelectorMarkets(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs.core;
@@ -3066,6 +3144,43 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
 
   await expect(page.locator("[data-role='portfolio-actions-row']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-action-deposit']")).toBeVisible();
+});
+
+test("portfolio Monte Carlo forecast horizon can return to one year after six months @regression", async ({ page }) => {
+  await stubPortfolioSummaryInfo(page, {
+    allTime: {
+      accountValueHistory: [],
+      pnlHistory: []
+    }
+  });
+  await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
+
+  for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await seedNearYearMonteCarloForecast(page);
+
+    const horizon = page.locator("[data-role='portfolio-monte-carlo-seg-horizon']");
+    const sixMonths = horizon.getByRole("button", { name: "6M" });
+    const oneYear = horizon.getByRole("button", { name: "1Y" });
+    const twoYears = horizon.getByRole("button", { name: "2Y" });
+
+    await expect(horizon).toBeVisible();
+    await expect(oneYear).toHaveAttribute("aria-pressed", "true");
+    await expect(oneYear).toBeEnabled();
+    await expect(twoYears).toBeDisabled();
+
+    await sixMonths.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(sixMonths).toHaveAttribute("aria-pressed", "true");
+    await expect(oneYear).toBeEnabled();
+
+    await oneYear.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+    await expect(oneYear).toHaveAttribute("aria-pressed", "true");
+    await expect(twoYears).toBeDisabled();
+  }
+
+  await page.unroute("**/info");
 });
 
 test("portfolio positions coin jumps to the trade route market @regression", async ({ page }) => {
