@@ -3,6 +3,10 @@
 (def effect-binding-rows
   [[:effects/api-fetch-predicted-fundings :api-fetch-predicted-fundings]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-funding-comparison-route
+    :actions/load-funding-comparison})
+
 (def action-binding-rows
   [[:actions/load-funding-comparison-route :load-funding-comparison-route]
    [:actions/load-funding-comparison :load-funding-comparison]

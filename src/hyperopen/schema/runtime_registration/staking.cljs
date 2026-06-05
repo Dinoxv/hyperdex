@@ -12,6 +12,14 @@
    [:effects/api-submit-staking-delegate :api-submit-staking-delegate]
    [:effects/api-submit-staking-undelegate :api-submit-staking-undelegate]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-staking-route
+    :actions/load-staking
+    :actions/submit-staking-deposit
+    :actions/submit-staking-withdraw
+    :actions/submit-staking-delegate
+    :actions/submit-staking-undelegate})
+
 (def action-binding-rows
   [[:actions/load-staking-route :load-staking-route]
    [:actions/load-staking :load-staking]

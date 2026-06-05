@@ -11,6 +11,14 @@
    [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]
    [:effects/api-submit-funding-deposit :api-submit-funding-deposit]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/apply-funding-history-filters
+    :actions/view-all-funding-history
+    :actions/submit-funding-send
+    :actions/submit-funding-transfer
+    :actions/submit-funding-withdraw
+    :actions/submit-funding-deposit})
+
 (def action-binding-rows
   [[:actions/set-funding-history-filters :set-funding-history-filters]
    [:actions/toggle-funding-history-filter-open :toggle-funding-history-filter-open]

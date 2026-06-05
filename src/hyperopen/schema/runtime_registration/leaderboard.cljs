@@ -4,6 +4,10 @@
   [[:effects/persist-leaderboard-preferences :persist-leaderboard-preferences]
    [:effects/api-fetch-leaderboard :api-fetch-leaderboard]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-leaderboard-route
+    :actions/load-leaderboard})
+
 (def action-binding-rows
   [[:actions/load-leaderboard-route :load-leaderboard-route]
    [:actions/load-leaderboard :load-leaderboard]

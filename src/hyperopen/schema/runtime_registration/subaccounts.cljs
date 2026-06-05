@@ -6,6 +6,14 @@
    [:effects/api-rename-subaccount :api-rename-subaccount]
    [:effects/api-transfer-subaccount :api-transfer-subaccount]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-subaccounts-route
+    :actions/select-subaccount
+    :actions/select-master-account
+    :actions/submit-create-subaccount
+    :actions/submit-rename-subaccount
+    :actions/submit-transfer-subaccount})
+
 (def action-binding-rows
   [[:actions/load-subaccounts-route :load-subaccounts-route]
    [:actions/select-subaccount :select-subaccount]

@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-order-contract-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.schema.runtime-registration-catalog :as registration-catalog]
             [hyperopen.runtime.effect-order-contract :as contract]))
 
 (deftest assert-action-effect-order-rejects-phase-order-regression-after-heavy-test
@@ -86,3 +87,8 @@
              (:phases summary))))
     (testing "No duplicate heavy effect is involved in this regression"
       (is (empty? (:duplicate-heavy-effect-ids summary))))))
+
+(deftest effect-order-policy-coverage-matches-runtime-registration-metadata-test
+  (is (= (registration-catalog/effect-order-policy-required-action-ids)
+         (contract/covered-action-ids))
+      "Actions marked as requiring effect-order policy in the runtime registration catalog must exactly match effect-order policy coverage."))

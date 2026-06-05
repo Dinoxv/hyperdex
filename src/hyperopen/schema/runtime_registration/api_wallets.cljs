@@ -6,6 +6,10 @@
    [:effects/api-authorize-api-wallet :api-authorize-api-wallet]
    [:effects/api-remove-api-wallet :api-remove-api-wallet]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-api-wallet-route
+    :actions/confirm-api-wallet-modal})
+
 (def action-binding-rows
   [[:actions/load-api-wallet-route :load-api-wallet-route]
    [:actions/set-api-wallet-form-field :set-api-wallet-form-field]

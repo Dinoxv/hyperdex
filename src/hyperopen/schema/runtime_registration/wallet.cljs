@@ -9,6 +9,11 @@
    [:effects/unlock-agent-trading :unlock-agent-trading]
    [:effects/copy-wallet-address :copy-wallet-address]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/navigate-mobile-header-menu
+    :actions/enable-agent-trading
+    :actions/unlock-agent-trading})
+
 (def action-binding-rows
   [[:actions/connect-wallet :connect-wallet-action]
    [:actions/disconnect-wallet :disconnect-wallet-action]

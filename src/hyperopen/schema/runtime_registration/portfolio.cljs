@@ -24,6 +24,17 @@
 	   [:effects/enable-portfolio-optimizer-manual-tracking
 	    :enable-portfolio-optimizer-manual-tracking]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/select-portfolio-summary-time-range
+    :actions/select-portfolio-chart-tab
+    :actions/set-portfolio-returns-benchmark-suggestions-open
+    :actions/select-portfolio-returns-benchmark
+    :actions/add-portfolio-optimizer-universe-instrument
+    :actions/add-portfolio-optimizer-universe-instrument-and-run
+    :actions/set-portfolio-optimizer-universe-from-current
+    :actions/confirm-portfolio-optimizer-scenario-save
+    :actions/auto-recompute-stale-portfolio-optimizer-scenario})
+
 (def action-binding-rows
   [[:actions/toggle-portfolio-summary-scope-dropdown :toggle-portfolio-summary-scope-dropdown]
    [:actions/select-portfolio-summary-scope :select-portfolio-summary-scope]

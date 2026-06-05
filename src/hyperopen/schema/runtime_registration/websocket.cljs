@@ -18,6 +18,9 @@
    [:effects/copy-websocket-diagnostics :copy-websocket-diagnostics]
    [:effects/ws-reset-subscriptions :ws-reset-subscriptions]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/ws-diagnostics-reconnect-now})
+
 (def action-binding-rows
   [[:actions/init-websockets :init-websockets]
    [:actions/subscribe-to-asset :subscribe-to-asset]

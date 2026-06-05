@@ -14,6 +14,16 @@
    [:effects/api-fetch-vault-ledger-updates :api-fetch-vault-ledger-updates]
    [:effects/api-submit-vault-transfer :api-submit-vault-transfer]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/load-vault-route
+    :actions/load-vaults
+    :actions/load-vault-detail
+    :actions/set-vaults-snapshot-range
+    :actions/set-vault-detail-chart-series
+    :actions/set-vault-detail-returns-benchmark-suggestions-open
+    :actions/select-vault-detail-returns-benchmark
+    :actions/submit-vault-transfer})
+
 (def action-binding-rows
   [[:actions/load-vault-route :load-vault-route]
    [:actions/load-vaults :load-vaults]

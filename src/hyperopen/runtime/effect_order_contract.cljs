@@ -1,18 +1,15 @@
-(ns hyperopen.runtime.effect-order-contract)
-
-(declare effect-phase
-         assert-action-effect-order!)
+(ns hyperopen.runtime.effect-order-contract
+  (:require [hyperopen.runtime.effect-order.policy-registration :as policy-registration]))
+(declare effect-phase assert-action-effect-order!)
 
 (def ^:private projection-effect-ids
   #{:effects/save
     :effects/save-many})
-
 (def ^:private persistence-effect-ids
   #{:effects/local-storage-set
     :effects/local-storage-set-json
     :effects/persist-leaderboard-preferences
     :effects/replace-shareable-route-query})
-
 (def ^:private effect-order-policy-by-action-id
   {:actions/select-asset
    {:required-phase-order [:projection :persistence :heavy-io]
@@ -459,17 +456,19 @@
                         :effects/api-load-subaccounts
                         :effects/fetch-asset-selector-markets}}})
 
+(def ^:private validated-effect-order-policy-by-action-id
+  (policy-registration/validate-policy-by-action-id! effect-order-policy-by-action-id))
 (defn action-policy
   [action-id]
-  (get effect-order-policy-by-action-id action-id))
+  (get validated-effect-order-policy-by-action-id action-id))
 
 (defn covered-action-ids
   []
-  (set (keys effect-order-policy-by-action-id)))
+  (set (keys validated-effect-order-policy-by-action-id)))
 
 (defn covered-action?
   [action-id]
-  (contains? effect-order-policy-by-action-id action-id))
+  (contains? validated-effect-order-policy-by-action-id action-id))
 
 (defn effect-order-summary
   [action-id effects]

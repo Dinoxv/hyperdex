@@ -46,6 +46,20 @@
    staking/action-binding-rows
    vaults/action-binding-rows))
 
+(def ^:private effect-order-policy-required-action-ids-data
+  (set
+   (concat websocket/effect-order-policy-required-action-ids
+           wallet/effect-order-policy-required-action-ids
+           portfolio/effect-order-policy-required-action-ids
+           trade/effect-order-policy-required-action-ids
+           funding/effect-order-policy-required-action-ids
+           leaderboard/effect-order-policy-required-action-ids
+           api-wallets/effect-order-policy-required-action-ids
+           subaccounts/effect-order-policy-required-action-ids
+           funding-comparison/effect-order-policy-required-action-ids
+           staking/effect-order-policy-required-action-ids
+           vaults/effect-order-policy-required-action-ids)))
+
 (defn- duplicate-ids
   [rows]
   (->> rows
@@ -70,6 +84,18 @@
 (def ^:private validated-action-binding-rows
   (assert-unique-ids! "action registration catalog" action-binding-rows-data))
 
+(def ^:private validated-effect-order-policy-required-action-ids
+  (let [registered (->> validated-action-binding-rows (map first) set)
+        missing (->> effect-order-policy-required-action-ids-data
+                     (remove registered)
+                     sort
+                     vec)]
+    (when (seq missing)
+      (throw (js/Error.
+              (str "effect-order policy requirement references unregistered actions: "
+                   (pr-str missing)))))
+    effect-order-policy-required-action-ids-data))
+
 (defn effect-binding-rows
   []
   validated-effect-binding-rows)
@@ -89,6 +115,10 @@
   (->> validated-action-binding-rows
        (map first)
        set))
+
+(defn effect-order-policy-required-action-ids
+  []
+  validated-effect-order-policy-required-action-ids)
 
 (defn effect-handler-keys
   []

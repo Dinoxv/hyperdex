@@ -26,6 +26,22 @@
    [:effects/api-submit-position-margin :api-submit-position-margin]
    [:effects/clear-order-feedback-toast-timeout :clear-order-feedback-toast-timeout]])
 
+(def effect-order-policy-required-action-ids
+  #{:actions/select-asset
+    :actions/select-chart-timeframe
+    :actions/request-chart-candle-backfill
+    :actions/select-orderbook-price-aggregation
+    :actions/select-account-info-tab
+    :actions/open-position-reduce-popover
+    :actions/submit-order
+    :actions/submit-position-margin-update
+    :actions/confirm-order-submission
+    :actions/submit-cancel-visible-open-orders-confirmation
+    :actions/cancel-visible-open-orders
+    :actions/cancel-order
+    :actions/cancel-twap
+    :actions/navigate})
+
 (def ^:private pre-order-form-action-binding-rows
   [[:actions/toggle-asset-dropdown :toggle-asset-dropdown]
    [:actions/close-asset-dropdown :close-asset-dropdown]
