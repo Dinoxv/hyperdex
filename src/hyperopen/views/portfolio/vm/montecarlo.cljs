@@ -31,10 +31,10 @@
    :subject "portfolio"
    :history-owner "your"
    :equity-label "Ending equity"
-   :lede (str "Resamples your realized daily returns thousands of times to map the "
+   :lede (str "Resamples your realized returns thousands of times to map the "
               "range of outcomes the same strategy could produce. Preserves your "
-              "return distribution while reshuffling the path — isolating luck from "
-              "skill across drawdowns, Sharpe and terminal value.")})
+              "return distribution while reshuffling the path. Isolating luck from "
+              "skill.")})
 
 (def ^:private scope-labels
   {:all "Perps + Spot + Vaults"
