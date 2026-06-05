@@ -67,3 +67,66 @@
                        [:funding-by-instrument "perp:DOGE" :annualized-carry])))
     (is (= #{:optimizer-history-api-legacy-fallback}
            (set (map :code (:warnings aligned)))))))
+
+(deftest align-api-v2-history-does-not-suppress-hard-api-rejections-with-legacy-data-test
+  (let [universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id "perp:BAD"
+                   :market-type :perp
+                   :coin "BAD"
+                   :optimizer-history/instrument-id "hl:perp:BAD"}]
+        api-v2-history
+        (api-v2/normalize-history-bundle
+         {:universe universe}
+         {:contract_version "optimizer-history-api-v2"
+          :request_id "rid-hard-warning"
+          :dataset_version "dv-hard-warning"
+          :status "partial"
+          :series_by_instrument
+          {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                          :lineage_kind "native"
+                          :series_kind "market_price"
+                          :points [{:time_ms 1000
+                                    :close 100
+                                    :return nil}
+                                   {:time_ms 2000
+                                    :close 110
+                                    :return 0.1}]
+                          :funding {:status "available"
+                                    :annualized_carry 0.01}
+                          :warnings []}
+           "hl:perp:BAD" {:instrument_id "hl:perp:BAD"
+                          :lineage_kind "rejected"
+                          :series_kind "market_price"
+                          :points []
+                          :funding {:status "rejected"}
+                          :warnings [{:code "validation-failed"
+                                      :instrument_id "hl:perp:BAD"}]}}
+          :warnings [{:code "validation-failed"
+                      :instrument_id "hl:perp:BAD"}]})
+        aligned (history-loader/align-history-inputs
+                 {:universe universe
+                  :api-v2-history api-v2-history
+                  :candle-history-by-coin
+                  {"BAD" [{:time 1000 :close "10"}
+                          {:time 2000 :close "12"}]}
+                  :funding-history-by-coin
+                  {"BAD" [{:time-ms 1000
+                           :funding-rate-raw "0.001"}
+                          {:time-ms 2000
+                           :funding-rate-raw "0.003"}]}
+                  :funding-periods-per-year 1000
+                  :min-observations 2})]
+    (is (= ["perp:BTC"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (= ["perp:BAD"]
+           (mapv :instrument-id (:excluded-instruments aligned))))
+    (is (= #{:validation-failed}
+           (set (map :code (:warnings aligned)))))
+    (is (not= :legacy-fallback
+              (get-in aligned
+                      [:funding-by-instrument
+                       "perp:BAD"
+                       :source])))))

@@ -125,6 +125,77 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-history-bundle-does-not-targeted-fallback-hard-api-v2-rejections-test
+  (async done
+    (let [legacy-calls (atom [])
+          deps {:optimizer-history-api {:enabled? true
+                                        :base-url "https://history.test"
+                                        :fallback-to-legacy? true
+                                        :legacy-fallback-request-spacing-ms 0}
+                :fetch-fn
+                (fn [_url _init]
+                  (js/Promise.resolve
+                   (json-response
+                    200
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-hard-warning"
+                     :dataset_version "dv-hard-warning"
+                     :status "partial"
+                     :series_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :lineage_kind "native"
+                                     :series_kind "market_price"
+                                     :points [{:time_ms 1000
+                                               :close 100
+                                               :return nil}
+                                              {:time_ms 2000
+                                               :close 110
+                                               :return 0.1}]
+                                     :funding {:status "available"
+                                               :annualized_carry 0.01}
+                                     :warnings []}
+                      "hl:perp:BAD" {:instrument_id "hl:perp:BAD"
+                                     :lineage_kind "rejected"
+                                     :series_kind "market_price"
+                                     :points []
+                                     :funding {:status "rejected"}
+                                     :warnings [{:code "validation-failed"
+                                                 :instrument_id "hl:perp:BAD"}]}}
+                     :warnings [{:code "validation-failed"
+                                 :instrument_id "hl:perp:BAD"}]})))
+                :request-id (fn [] "rid-hard-warning")
+                :request-candle-snapshot!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:candle coin])
+                  (js/Promise.resolve [{:time 1000 :close "10"}
+                                       {:time 2000 :close "12"}]))
+                :request-market-funding-history!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:funding coin])
+                  (js/Promise.resolve [{:time-ms 1000
+                                        :funding-rate-raw "0.001"}]))}
+          request {:universe [{:instrument-id "perp:BTC"
+                               :market-type :perp
+                               :coin "BTC"
+                               :optimizer-history/instrument-id "hl:perp:BTC"}
+                              {:instrument-id "perp:BAD"
+                               :market-type :perp
+                               :coin "BAD"
+                               :optimizer-history/instrument-id "hl:perp:BAD"}]
+                   :bars 30
+                   :interval :1d
+                   :now-ms 2000}]
+      (-> (history-client/request-history-bundle! deps request)
+          (.then
+           (fn [bundle]
+             (is (= [] @legacy-calls))
+             (is (= #{:validation-failed}
+                    (set (map :code (:warnings bundle)))))
+             (is (not (contains? (set (map :code (:warnings bundle)))
+                                 :optimizer-history-api-legacy-fallback)))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-history-bundle-throttles-legacy-info-requests-test
   (async done
     (let [active (atom 0)

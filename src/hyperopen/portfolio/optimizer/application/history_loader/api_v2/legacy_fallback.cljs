@@ -7,29 +7,44 @@
   1095)
 
 (def ^:private fallback-lineage-kinds
-  #{:missing :rejected})
+  #{:missing})
 
-(def ^:private fallback-quality-statuses
+(def ^:private hard-lineage-kinds
+  #{:rejected})
+
+(def ^:private hard-quality-statuses
   #{:failed :rejected})
 
-(def fallback-warning-codes
-  #{:missing-candle-history
-    :validation-failed
+(def hard-warning-codes
+  #{:instrument-kind-mismatch
+    :proxy-mapping-unapproved
     :proxy-validation-failed
-    :instrument-kind-mismatch})
+    :validation-failed})
 
-(def suppressed-warning-codes
-  (conj fallback-warning-codes :identity-ambiguous))
+(def recoverable-warning-codes
+  #{:identity-ambiguous
+    :missing-candle-history})
+
+(defn hard-warning?
+  [warning]
+  (contains? hard-warning-codes (:code warning)))
+
+(defn- hard-series?
+  [series]
+  (and (map? series)
+       (or (contains? hard-lineage-kinds (:lineage-kind series))
+           (contains? hard-quality-statuses
+                      (get-in series [:quality :status]))
+           (some hard-warning? (:warnings series)))))
 
 (defn series-fallback-needed?
   [series]
-  (or (nil? series)
-      (contains? fallback-lineage-kinds (:lineage-kind series))
-      (not (seq (:points series)))
-      (contains? fallback-quality-statuses
-                 (get-in series [:quality :status]))
-      (some #(contains? fallback-warning-codes (:code %))
-            (:warnings series))))
+  (and (not (hard-series? series))
+       (or (nil? series)
+           (contains? fallback-lineage-kinds (:lineage-kind series))
+           (not (seq (:points series)))
+           (some #(contains? recoverable-warning-codes (:code %))
+                 (:warnings series)))))
 
 (defn- legacy-funding-summary
   [instrument funding-history-by-coin funding-periods-per-year]
@@ -106,7 +121,7 @@
 (defn suppress-warning?
   [fallback-local-ids warning-local-id warning]
   (and (contains? fallback-local-ids warning-local-id)
-       (contains? suppressed-warning-codes (:code warning))))
+       (contains? recoverable-warning-codes (:code warning))))
 
 (defn warning
   [instrument-id]

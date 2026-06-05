@@ -212,14 +212,33 @@
   [request universe]
   (assoc request :universe (vec universe)))
 
+(defn- warning-targets-instrument?
+  [local-id backend-id warning]
+  (contains? (cond-> #{local-id}
+               backend-id (conj backend-id))
+             (:instrument-id warning)))
+
+(defn- hard-warning-for-instrument?
+  [normalized local-id backend-id]
+  (boolean
+   (some (fn [warning]
+           (and (legacy-fallback/hard-warning? warning)
+                (warning-targets-instrument? local-id backend-id warning)))
+         (:warnings normalized))))
+
 (defn- legacy-fallback-universe
   [request normalized]
   (let [series-by-instrument (:series-by-instrument normalized)]
     (filterv (fn [instrument]
-               (let [local-id (instruments/normalize-instrument-id instrument)]
+               (let [local-id (instruments/normalize-instrument-id instrument)
+                     backend-id (backend-history-id instrument)]
                  (or (not (api-v2-instrument? instrument))
-                     (legacy-fallback/series-fallback-needed?
-                      (get series-by-instrument local-id)))))
+                     (and (not (hard-warning-for-instrument?
+                                normalized
+                                local-id
+                                backend-id))
+                          (legacy-fallback/series-fallback-needed?
+                           (get series-by-instrument local-id))))))
              (:universe request))))
 
 (defn- targeted-fallback-warning

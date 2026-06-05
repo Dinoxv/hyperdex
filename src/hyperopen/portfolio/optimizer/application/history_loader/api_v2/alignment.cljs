@@ -171,6 +171,20 @@
   (or (get id-map (:instrument-id warning))
       (:instrument-id warning)))
 
+(defn- warning-targets-instrument?
+  [local-id backend-id warning]
+  (contains? (cond-> #{local-id}
+               backend-id (conj backend-id))
+             (:instrument-id warning)))
+
+(defn- hard-warning-for-instrument?
+  [api-v2-history local-id backend-id]
+  (boolean
+   (some (fn [warning]
+           (and (legacy-fallback/hard-warning? warning)
+                (warning-targets-instrument? local-id backend-id warning)))
+         (:warnings api-v2-history))))
+
 (defn- return-history-warning
   [instrument api-v2-history min-return-observations]
   (let [local-id (instruments/normalize-instrument-id instrument)
@@ -207,13 +221,18 @@
                            backend-id (codec/non-blank-text
                                        (:optimizer-history/instrument-id instrument))
                            api-series (get series-by-instrument local-id)
+                           hard-api-warning? (hard-warning-for-instrument?
+                                              api-v2-history
+                                              local-id
+                                              backend-id)
                            legacy-series* (legacy-fallback/series
                                            instrument
                                            candle-history-by-coin
                                            funding-history-by-coin
                                            vault-details-by-address
                                            funding-periods-per-year*)
-                           legacy-fallback? (and (legacy-fallback/series-fallback-needed?
+                           legacy-fallback? (and (not hard-api-warning?)
+                                                 (legacy-fallback/series-fallback-needed?
                                                   api-series)
                                                  (usable-series? legacy-series*))
                            series (if legacy-fallback?
