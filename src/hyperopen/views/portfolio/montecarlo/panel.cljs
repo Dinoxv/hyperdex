@@ -103,8 +103,7 @@
          (chart-card {:result result :run-key run-key :chrome chrome})
          [:div {:class ["mc-rail"]}
           (summary/prob-card {:result result :controls controls :method method :chrome chrome})
-          (if (= method :shuffle)
-            (summary/realized-card {:result result :live-equity live-equity :chrome chrome})
+          (when-not (= method :shuffle)
             (summary/percentile-table {:result result :controls controls
                                        :live-equity live-equity :chrome chrome}))]]
         (distributions/distributions {:result result :controls controls :method method

@@ -92,25 +92,3 @@
            [:td {:class [(if (>= v 0) "mc-pos" "mc-neg")]}
             (fmt/signed-pct v 1)]])
         rows)]]]))
-
-(defn realized-card
-  "Shuffle-mode replacement for the terminal percentile table. Because every
-  ordering ends at the same realized return, there is no terminal spread to
-  tabulate — show the single realized ending equity and total return instead."
-  [{:keys [result live-equity chrome]}]
-  (let [realized (get-in result [:terminal :p50])
-        end-eq (* live-equity (+ 1 realized))]
-    [:div {:class ["mc-card" "mc-card-pad" "mc-realized-card"]
-           :data-role (str (:data-role-prefix chrome) "-realized-outcome")}
-     [:div {:class ["mc-caption"]} "Realized outcome · identical across all orderings"]
-     [:div {:class ["mc-realized-grid"]}
-      [:div {:class ["mc-realized-cell"]}
-       [:div {:class ["mc-realized-k"]} (or (:equity-label chrome) "Ending equity")]
-       [:div {:class ["mc-realized-v"]} (fmt/usd end-eq)]]
-      [:div {:class ["mc-realized-cell"]}
-       [:div {:class ["mc-realized-k"]} "Total return"]
-       [:div {:class ["mc-realized-v" (if (>= realized 0) "mc-pos" "mc-neg")]}
-        (fmt/signed-pct realized 1)]]]
-     [:div {:class ["mc-realized-note"]}
-      (str "Annualized volatility " (fmt/unsigned-pct (get-in result [:vol :p50]) 0)
-           " · also fixed across all orderings")]]))

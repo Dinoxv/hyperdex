@@ -528,54 +528,10 @@
 .monte-carlo .mc-notice-body { margin: 0; max-width: 560px; color: var(--mc-text-2); font-size: 12.5px; line-height: 1.55; }
 
 /* ---------- shuffle (sequence-risk) mode ---------- */
-/* Realized-outcome card replaces the terminal percentile table: the terminal
-   value is identical across all orderings, so there is a single outcome. */
-.monte-carlo .mc-realized-grid {
-  display: grid;
+.monte-carlo .mc-dist-grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.monte-carlo .mc-realized-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid var(--mc-border);
-  border-radius: 9px;
-  background: var(--mc-bg-deep);
-}
-
-.monte-carlo .mc-realized-k {
-  font-family: var(--mc-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--mc-text-3);
-}
-
-.monte-carlo .mc-realized-v {
-  font-family: var(--mc-mono);
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--mc-text);
-}
-
-.monte-carlo .mc-realized-note {
-  margin-top: 10px;
-  font-family: var(--mc-mono);
-  font-size: 10.5px;
-  color: var(--mc-text-3);
-}
-
-/* Shuffle mode shows three distribution cards (Sharpe, max drawdown, CAGR),
-   mirroring QuantStats' montecarlo_sharpe / montecarlo_drawdown / montecarlo_cagr. */
-.monte-carlo .mc-dist-grid-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 @media (max-width: 720px) {
-  .monte-carlo .mc-dist-grid-3 { grid-template-columns: 1fr; }
+  .monte-carlo .mc-dist-grid-2 { grid-template-columns: 1fr; }
 }
