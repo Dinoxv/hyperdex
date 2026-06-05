@@ -1,7 +1,7 @@
 (ns hyperopen.views.portfolio.montecarlo.controls
   "Control strip for the Monte Carlo tab: method, simulation count, horizon, bust
-  and goal thresholds, RNG seed, and a Re-run button. Every control dispatches a
-  pure action; the view-model re-runs the (cached) engine when a value changes.
+  and goal thresholds, and a Re-run button. Every control dispatches a pure
+  action; the view-model re-runs the (cached) engine when a value changes.
 
   The method toggle picks between `:shuffle` (the QuantStats sequence-risk
   reordering, which has no forecast horizon) and `:bootstrap` (the forward
@@ -66,7 +66,7 @@
 
 (defn controls-bar
   [{:keys [controls sims-options horizon-options method-options sample-size total-years chrome]}]
-  (let [{:keys [method sims horizon bust goal seed]} controls
+  (let [{:keys [method sims horizon bust goal]} controls
         {:keys [set-control-action rerun-action data-role-prefix]} chrome
         base {:set-action set-control-action :data-role-prefix data-role-prefix}
         shuffle? (= method :shuffle)
@@ -96,8 +96,6 @@
             (stepper (merge base {:control :bust :value bust :suffix "%" :step 5})))
      (field "Goal (total return)"
             (stepper (merge base {:control :goal :value goal :suffix "%" :step 10})))
-     (field "Seed"
-            (stepper (merge base {:control :seed :value seed :step 1})))
      [:div {:class ["mc-run"]}
       [:span {:class ["mc-run-status"]
               :data-role (str data-role-prefix "-run-status")}
