@@ -27,10 +27,9 @@
 (defn- chart-card
   [{:keys [result run-key chrome]}]
   (let [span-years (get-in result [:meta :span-years])
-        sample (get-in result [:meta :sample-size])
         shuffle? (= (get-in result [:meta :method]) :shuffle)
         title (if shuffle?
-                (str "Reshuffled equity paths · " sample " snapshots over ~" (fmt/years-label span-years))
+                (str "Reshuffled  paths · over ~" (fmt/years-label span-years))
                 (str "Simulated equity paths · ~" (fmt/years-label span-years) " forecast"))]
     [:div {:class ["mc-card" "mc-chart-card"]}
      [:div {:class ["mc-chart-head"]}
