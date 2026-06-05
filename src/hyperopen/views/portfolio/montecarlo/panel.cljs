@@ -50,7 +50,7 @@
                                     :update-key run-key})}]]]))
 
 (defn- footnote
-  [{:keys [controls result sample-size chrome]}]
+  [{:keys [controls result chrome]}]
   (let [{:keys [horizon bust goal]} controls
         span-years (get-in result [:meta :span-years])
         total-years (get-in result [:meta :total-years])
@@ -69,7 +69,7 @@
        "Sequence-risk view, not a forward prediction."]
       [:div {:class ["mc-foot"]}
        [:b "Method. "]
-       (str "Each path resamples " (:history-owner chrome) " " sample-size
+       (str "Each path resamples " (:history-owner chrome)
             " realized return intervals at random (with replacement) to fill a ~"
             (fmt/years-label span-years) " calendar forecast"
             (when (> (/ horizon 12) (or total-years 0))
