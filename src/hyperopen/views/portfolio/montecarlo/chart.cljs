@@ -9,27 +9,12 @@
   the renderer in a per-element holder atom, never in app state, consistent with
   the project's rule that live objects and timers stay out of core state."
   (:require [hyperopen.portfolio.montecarlo.engine :as engine]
+            [hyperopen.views.portfolio.montecarlo.chart.model :as chart-model]
             [hyperopen.views.portfolio.montecarlo.format :as fmt]))
 
-(def ^:private palette
-  {:accent "#00d4aa"
-   :red "#ff6b6b"
-   :gold "#d4b558"
-   :border "#21333b"
-   :text-2 "#8b9ba2"
-   :text-3 "#5d6f76"})
-
-(def ^:private mono-font "\"JetBrains Mono\", ui-monospace, monospace")
-
-(defn- axis-time-label
-  "Compact elapsed-time tick label (the x-axis is calendar time, not a day count
-  — vault points are sparse and irregular)."
-  [y]
-  (cond
-    (<= y 0) "0"
-    (< y (/ 1.0 12)) (str (js/Math.round (* y 365)) "d")
-    (< y 1) (str (js/Math.round (* y 12)) "mo")
-    :else (str (.toFixed y 1) "y")))
+(def ^:private palette chart-model/palette)
+(def ^:private mono-font chart-model/mono-font)
+(def ^:private point chart-model/point)
 
 (defn- hex->rgba
   [hex a]
@@ -57,166 +42,162 @@
 ;; Spaghetti + confidence-band equity chart
 ;; ---------------------------------------------------------------------------
 
+(defn- stroke-segment!
+  [ctx from to]
+  (.beginPath ctx)
+  (.moveTo ctx (:x from) (:y from))
+  (.lineTo ctx (:x to) (:y to))
+  (.stroke ctx))
+
+(defn- stroke-polyline!
+  [ctx points]
+  (.beginPath ctx)
+  (doseq [[idx p] (map-indexed vector points)]
+    (if (zero? idx)
+      (.moveTo ctx (:x p) (:y p))
+      (.lineTo ctx (:x p) (:y p))))
+  (.stroke ctx))
+
+(defn- fill-polygon!
+  [ctx points color]
+  (.beginPath ctx)
+  (doseq [p points]
+    (.lineTo ctx (:x p) (:y p)))
+  (.closePath ctx)
+  (set! (.-fillStyle ctx) color)
+  (.fill ctx))
+
+(defn- draw-bust-zone!
+  [ctx {:keys [plot colors bust-y]}]
+  (let [{:keys [pad-l pad-t plot-w plot-h]} plot]
+    (when (< bust-y (+ pad-t plot-h))
+      (set! (.-fillStyle ctx) (hex->rgba (:bust-col colors) 0.07))
+      (.fillRect ctx pad-l bust-y plot-w (- (+ pad-t plot-h) bust-y))
+      (set! (.-strokeStyle ctx) (hex->rgba (:bust-col colors) 0.55))
+      (.setLineDash ctx #js [4 4])
+      (set! (.-lineWidth ctx) 1)
+      (stroke-segment! ctx
+                       (point pad-l bust-y)
+                       (point (+ pad-l plot-w) bust-y))
+      (.setLineDash ctx #js []))))
+
+(defn- draw-grid!
+  [ctx {:keys [plot grid-lines]}]
+  (let [{:keys [pad-l plot-w]} plot]
+    (set! (.-font ctx) (str "10px " mono-font))
+    (set! (.-textBaseline ctx) "middle")
+    (doseq [{:keys [y label]} grid-lines]
+      (set! (.-strokeStyle ctx) (hex->rgba (:border palette) 0.6))
+      (set! (.-lineWidth ctx) 1)
+      (stroke-segment! ctx
+                       (point pad-l y)
+                       (point (+ pad-l plot-w) y))
+      (set! (.-fillStyle ctx) (:text-3 palette))
+      (set! (.-textAlign ctx) "right")
+      (.fillText ctx label (- pad-l 10) y))))
+
+(defn- draw-x-axis!
+  [ctx {:keys [x-axis]}]
+  (set! (.-textAlign ctx) "center")
+  (set! (.-textBaseline ctx) "top")
+  (doseq [{:keys [x y label]} x-axis]
+    (set! (.-fillStyle ctx) (:text-3 palette))
+    (.fillText ctx label x y)))
+
+(defn- draw-sampled-paths!
+  [ctx {:keys [sampled-paths colors]}]
+  (set! (.-lineWidth ctx) 0.8)
+  (doseq [path sampled-paths]
+    (set! (.-strokeStyle ctx) (hex->rgba (:accent colors) 0.05))
+    (stroke-polyline! ctx path)))
+
+(defn- draw-confidence-bands!
+  [ctx {:keys [colors outer-band-points inner-band-points]}]
+  (fill-polygon! ctx outer-band-points (hex->rgba (:band-col colors) 0.10))
+  (fill-polygon! ctx inner-band-points (hex->rgba (:band-col colors) 0.16)))
+
+(defn- draw-median!
+  [ctx {:keys [colors median-points]}]
+  (set! (.-lineWidth ctx) 2)
+  (set! (.-strokeStyle ctx) (:accent colors))
+  (stroke-polyline! ctx median-points))
+
+(defn- draw-band-edges!
+  [ctx {:keys [colors p95-points p5-points]}]
+  (set! (.-lineWidth ctx) 1)
+  (.setLineDash ctx #js [5 4])
+  (doseq [edge [p95-points p5-points]]
+    (set! (.-strokeStyle ctx) (hex->rgba (:band-col colors) 0.5))
+    (stroke-polyline! ctx edge))
+  (.setLineDash ctx #js []))
+
+(defn- draw-start-marker!
+  [ctx {:keys [plot start-y]}]
+  (let [{:keys [pad-l plot-w]} plot]
+    (set! (.-strokeStyle ctx) (hex->rgba (:text-2 palette) 0.4))
+    (set! (.-lineWidth ctx) 1)
+    (stroke-segment! ctx
+                     (point pad-l start-y)
+                     (point (+ pad-l plot-w) start-y))))
+
+(defn- draw-goal-line!
+  [ctx {:keys [plot domain goal-y]}]
+  (let [{:keys [pad-l plot-w]} plot]
+    (when (<= (:goal-eq domain) (:hi domain))
+      (set! (.-strokeStyle ctx) (hex->rgba (:gold palette) 0.6))
+      (.setLineDash ctx #js [4 4])
+      (stroke-segment! ctx
+                       (point pad-l goal-y)
+                       (point (+ pad-l plot-w) goal-y))
+      (.setLineDash ctx #js [])
+      (set! (.-fillStyle ctx) (:gold palette))
+      (set! (.-font ctx) (str "9px " mono-font))
+      (set! (.-textAlign ctx) "left")
+      (set! (.-textBaseline ctx) "bottom")
+      (.fillText ctx "GOAL" (+ pad-l 4) (- goal-y 3)))))
+
+(defn- draw-bust-label!
+  [ctx {:keys [plot colors bust-y]}]
+  (let [{:keys [pad-l pad-t plot-h]} plot]
+    (when (< bust-y (+ pad-t plot-h))
+      (set! (.-fillStyle ctx) (:bust-col colors))
+      (set! (.-font ctx) (str "9px " mono-font))
+      (set! (.-textAlign ctx) "left")
+      (set! (.-textBaseline ctx) "top")
+      (.fillText ctx "BUST" (+ pad-l 4) (+ bust-y 3)))))
+
+(defn- draw-endpoint-dots!
+  [ctx {:keys [endpoint-dots]}]
+  (doseq [{:keys [x y color radius]} endpoint-dots]
+    (set! (.-fillStyle ctx) color)
+    (.beginPath ctx)
+    (.arc ctx x y radius 0 (* 2 js/Math.PI))
+    (.fill ctx)))
+
 (defn draw-spaghetti!
   [canvas {:keys [result accent band bust-color show-paths? path-count height progress]}]
   (let [{:keys [ctx w h]} (setup! canvas (or height 420))
-        pad-l 64 pad-r 16 pad-t 14 pad-b 26
-        accent (or accent (:accent palette))
-        band-col (or band accent)
-        bust-col (or bust-color (:red palette))
-        start (get-in result [:meta :start-equity])
-        H (get-in result [:meta :horizon])
-        span-years (or (get-in result [:meta :span-years]) 0)
-        bust (get-in result [:meta :bust])
-        goal (get-in result [:meta :goal])
-        progress (if (nil? progress) 1 progress)
-        {:keys [p5 p25 p50 p75 p95]} (:band result)
-        times (:times result)
-        n (count times)
-        bust-eq (* start (+ 1 bust))
-        goal-eq (* start (+ 1 goal))
-        lo0 (reduce min (-> (vec p5) (conj bust-eq) (conj start)))
-        hi0 (reduce max (-> (vec p95) (conj goal-eq) (conj start)))
-        range0 (max 1e-9 (- hi0 lo0))
-        pad-range (* range0 0.06)
-        lo (- lo0 pad-range)
-        hi (+ hi0 pad-range)
-        plot-w (- w pad-l pad-r)
-        plot-h (- h pad-t pad-b)
-        x-of (fn [t] (+ pad-l (* (/ t H) plot-w)))
-        y-of (fn [v] (+ pad-t (* (- 1 (/ (- v lo) (- hi lo))) plot-h)))
-        tx (fn [i] (+ pad-l (* (/ (nth times i) H) plot-w)))
-        max-i (max 1 (js/Math.floor (* progress (dec n))))]
+        model (chart-model/spaghetti-model {:w w :h h}
+                                            {:result result
+                                             :accent accent
+                                             :band band
+                                             :bust-color bust-color
+                                             :show-paths? show-paths?
+                                             :path-count path-count
+                                             :progress progress})]
     (.clearRect ctx 0 0 w h)
-    ;; bust zone shading + dashed threshold
-    (let [bust-y (y-of bust-eq)]
-      (when (< bust-y (+ pad-t plot-h))
-        (set! (.-fillStyle ctx) (hex->rgba bust-col 0.07))
-        (.fillRect ctx pad-l bust-y plot-w (- (+ pad-t plot-h) bust-y))
-        (set! (.-strokeStyle ctx) (hex->rgba bust-col 0.55))
-        (.setLineDash ctx #js [4 4])
-        (set! (.-lineWidth ctx) 1)
-        (.beginPath ctx)
-        (.moveTo ctx pad-l bust-y)
-        (.lineTo ctx (+ pad-l plot-w) bust-y)
-        (.stroke ctx)
-        (.setLineDash ctx #js [])))
-    ;; horizontal grid + return-percent labels
-    (set! (.-font ctx) (str "10px " mono-font))
-    (set! (.-textBaseline ctx) "middle")
-    (dotimes [i 6]
-      (let [v (+ lo (* (- hi lo) (/ i 5)))
-            y (y-of v)
-            ret-pct (* (- (/ v start) 1) 100)]
-        (set! (.-strokeStyle ctx) (hex->rgba (:border palette) 0.6))
-        (set! (.-lineWidth ctx) 1)
-        (.beginPath ctx)
-        (.moveTo ctx pad-l y)
-        (.lineTo ctx (+ pad-l plot-w) y)
-        (.stroke ctx)
-        (set! (.-fillStyle ctx) (:text-3 palette))
-        (set! (.-textAlign ctx) "right")
-        (.fillText ctx (str (when (>= ret-pct 0) "+") (.toFixed ret-pct 0) "%") (- pad-l 10) y)))
-    ;; x-axis elapsed-time labels (calendar time, not a day count)
-    (set! (.-textAlign ctx) "center")
-    (set! (.-textBaseline ctx) "top")
-    (dotimes [i 5]
-      (let [frac (/ i 4)
-            t (js/Math.round (* frac H))]
-        (set! (.-fillStyle ctx) (:text-3 palette))
-        (.fillText ctx (axis-time-label (* frac span-years)) (x-of t) (+ pad-t plot-h 8))))
-    ;; p5..p95 band
-    (.beginPath ctx)
-    (doseq [i (range 0 (inc max-i))] (.lineTo ctx (tx i) (y-of (nth p95 i))))
-    (doseq [i (range max-i -1 -1)] (.lineTo ctx (tx i) (y-of (nth p5 i))))
-    (.closePath ctx)
-    (set! (.-fillStyle ctx) (hex->rgba band-col 0.10))
-    (.fill ctx)
-    ;; inner p25..p75 band
-    (.beginPath ctx)
-    (doseq [i (range 0 (inc max-i))] (.lineTo ctx (tx i) (y-of (nth p75 i))))
-    (doseq [i (range max-i -1 -1)] (.lineTo ctx (tx i) (y-of (nth p25 i))))
-    (.closePath ctx)
-    (set! (.-fillStyle ctx) (hex->rgba band-col 0.16))
-    (.fill ctx)
-    ;; faint individual sampled paths
-    (when show-paths?
-      (let [paths (:draw-paths result)
-            shown (min (count paths) (or path-count 120))
-            last-t (js/Math.floor (* progress H))]
-        (set! (.-lineWidth ctx) 0.8)
-        (dotimes [p shown]
-          (let [path (nth paths p)]
-            (set! (.-strokeStyle ctx) (hex->rgba accent 0.05))
-            (.beginPath ctx)
-            (loop [t 0]
-              (when (<= t last-t)
-                (let [x (x-of t) y (y-of (aget path t))]
-                  (if (zero? t) (.moveTo ctx x y) (.lineTo ctx x y)))
-                (recur (inc t))))
-            (.stroke ctx)))))
-    ;; median line
-    (set! (.-lineWidth ctx) 2)
-    (set! (.-strokeStyle ctx) accent)
-    (.beginPath ctx)
-    (doseq [i (range 0 (inc max-i))]
-      (let [x (tx i) y (y-of (nth p50 i))]
-        (if (zero? i) (.moveTo ctx x y) (.lineTo ctx x y))))
-    (.stroke ctx)
-    ;; p5 / p95 dashed edges
-    (set! (.-lineWidth ctx) 1)
-    (.setLineDash ctx #js [5 4])
-    (doseq [edge [p95 p5]]
-      (set! (.-strokeStyle ctx) (hex->rgba band-col 0.5))
-      (.beginPath ctx)
-      (doseq [i (range 0 (inc max-i))]
-        (let [x (tx i) y (y-of (nth edge i))]
-          (if (zero? i) (.moveTo ctx x y) (.lineTo ctx x y))))
-      (.stroke ctx))
-    (.setLineDash ctx #js [])
-    ;; start-equity marker
-    (set! (.-strokeStyle ctx) (hex->rgba (:text-2 palette) 0.4))
-    (set! (.-lineWidth ctx) 1)
-    (.beginPath ctx)
-    (.moveTo ctx pad-l (y-of start))
-    (.lineTo ctx (+ pad-l plot-w) (y-of start))
-    (.stroke ctx)
-    ;; goal line (gold)
-    (when (<= goal-eq hi)
-      (let [gy (y-of goal-eq)]
-        (set! (.-strokeStyle ctx) (hex->rgba (:gold palette) 0.6))
-        (.setLineDash ctx #js [4 4])
-        (.beginPath ctx)
-        (.moveTo ctx pad-l gy)
-        (.lineTo ctx (+ pad-l plot-w) gy)
-        (.stroke ctx)
-        (.setLineDash ctx #js [])
-        (set! (.-fillStyle ctx) (:gold palette))
-        (set! (.-font ctx) (str "9px " mono-font))
-        (set! (.-textAlign ctx) "left")
-        (set! (.-textBaseline ctx) "bottom")
-        (.fillText ctx "GOAL" (+ pad-l 4) (- gy 3))))
-    ;; bust label
-    (let [bust-y (y-of bust-eq)]
-      (when (< bust-y (+ pad-t plot-h))
-        (set! (.-fillStyle ctx) bust-col)
-        (set! (.-font ctx) (str "9px " mono-font))
-        (set! (.-textAlign ctx) "left")
-        (set! (.-textBaseline ctx) "top")
-        (.fillText ctx "BUST" (+ pad-l 4) (+ bust-y 3))))
-    ;; endpoint dots once the reveal completes
-    (when (>= progress 0.999)
-      (let [ex (tx (dec n))]
-        (doseq [[edge col r] [[p95 band-col 2.3] [p50 accent 3.2] [p5 band-col 2.3]]]
-          (let [y (y-of (nth edge (dec n)))]
-            (set! (.-fillStyle ctx) col)
-            (.beginPath ctx)
-            (.arc ctx ex y r 0 (* 2 js/Math.PI))
-            (.fill ctx)))))
-    ;; Return the pixel↔value geometry so the render hook can stash it for the
-    ;; hover tooltip; the band/times themselves are read back from the holder's
-    ;; spec, only this mapping is per-draw.
-    {:pad-l pad-l :plot-w plot-w :horizon H :start start :span-years span-years}))
+    (draw-bust-zone! ctx model)
+    (draw-grid! ctx model)
+    (draw-x-axis! ctx model)
+    (draw-confidence-bands! ctx model)
+    (draw-sampled-paths! ctx model)
+    (draw-median! ctx model)
+    (draw-band-edges! ctx model)
+    (draw-start-marker! ctx model)
+    (draw-goal-line! ctx model)
+    (draw-bust-label! ctx model)
+    (draw-endpoint-dots! ctx model)
+    (:hover-geo model)))
 
 ;; ---------------------------------------------------------------------------
 ;; Distribution histogram
@@ -327,7 +308,7 @@
             ret (fn [v] (fmt/signed-pct (- (/ v start) 1) 1))
             elapsed (if (pos? horizon) (* span-years (/ (nth times gi) horizon)) 0)]
         (set! (.-innerHTML tip)
-              (str (tip-row "Time" (axis-time-label elapsed) nil)
+              (str (tip-row "Time" (chart-model/axis-time-label elapsed) nil)
                    (tip-row "P95" (ret (nth (:p95 band) gi)) "var(--mc-accent)")
                    (tip-row "Median" (ret (nth (:p50 band) gi)) nil)
                    (tip-row "P5" (ret (nth (:p5 band) gi)) "var(--mc-red)")))
