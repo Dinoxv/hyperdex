@@ -195,11 +195,13 @@
 
 (defn open-funding-transfer-modal
   ([state]
-   (open-funding-transfer-modal state nil nil))
+   (open-funding-transfer-modal state nil nil nil))
   ([state anchor]
-   (open-funding-transfer-modal state anchor nil))
+   (open-funding-transfer-modal state anchor nil nil))
   ([state anchor opener-data-role]
-   (modal-commands/open-funding-transfer-modal (command-deps) state anchor opener-data-role)))
+   (open-funding-transfer-modal state anchor opener-data-role nil))
+  ([state anchor opener-data-role transfer-context]
+   (modal-commands/open-funding-transfer-modal (command-deps) state anchor opener-data-role transfer-context)))
 
 (defn open-funding-withdraw-modal
   ([state]

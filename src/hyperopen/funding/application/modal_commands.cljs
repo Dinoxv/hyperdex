@@ -88,9 +88,15 @@
            funding-modal-path]}
    state
    anchor
-   opener-data-role]
+   opener-data-role
+   transfer-context]
   (let [base (modal-state state)
-        anchor* (normalize-anchor anchor)]
+        anchor* (normalize-anchor anchor)
+        context (when (map? transfer-context) transfer-context)
+        transfer-dex (or (some-> (:dex context) str str/trim) "")
+        to-perp? (if (contains? context :to-perp?)
+                   (true? (:to-perp? context))
+                   true)]
     [[:effects/load-surface-module :funding-modal]
      [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
@@ -99,7 +105,8 @@
                  :anchor anchor*
                  :withdraw-step :asset-select
                  :withdraw-search-input ""
-                 :to-perp? true
+                 :to-perp? to-perp?
+                 :transfer-dex transfer-dex
                  :destination-input (or (wallet-address state) ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]]))
 (defn open-funding-withdraw-modal

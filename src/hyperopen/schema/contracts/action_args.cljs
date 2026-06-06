@@ -53,6 +53,11 @@
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)
         :anchor-and-data-role (s/tuple any? (s/nilable string?))))
+(s/def ::funding-transfer-open-args
+  (s/or :none ::common/no-args
+        :anchor-only (s/tuple any?)
+        :anchor-and-data-role (s/tuple any? (s/nilable string?))
+        :anchor-data-role-and-context (s/tuple any? (s/nilable string?) map?)))
 (s/def ::fee-schedule-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
@@ -431,7 +436,7 @@
    :actions/load-user-data ::common/address-args
    :actions/set-funding-modal ::funding-modal-args
    :actions/open-funding-send-modal ::funding-send-open-args
-   :actions/open-funding-transfer-modal ::funding-modal-open-args
+   :actions/open-funding-transfer-modal ::funding-transfer-open-args
    :actions/open-funding-withdraw-modal ::funding-modal-open-args
    :actions/open-funding-deposit-modal ::funding-modal-open-args
    :actions/close-funding-modal ::common/no-args

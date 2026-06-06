@@ -49,6 +49,7 @@
               :withdraw-generated-address nil
               :amount-input ""
               :to-perp? true
+              :transfer-dex ""
               :destination-input ""
               :hyperunit-lifecycle {:direction nil
                                     :asset-key nil

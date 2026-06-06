@@ -39,7 +39,8 @@
             contract-id
             key
             transfer-disabled?
-            available-balance-tooltip-position]}
+            available-balance-tooltip-position]
+     :as row}
     {:keys [read-only?]}]
    (let [coin-style (when-not (balances-shared/usdc-balance-row? {:coin coin})
                       {:color "rgb(151, 252, 228)"})
@@ -57,7 +58,11 @@
                                                               :selection-coin selection-coin
                                                               :available-balance available-balance
                                                               :amount-decimals amount-decimals})
-                        :event.currentTarget/bounds])]
+                        :event.currentTarget/bounds])
+         transfer-enabled?* (and (not read-only?)
+                                 (balances-shared/transfer-enabled? row))
+         transfer-action (when transfer-enabled?*
+                           (balances-shared/balance-row-transfer-action row))]
      (into [:div {:class ["grid"
                           (desktop-grid-template-class read-only?)
                           "gap-x-4"
@@ -99,9 +104,15 @@
                   (balances-shared/balance-row-action-button "Send" send-action)
                   (balances-shared/balance-row-disabled-action "Send"))]
                [:div.text-left
-                (if transfer-disabled?
+                (cond
+                  transfer-disabled?
                   [:span {:class ["text-xs" "text-trading-text-secondary"]} "Unified"]
-                  (balances-shared/balance-row-action-button "Transfer"))]
+
+                  transfer-enabled?*
+                  (balances-shared/balance-row-action-button "Transfer" transfer-action)
+
+                  :else
+                  (balances-shared/balance-row-disabled-action "Transfer"))]
                [:div.text-left]])
             [[:div.text-left
               (balances-shared/balance-contract-node contract-id)]])))))

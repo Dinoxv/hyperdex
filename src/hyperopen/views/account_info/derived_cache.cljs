@@ -10,20 +10,22 @@
 (def ^:dynamic *normalized-open-orders* projections/normalized-open-orders)
 
 (defn memoized-balance-rows
-  [webdata2 spot-data account market-by-key]
+  [webdata2 spot-data account market-by-key perp-dex-states]
   (let [cache @balance-rows-cache
         cache-hit? (and (map? cache)
                         (identical? webdata2 (:webdata2 cache))
                         (identical? spot-data (:spot-data cache))
                         (identical? account (:account cache))
-                        (identical? market-by-key (:market-by-key cache)))]
+                        (identical? market-by-key (:market-by-key cache))
+                        (identical? perp-dex-states (:perp-dex-states cache)))]
     (if cache-hit?
       (:result cache)
-      (let [result (*build-balance-rows* webdata2 spot-data account market-by-key)]
+      (let [result (*build-balance-rows* webdata2 spot-data account market-by-key perp-dex-states)]
         (reset! balance-rows-cache {:webdata2 webdata2
                                     :spot-data spot-data
                                     :account account
                                     :market-by-key market-by-key
+                                    :perp-dex-states perp-dex-states
                                     :result result})
         result))))
 

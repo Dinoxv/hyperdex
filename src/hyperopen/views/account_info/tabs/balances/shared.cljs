@@ -284,3 +284,30 @@
                   "text-xs"
                   "text-trading-text-secondary"]}
    label])
+
+(defn transfer-enabled?
+  "Spot <-> perps transfers only apply to USDC rows. Unified rows are handled
+  separately via `:transfer-disabled?`."
+  [{:keys [coin transfer-disabled?]}]
+  (and (not transfer-disabled?)
+       (usdc-balance-row? {:coin coin})))
+
+(defn balance-row-transfer-to-perp?
+  [{:keys [coin transfer-to-perp?]}]
+  (if (some? transfer-to-perp?)
+    (boolean transfer-to-perp?)
+    (not (str/includes? (str coin) "Perps"))))
+
+(defn balance-row-transfer-label
+  [row]
+  (if (balance-row-transfer-to-perp? row)
+    "Transfer to Perps"
+    "Transfer to Spot"))
+
+(defn balance-row-transfer-action
+  [{:keys [transfer-dex] :as row}]
+  [:actions/open-funding-transfer-modal
+   :event.currentTarget/bounds
+   nil
+   {:dex (or (some-> transfer-dex str str/trim) "")
+    :to-perp? (balance-row-transfer-to-perp? row)}])

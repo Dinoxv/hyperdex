@@ -38,10 +38,39 @@
       :amount-entry
       :asset-select)))
 
+;; Full mainnet USDC spot token id expected by Hyperliquid `sendAsset` signing.
+;; Matches the precedent in `hyperopen.subaccounts.effects` and the
+;; 2026-06-03 unified sendAsset routing fix. Used only as a fallback when spot
+;; metadata is unavailable.
+(def ^:private hyperliquid-mainnet-usdc-token
+  "USDC:0x6d1e7cde53ba9467b783cb7c530ce054")
+
+(defn- usdc-transfer-token
+  [state]
+  (or (some (fn [{:keys [name tokenId]}]
+              (let [token-name (some-> name str str/trim str/upper-case)
+                    token-id (some-> tokenId str str/trim)]
+                (when (and (= "USDC" token-name) (seq token-id))
+                  (str "USDC:" token-id))))
+            (get-in state [:spot :meta :tokens]))
+      hyperliquid-mainnet-usdc-token))
+
+(defn- named-dex-transfer-request
+  [state dex to-perp? amount]
+  (when-let [destination (amounts/normalize-evm-address (get-in state [:wallet :address]))]
+    {:action {:type "sendAsset"
+              :destination destination
+              :sourceDex (if to-perp? "spot" dex)
+              :destinationDex (if to-perp? dex "spot")
+              :token (usdc-transfer-token state)
+              :amount (amounts/amount->text amount)
+              :fromSubAccount ""}}))
+
 (defn transfer-preview
   [state modal]
   (let [amount (amounts/parse-input-amount (:amount-input modal))
         to-perp? (true? (:to-perp? modal))
+        dex (availability/transfer-dex-name (:transfer-dex modal))
         max-amount (availability/transfer-max-amount state modal)]
     (cond
       (not (amounts/finite-number? max-amount))
@@ -65,6 +94,13 @@
       (> amount max-amount)
       {:ok? false
        :display-message "Amount exceeds available balance."}
+
+      dex
+      (if-let [request (named-dex-transfer-request state dex to-perp? amount)]
+        {:ok? true
+         :request request}
+        {:ok? false
+         :display-message "Connect your wallet before transferring funds."})
 
       :else
       {:ok? true

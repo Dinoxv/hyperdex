@@ -197,6 +197,55 @@
                     (is false (str "Unexpected transfer error-response failure: " err))
                     (done)))))))
 
+(deftest api-submit-funding-transfer-routes-send-asset-action-to-send-asset-signer-test
+  (async done
+    (let [default-modal (effects-support/default-funding-modal-state)
+          store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (effects-support/seed-modal :transfer)}})
+          usd-class-calls (atom [])
+          send-asset-calls (atom [])
+          toasts (atom [])
+          dispatches (atom [])]
+      (-> (effects/api-submit-funding-transfer!
+           (submit-deps
+            {:store store
+            :request {:action {:type "sendAsset"
+                               :destination "0xabc"
+                               :sourceDex "xyz"
+                               :destinationDex "spot"
+                               :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                               :amount "100"
+                               :fromSubAccount ""}}
+            :submit-usd-class-transfer! (fn [_store _address action]
+                                          (swap! usd-class-calls conj action)
+                                          (js/Promise.resolve {:status "ok"}))
+            :submit-send-asset! (fn [_store address action]
+                                  (swap! send-asset-calls conj [address action])
+                                  (js/Promise.resolve {:status "ok"}))
+            :show-toast! (effects-support/capture-toast! toasts)
+            :dispatch! (effects-support/capture-dispatch! dispatches)
+            :default-funding-modal-state (fn [] default-modal)}))
+          (.then (fn [resp]
+                   (is (= {:status "ok"} resp))
+                   ;; Named-DEX transfers must be signed with the sendAsset signer,
+                   ;; not usdClassTransfer.
+                   (is (= [] @usd-class-calls))
+                   (is (= [["0xabc" {:type "sendAsset"
+                                     :destination "0xabc"
+                                     :sourceDex "xyz"
+                                     :destinationDex "spot"
+                                     :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                                     :amount "100"
+                                     :fromSubAccount ""}]]
+                          @send-asset-calls))
+                   (is (= default-modal (get-in @store [:funding-ui :modal])))
+                   (is (= [[:success "Transfer submitted."]]
+                          @toasts))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected send-asset transfer error: " err))
+                    (done)))))))
+
 (deftest api-submit-funding-withdraw-no-wallet-sets-error-test
   (let [store (atom {:wallet {}
                      :funding-ui {:modal (effects-support/seed-modal :withdraw)}})

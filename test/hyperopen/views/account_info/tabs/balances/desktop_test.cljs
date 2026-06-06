@@ -112,6 +112,43 @@
     (is (contains? (hiccup/node-class-set transfer-label-node) "text-trading-text-secondary"))
     (is (nil? transfer-button-node))))
 
+(deftest balance-row-named-dex-transfer-button-opens-transfer-modal-with-context-test
+  (let [row-node (balances-tab/balance-row {:key "perps-usdc-xyz"
+                                            :coin "USDC (Perps) xyz"
+                                            :selection-coin "xyz:USDC"
+                                            :transfer-dex "xyz"
+                                            :transfer-to-perp? false
+                                            :total-balance 1923.97
+                                            :available-balance 1923.97
+                                            :usdc-value 1923.97
+                                            :pnl-value nil
+                                            :pnl-pct nil
+                                            :amount-decimals nil})
+        transfer-button (hiccup/find-first-node
+                         row-node
+                         #(and (= :button (first %))
+                               (contains? (hiccup/direct-texts %) "Transfer")))]
+    (is (some? transfer-button))
+    (is (= [[:actions/open-funding-transfer-modal
+             :event.currentTarget/bounds
+             nil
+             {:dex "xyz" :to-perp? false}]]
+           (get-in transfer-button [1 :on :click])))))
+
+(deftest balance-row-non-usdc-row-transfer-control-stays-disabled-test
+  (let [row-node (balances-tab/balance-row {:key "spot-1"
+                                            :coin "HYPE"
+                                            :selection-coin "HYPE"
+                                            :total-balance 7.0
+                                            :available-balance 7.0
+                                            :usdc-value 70.0
+                                            :amount-decimals 2})
+        transfer-button (hiccup/find-first-node
+                         row-node
+                         #(and (= :button (first %))
+                               (contains? (hiccup/direct-texts %) "Transfer")))]
+    (is (nil? transfer-button))))
+
 (deftest balance-row-unified-available-balance-renders-dashed-tooltip-test
   (let [row-node (balances-tab/balance-row {:key "unified-usdc"
                                             :coin "USDC"

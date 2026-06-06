@@ -40,6 +40,7 @@
    :deposit-generated-asset-key nil
    :amount-input ""
    :to-perp? true
+   :transfer-dex ""
    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
    :withdraw-selected-asset-key :usdc
    :withdraw-generated-address nil

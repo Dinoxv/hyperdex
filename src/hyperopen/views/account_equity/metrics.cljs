@@ -251,7 +251,7 @@
         cross-total-margin-used (parse-num (:totalMarginUsed cross-summary))
         maintenance-margin (parse-num (:crossMaintenanceMarginUsed clearinghouse-state))
         market-by-key (get-in state [:asset-selector :market-by-key] {})
-        balance-rows (derived-cache/memoized-balance-rows webdata2 (:spot state) (:account state) market-by-key)
+        balance-rows (derived-cache/memoized-balance-rows webdata2 (:spot state) (:account state) market-by-key (:perp-dex-clearinghouse state))
         balance-row-by-token (balance-rows-by-token balance-rows)
         perps-row (first (filter #(= "perps-usdc" (:key %)) balance-rows))
         perps-row-balance (parse-num (:total-balance perps-row))

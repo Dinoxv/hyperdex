@@ -298,6 +298,69 @@
     (is (not (contains? coins "+0")))
     (is (not (contains? coins "#1")))))
 
+(deftest build-balance-rows-includes-named-dex-perps-usdc-row-test
+  (let [rows (projections/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "78.22344090"
+                                                 :entryNtl "0"}]}}
+              nil
+              {}
+              {"xyz" {:withdrawable "1923.97"
+                      :marginSummary {:accountValue "1923.97"
+                                      :totalMarginUsed "0.0"}}})
+        by-coin (into {} (map (juxt :coin identity)) rows)
+        named-row (some (fn [row]
+                          (when (= "xyz:USDC" (:selection-coin row))
+                            row))
+                        rows)]
+    ;; The named DEX perps collateral becomes its own balance row.
+    (is (some? named-row))
+    (is (= 1923.97 (shared/parse-num (:total-balance named-row))))
+    (is (= 1923.97 (shared/parse-num (:usdc-value named-row))))
+    (is (= "xyz" (:transfer-dex named-row)))
+    (is (false? (:transfer-to-perp? named-row)))
+    ;; The display parses to a `xyz` namespace chip while staying a USDC row.
+    (is (= "xyz" (:prefix (shared/parse-coin-namespace (:selection-coin named-row)))))
+    (is (= "USDC" (:base (shared/parse-coin-namespace (:selection-coin named-row)))))
+    ;; Default perps is zero, so no default perps row is added, but spot USDC stays.
+    (is (nil? (get by-coin "USDC (Perps)")))
+    (is (some? (get by-coin "USDC (Spot)")))))
+
+(deftest build-balance-rows-omits-named-dex-perps-row-for-unified-accounts-test
+  (let [rows (projections/build-balance-rows
+              {:clearinghouseState {:marginSummary {:accountValue "0.0"
+                                                    :totalMarginUsed "0.0"}}
+               :spotAssetCtxs []}
+              {:meta {:tokens [{:index 0
+                                :name "USDC"
+                                :weiDecimals 8}]
+                      :universe []}
+               :clearinghouse-state {:balances [{:coin "USDC"
+                                                 :token 0
+                                                 :hold "0.0"
+                                                 :total "78.22344090"
+                                                 :entryNtl "0"}]}}
+              {:mode :unified
+               :abstraction-raw "unifiedAccount"}
+              {}
+              {"xyz" {:withdrawable "1923.97"
+                      :marginSummary {:accountValue "1923.97"
+                                      :totalMarginUsed "0.0"}}})
+        named-row (some (fn [row]
+                          (when (= "xyz:USDC" (:selection-coin row))
+                            row))
+                        rows)]
+    (is (nil? named-row))))
+
 (deftest build-balance-rows-filters-zero-balance-rows-by-default-test
   (let [rows (projections/build-balance-rows
               {:clearinghouseState {:marginSummary {:accountValue "0.0"

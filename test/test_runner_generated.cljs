@@ -148,6 +148,7 @@
             [hyperopen.funding.application.modal-vm.models-test]
             [hyperopen.funding.application.modal-vm.presentation-test]
             [hyperopen.funding.application.submit-effects-test]
+            [hyperopen.funding.domain.named-dex-transfer-preview-test]
             [hyperopen.funding.domain.policy-preview-test]
             [hyperopen.funding.domain.policy-test]
             [hyperopen.funding.effects-api-wrappers-test]
@@ -162,6 +163,7 @@
             [hyperopen.funding.infrastructure.route-clients-test]
             [hyperopen.funding.infrastructure.wallet-rpc-test]
             [hyperopen.funding.predictability-test]
+            [hyperopen.funding.transfer-modal-context-test]
             [hyperopen.header.actions-test]
             [hyperopen.i18n.locale-test]
             [hyperopen.leaderboard.actions-test]
@@ -832,6 +834,7 @@
              'hyperopen.funding.application.modal-vm.models-test
              'hyperopen.funding.application.modal-vm.presentation-test
              'hyperopen.funding.application.submit-effects-test
+             'hyperopen.funding.domain.named-dex-transfer-preview-test
              'hyperopen.funding.domain.policy-preview-test
              'hyperopen.funding.domain.policy-test
              'hyperopen.funding.effects-api-wrappers-test
@@ -846,6 +849,7 @@
              'hyperopen.funding.infrastructure.route-clients-test
              'hyperopen.funding.infrastructure.wallet-rpc-test
              'hyperopen.funding.predictability-test
+             'hyperopen.funding.transfer-modal-context-test
              'hyperopen.header.actions-test
              'hyperopen.i18n.locale-test
              'hyperopen.leaderboard.actions-test

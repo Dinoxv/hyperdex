@@ -58,7 +58,6 @@
         row-id (some-> key str str/trim)
         {:keys [base-label]} (shared/resolve-coin-display (or selection-coin coin) {})
         expanded? (= expanded-row-id row-id)
-        transfer-enabled? (not transfer-disabled?)
         send-enabled?* (and (not read-only?)
                             (balances-shared/send-enabled? {:key key
                                                             :selection-coin selection-coin
@@ -70,7 +69,12 @@
                                                              :selection-coin selection-coin
                                                              :available-balance available-balance
                                                              :amount-decimals amount-decimals})
-                       :event.currentTarget/bounds])]
+                       :event.currentTarget/bounds])
+        transfer-enabled?* (and (not read-only?)
+                                (balances-shared/transfer-enabled? row))
+        transfer-label (balances-shared/balance-row-transfer-label row)
+        transfer-action (when transfer-enabled?*
+                          (balances-shared/balance-row-transfer-action row))]
     (mobile-cards/expandable-card
      {:data-role (str "mobile-balance-card-" row-id)
       :expanded? expanded?
@@ -127,4 +131,4 @@
                          [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
                           [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
                            (mobile-balance-footer-action "Send" send-enabled?* send-action)
-                           (mobile-balance-footer-action "Transfer to Perps" transfer-enabled?)]])]})))
+                           (mobile-balance-footer-action transfer-label transfer-enabled?* transfer-action)]])]})))

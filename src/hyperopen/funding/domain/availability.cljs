@@ -177,11 +177,28 @@
               assets)
         (first assets))))
 
+(defn transfer-dex-name
+  "Normalize the perps-side dex carried on the transfer modal. An empty string,
+  nil, or \"spot\" all mean the default perps clearinghouse; any other non-blank
+  string names a HIP-3 perps DEX (e.g. \"xyz\")."
+  [value]
+  (let [dex (some-> value str str/trim)]
+    (when (and (seq dex)
+               (not= "spot" (str/lower-case dex)))
+      dex)))
+
+(defn named-dex-withdrawable
+  [state dex]
+  (max 0 (or (clearinghouse-withdrawable (get-in state [:perp-dex-clearinghouse dex]))
+             0)))
+
 (defn transfer-max-amount
-  [state {:keys [to-perp?]}]
+  [state {:keys [to-perp? transfer-dex]}]
   (if (true? to-perp?)
     (or (spot-usdc-available state) 0)
-    (perps-withdrawable state)))
+    (if-let [dex (transfer-dex-name transfer-dex)]
+      (named-dex-withdrawable state dex)
+      (perps-withdrawable state))))
 
 (defn withdraw-max-amount
   [state selected-asset]

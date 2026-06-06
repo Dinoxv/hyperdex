@@ -27,7 +27,22 @@
       (or (not (zero? account-value))
           (not (zero? available))))))
 
-(defn- balance-tab-count [webdata2 spot-data account]
+(defn- non-zero-perps-dex-clearinghouse? [clearinghouse-state]
+  (when (map? clearinghouse-state)
+    (let [account-value (projections/parse-num (get-in clearinghouse-state [:marginSummary :accountValue]))
+          total-margin-used (projections/parse-num (get-in clearinghouse-state [:marginSummary :totalMarginUsed]))
+          available (- account-value total-margin-used)]
+      (or (not (zero? account-value))
+          (not (zero? available))))))
+
+(defn- non-zero-named-dex-perps-count [perp-dex-states]
+  (->> (or perp-dex-states {})
+       (filter (fn [[dex clearinghouse-state]]
+                 (and (seq (some-> dex str str/trim))
+                      (non-zero-perps-dex-clearinghouse? clearinghouse-state))))
+       count))
+
+(defn- balance-tab-count [webdata2 spot-data account perp-dex-states]
   (let [balances (or (get-in spot-data [:clearinghouse-state :balances]) [])
         non-zero-spot-balances (->> balances
                                     (remove projections/outcome-balance?)
@@ -41,7 +56,8 @@
             usdc-count (if (or has-non-zero-spot-usdc? perps-usdc-visible?) 1 0)]
         (+ non-usdc-count usdc-count))
       (+ (count non-zero-spot-balances)
-         (if perps-usdc-visible? 1 0)))))
+         (if perps-usdc-visible? 1 0)
+         (non-zero-named-dex-perps-count perp-dex-states)))))
 
 (defn- positions-tab-count [webdata2 perp-dex-states]
   (let [base-positions (->> (or (get-in webdata2 [:clearinghouseState :assetPositions]) [])
@@ -230,7 +246,7 @@
                                  outcome-options]
   (let [now-ms (platform/now-ms)]
     (case selected-tab
-      :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key)}
+      :balances {:balance-rows (derived-cache/memoized-balance-rows webdata2 spot-data account market-by-key perp-dex-states)}
       :outcomes {:outcomes (projections/build-outcome-rows spot-data market-by-key outcome-options)}
       :positions (let [positions (derived-cache/memoized-positions webdata2 perp-dex-states)
                        positions (attach-position-market-mark-prices positions market-by-key)
@@ -331,7 +347,7 @@
                                                         pending-cancel-oids)
                     :positions (positions-tab-count webdata2 perp-dex-states)
                     :outcomes outcome-count
-                    :balances (balance-tab-count webdata2 spot-data account)
+                    :balances (balance-tab-count webdata2 spot-data account perp-dex-states)
                     :twap (count (or twap-states-source []))}
         open-orders-sort (get-in state [:account-info :open-orders-sort] {:column "Time" :direction :desc})
         positions-state (cond-> (merge {:direction-filter :all

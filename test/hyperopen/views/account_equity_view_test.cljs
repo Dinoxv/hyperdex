@@ -594,7 +594,7 @@
         state-b (assoc state-a :orderbooks {:ETH []})
         balance-row-calls (atom 0)
         positions-calls (atom 0)]
-    (with-redefs [derived-cache/memoized-balance-rows (fn [_webdata2 _spot-data _account _market-by-key]
+    (with-redefs [derived-cache/memoized-balance-rows (fn [_webdata2 _spot-data _account _market-by-key _perp-dex-states]
                                                         (swap! balance-row-calls inc)
                                                         [])
                   derived-cache/memoized-positions (fn [_webdata2 _perp-dex-states]

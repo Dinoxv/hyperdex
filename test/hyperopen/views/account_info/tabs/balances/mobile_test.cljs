@@ -88,6 +88,36 @@
     (is (contains? collapsed-strings "MEOW"))
     (is (not (contains? collapsed-strings "Available Balance")))))
 
+(deftest balances-mobile-card-named-dex-transfer-opens-transfer-modal-with-context-test
+  (let [row {:key "perps-usdc-xyz"
+             :coin "USDC (Perps) xyz"
+             :selection-coin "xyz:USDC"
+             :transfer-dex "xyz"
+             :transfer-to-perp? false
+             :total-balance 1923.97
+             :available-balance 1923.97
+             :usdc-value 1923.97
+             :pnl-value nil
+             :pnl-pct nil
+             :amount-decimals nil}
+        content (test-support/render-balances-tab [row]
+                                                  false
+                                                  fixtures/default-sort-state
+                                                  ""
+                                                  {:balances "perps-usdc-xyz"})
+        card (hiccup/find-by-data-role content "mobile-balance-card-perps-usdc-xyz")
+        transfer-button (hiccup/find-first-node
+                         card
+                         #(and (= :button (first %))
+                               (contains? (hiccup/direct-texts %) "Transfer to Spot")))]
+    (is (some? card))
+    (is (some? transfer-button))
+    (is (= [[:actions/open-funding-transfer-modal
+             :event.currentTarget/bounds
+             nil
+             {:dex "xyz" :to-perp? false}]]
+           (get-in transfer-button [1 :on :click])))))
+
 (deftest balances-mobile-card-normalizes-row-id-before-binding-expansion-state-test
   (let [row (assoc fixtures/sample-balance-row
                    :key "  usdc  "

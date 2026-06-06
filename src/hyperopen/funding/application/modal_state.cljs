@@ -29,6 +29,7 @@
    :deposit-generated-asset-key nil
    :amount-input ""
    :to-perp? true
+   :transfer-dex ""
    :destination-input ""
    :withdraw-selected-asset-key assets-domain/withdraw-default-asset-key
    :withdraw-generated-address nil

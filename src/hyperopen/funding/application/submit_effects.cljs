@@ -51,6 +51,7 @@
            request
            dispatch!
            submit-usd-class-transfer!
+           submit-send-asset!
            exchange-response-error
            runtime-error-message
            show-toast!
@@ -60,14 +61,19 @@
            refresh-after-funding-submit!]}]
   (let [spectate-mode-message (spectate-mode-submit-error store)
         address (get-in @store [:wallet :address])
-        action (:action request)]
+        action (:action request)
+        ;; Named-DEX transfers are `sendAsset` and must be signed with the
+        ;; sendAsset signer; default spot <-> perps stays `usdClassTransfer`.
+        submit-transfer! (if (= "sendAsset" (:type action))
+                           submit-send-asset!
+                           submit-usd-class-transfer!)]
     (if (seq spectate-mode-message)
       (set-funding-submit-error! store show-toast! spectate-mode-message)
       (if (nil? address)
       (set-funding-submit-error! store
                                  show-toast!
                                  "Connect your wallet before transferring funds.")
-      (-> (submit-usd-class-transfer! store address action)
+      (-> (submit-transfer! store address action)
           (.then (fn [resp]
                    (if (= "ok" (:status resp))
                      (do

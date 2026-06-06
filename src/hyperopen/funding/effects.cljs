@@ -76,11 +76,13 @@
            request
            dispatch!
            submit-usd-class-transfer!
+           submit-send-asset!
            exchange-response-error
            runtime-error-message
            show-toast!
            default-funding-modal-state]
     :or {submit-usd-class-transfer! trading-api/submit-usd-class-transfer!
+         submit-send-asset! trading-api/submit-send-asset!
          exchange-response-error common/fallback-exchange-response-error
          runtime-error-message common/fallback-runtime-error-message
          show-toast! (fn [_store _kind _message] nil)
@@ -90,6 +92,7 @@
     :request request
     :dispatch! dispatch!
     :submit-usd-class-transfer! submit-usd-class-transfer!
+    :submit-send-asset! submit-send-asset!
     :exchange-response-error exchange-response-error
     :runtime-error-message runtime-error-message
     :show-toast! show-toast!

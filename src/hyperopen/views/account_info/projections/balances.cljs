@@ -369,12 +369,43 @@
          (remove nil?)
          vec)))
 
+(defn- named-dex-perps-rows
+  "Builds one `USDC (Perps)` balance row per named HIP-3 perps DEX that has a
+  clearinghouse snapshot. Each row is tagged with its dex via `:selection-coin`
+  (e.g. `\"xyz:USDC\"`) so the display renders an `xyz` namespace chip, and it
+  carries the transfer context used to open a DEX-scoped transfer modal."
+  [perp-dex-states unified?]
+  (if (or unified? (not (map? perp-dex-states)))
+    []
+    (->> perp-dex-states
+         (keep (fn [[dex clearinghouse-state]]
+                 (let [dex* (some-> dex str str/trim)]
+                   (when (and (seq dex*) (map? clearinghouse-state))
+                     (let [account-value (parse-num (get-in clearinghouse-state [:marginSummary :accountValue]))
+                           total-margin-used (parse-num (get-in clearinghouse-state [:marginSummary :totalMarginUsed]))
+                           available (- account-value total-margin-used)]
+                       {:key (str "perps-usdc-" dex*)
+                        :selection-coin (str dex* ":USDC")
+                        :coin (str "USDC (Perps) " dex*)
+                        :transfer-dex dex*
+                        :transfer-to-perp? false
+                        :total-balance account-value
+                        :available-balance available
+                        :usdc-value account-value
+                        :pnl-value nil
+                        :pnl-pct nil
+                        :amount-decimals nil})))))
+         (sort-by :key)
+         vec)))
+
 (defn build-balance-rows
   ([webdata2 spot-data]
-   (build-balance-rows webdata2 spot-data nil))
+   (build-balance-rows webdata2 spot-data nil nil nil))
   ([webdata2 spot-data account]
-   (build-balance-rows webdata2 spot-data account nil))
+   (build-balance-rows webdata2 spot-data account nil nil))
   ([webdata2 spot-data account market-by-key]
+   (build-balance-rows webdata2 spot-data account market-by-key nil))
+  ([webdata2 spot-data account market-by-key perp-dex-states]
    (let [clearinghouse-state (:clearinghouseState webdata2)
          unified? (unified-account-mode? account)
          spot-meta (:meta spot-data)
@@ -401,6 +432,8 @@
                        {:key "perps-usdc"
                         :selection-coin "USDC"
                         :coin (if unified? "USDC" "USDC (Perps)")
+                        :transfer-dex ""
+                        :transfer-to-perp? false
                         :total-balance account-value
                         :available-balance available
                         :usdc-value account-value
@@ -431,20 +464,25 @@
                                        contract-id (when-not (= coin "USDC")
                                                      (or (extract-balance-contract-id balance)
                                                          (extract-balance-contract-id token-meta)))]
-                                   {:key (str "spot-" (or token-idx coin))
-                                    :selection-coin coin
-                                    :coin coin-label
-                                    :total-balance total-num
-                                    :available-balance available-num
-                                    :usdc-value usdc-value
-                                    :pnl-value pnl-value
-                                    :pnl-pct pnl-pct
-                                    :amount-decimals decimals
-                                    :contract-id contract-id})))
+                                   (cond-> {:key (str "spot-" (or token-idx coin))
+                                            :selection-coin coin
+                                            :coin coin-label
+                                            :total-balance total-num
+                                            :available-balance available-num
+                                            :usdc-value usdc-value
+                                            :pnl-value pnl-value
+                                            :pnl-pct pnl-pct
+                                            :amount-decimals decimals
+                                            :contract-id contract-id}
+                                     (= coin "USDC")
+                                     (assoc :transfer-dex ""
+                                            :transfer-to-perp? true)))))
                           vec))
          rows (if unified?
                 (merge-unified-usdc-row spot-rows perps-row)
-                (->> (concat (when perps-row [perps-row]) spot-rows)
+                (->> (concat (when perps-row [perps-row])
+                             (named-dex-perps-rows perp-dex-states unified?)
+                             spot-rows)
                      (remove nil?)
                      (filter non-zero-balance-row?)
                      vec))]
