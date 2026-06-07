@@ -1,7 +1,7 @@
 ---
 owner: architecture
 status: canonical
-last_reviewed: 2026-03-08
+last_reviewed: 2026-06-07
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -10,6 +10,10 @@ source_of_truth: true
 
 ## Scope
 This document points to design intent, operating principles, and verified architecture rationale.
+
+Review note, 2026-06-07: verified the canonical inputs below still exist and remain
+the active owners for design intent, AGENTS section routing, architecture boundaries,
+and Architecture Decision Records.
 
 ## Repo-Wide Engineering Rules (MUST)
 - MUST keep changes scoped to the task and avoid unrelated edits.
