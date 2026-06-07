@@ -416,6 +416,11 @@
   (subaccounts-effects/api-load-subaccounts!
    (subaccounts-load-deps store)))
 
+(defn api-refresh-subaccounts-effect
+  [_ store]
+  (subaccounts-effects/api-refresh-subaccounts!
+   (subaccounts-load-deps store)))
+
 (defn- subaccounts-management-deps
   [store]
   (merge (subaccounts-load-deps store)

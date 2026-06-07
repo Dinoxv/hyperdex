@@ -362,6 +362,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-load-subaccounts}}
 
+   :actions/refresh-subaccounts
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-refresh-subaccounts}}
+
    :actions/select-subaccount
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

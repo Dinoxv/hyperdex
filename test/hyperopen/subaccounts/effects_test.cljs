@@ -88,6 +88,7 @@
                            :loaded-for-owner nil
                            :rows []
                            :error nil
+                           :refreshing? false
                            :selected-address nil
                            :selection-loaded? false
                            :create-name ""
@@ -233,6 +234,79 @@
               :request-sub-accounts! :request
               :force-refresh? false}
              @captured-opts)))))
+
+(deftest api-refresh-subaccounts-uses-force-path-and-clears-refreshing-flag-test
+  (async done
+    (let [captured-opts (atom nil)
+          store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context
+                       {:subaccounts {:status :loaded
+                                      :loaded-for-owner owner-address
+                                      :rows [{:name "Stale"
+                                              :master owner-address
+                                              :sub-account-user subaccount-address}]
+                                      :refreshing? true}}})]
+      (-> (effects/api-refresh-subaccounts!
+           {:store store
+            :now-ms-fn (constantly 999)
+            :request-sub-accounts! (fn [_address opts]
+                                     (reset! captured-opts opts)
+                                     (js/Promise.resolve
+                                      [{:name "Fresh"
+                                        :master owner-address
+                                        :sub-account-user subaccount-address}]))})
+          (.then (fn [_]
+                   (is (= [:sub-accounts owner-address 999]
+                          (:dedupe-key @captured-opts))
+                       "Force refresh must use a unique tokenized dedupe key to bypass any stuck single-flight entry.")
+                   (is (= [:sub-accounts owner-address 999]
+                          (:cache-key @captured-opts)))
+                   (is (= :loaded
+                          (get-in @store [:account-context :subaccounts :status])))
+                   (is (= "Fresh"
+                          (-> @store
+                              (get-in [:account-context :subaccounts :rows])
+                              first
+                              :name)))
+                   (is (false? (get-in @store [:account-context :subaccounts :refreshing?]))
+                       "Refreshing flag must be cleared once the force load settles.")
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected api-refresh-subaccounts! error: " err))
+                    (done)))))))
+
+(deftest api-refresh-subaccounts-clears-refreshing-flag-and-keeps-rows-on-error-test
+  (async done
+    (let [store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context
+                       {:subaccounts {:status :loaded
+                                      :loaded-for-owner owner-address
+                                      :rows [{:name "Stale"
+                                              :master owner-address
+                                              :sub-account-user subaccount-address}]
+                                      :refreshing? true}}})]
+      (-> (effects/api-refresh-subaccounts!
+           {:store store
+            :request-sub-accounts! (fn [_address _opts]
+                                     (js/Promise.reject (js/Error. "boom")))})
+          (.then (fn [_]
+                   (is (= :error
+                          (get-in @store [:account-context :subaccounts :status])))
+                   (is (= "boom"
+                          (get-in @store [:account-context :subaccounts :error])))
+                   (is (false? (get-in @store [:account-context :subaccounts :refreshing?])))
+                   (is (= "Stale"
+                          (-> @store
+                              (get-in [:account-context :subaccounts :rows])
+                              first
+                              :name))
+                       "A failed refresh must keep the previously rendered rows visible.")
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected refresh error rejection: " err))
+                    (done)))))))
 
 (deftest create-subaccount-success-clears-form-and-force-refreshes-rows-test
   (async done

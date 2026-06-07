@@ -82,7 +82,7 @@
     (is (some? copy-selected))
     (is (some? selected-row))
     (is (some? other-row))
-    (is (= [[:actions/load-subaccounts-route "/subAccounts"]]
+    (is (= [[:actions/refresh-subaccounts]]
            (get-in refresh-button [1 :on :click])))
     (is (= [[:actions/select-master-account]]
            (get-in select-master [1 :on :click])))
@@ -114,6 +114,21 @@
                    "boom"))
     (is (contains? (set (hiccup/collect-strings disconnected-node))
                    "Not connected"))))
+
+(deftest subaccounts-view-keeps-rows-visible-while-refreshing-test
+  (let [view-node (view/subaccounts-view
+                   (assoc-in (base-state)
+                             [:account-context :subaccounts :refreshing?] true))
+        refresh-button (hiccup/find-by-data-role view-node "subaccounts-refresh")
+        strings (set (hiccup/collect-strings view-node))]
+    (is (some? (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address)))
+        "A refresh must keep the rendered subaccount rows visible.")
+    (is (contains? strings "Desk"))
+    (is (not (contains? strings "Loading subaccounts...")))
+    (is (= "Refreshing..." (last refresh-button)))
+    (is (true? (get-in refresh-button [1 :disabled])))
+    (is (= [[:actions/refresh-subaccounts]]
+           (get-in refresh-button [1 :on :click])))))
 
 (deftest subaccounts-view-renders-create-rename-and-transfer-controls-test
   (let [view-node (view/subaccounts-view

@@ -2,12 +2,14 @@
 
 (def effect-binding-rows
   [[:effects/api-load-subaccounts :api-load-subaccounts]
+   [:effects/api-refresh-subaccounts :api-refresh-subaccounts]
    [:effects/api-create-subaccount :api-create-subaccount]
    [:effects/api-rename-subaccount :api-rename-subaccount]
    [:effects/api-transfer-subaccount :api-transfer-subaccount]])
 
 (def effect-order-policy-required-action-ids
   #{:actions/load-subaccounts-route
+    :actions/refresh-subaccounts
     :actions/select-subaccount
     :actions/select-master-account
     :actions/submit-create-subaccount
@@ -16,6 +18,7 @@
 
 (def action-binding-rows
   [[:actions/load-subaccounts-route :load-subaccounts-route]
+   [:actions/refresh-subaccounts :refresh-subaccounts]
    [:actions/select-subaccount :select-subaccount]
    [:actions/select-master-account :select-master-account]
    [:actions/set-subaccount-form-field :set-subaccount-form-field]

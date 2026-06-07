@@ -102,6 +102,7 @@
      [[:account-context :subaccounts :loaded-for-owner] owner-address]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
+     [[:account-context :subaccounts :refreshing?] false]
      [[:account-context :subaccounts :create-name] ""]
      [[:account-context :subaccounts :create-popover-open?] false]
      [[:account-context :subaccounts :rename-name] ""]
@@ -116,6 +117,7 @@
      [[:account-context :subaccounts :loaded-for-owner] nil]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
+     [[:account-context :subaccounts :refreshing?] false]
      [[:account-context :subaccounts :selected-address] nil]
      [[:account-context :subaccounts :create-name] ""]
      [[:account-context :subaccounts :create-popover-open?] false]
@@ -129,13 +131,44 @@
      [[:account-context :subaccounts :selection-loaded?] false]]))
 
 (defn load-subaccounts-route
+  "Route-entry loader for the Sub-Accounts page. Idempotent: when the page
+   already has (or is loading) data for the same master, re-entering the route
+   is a no-op so we never blank the visible rows or rejoin a pending load. A
+   fresh owner, an error, or an idle state triggers a full load. Manual
+   refreshes go through `refresh-subaccounts` (non-destructive force load)."
   [state path]
-  (if (subaccounts-route? path)
-    (let [owner-address (account-context/owner-address state)]
-      (cond-> [[:effects/save-many (load-route-path-values owner-address)]]
-        (seq owner-address)
-        (conj [:effects/api-load-subaccounts])))
-    []))
+  (if-not (subaccounts-route? path)
+    []
+    (let [owner-address (account-context/owner-address state)
+          {:keys [status loaded-for-owner]}
+          (get-in state [:account-context :subaccounts])]
+      (cond
+        (not (seq owner-address))
+        [[:effects/save-many (load-route-path-values nil)]]
+
+        (and (= owner-address loaded-for-owner)
+             (contains? #{:loading :loaded} status))
+        []
+
+        :else
+        [[:effects/save-many (load-route-path-values owner-address)]
+         [:effects/api-load-subaccounts]]))))
+
+(defn refresh-subaccounts
+  "User-triggered refresh of the Sub-Accounts page. Keeps the currently
+   rendered rows visible (sets a `:refreshing?` flag instead of clearing rows
+   and forcing `:loading`) and dispatches a force-refresh load that bypasses
+   the single-flight/cache dedupe key, so a stale or stuck in-flight request
+   can never block recovery."
+  [state]
+  (let [owner-address (account-context/owner-address state)]
+    (if-not (seq owner-address)
+      [[:effects/save [:account-context :subaccounts :error]
+        missing-owner-message]]
+      [[:effects/save-many [[[:account-context :subaccounts :refreshing?] true]
+                            [[:account-context :subaccounts :loaded-for-owner] owner-address]
+                            [[:account-context :subaccounts :error] nil]]]
+       [:effects/api-refresh-subaccounts]])))
 
 (defn select-subaccount
   [state address]

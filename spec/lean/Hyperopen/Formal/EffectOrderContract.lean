@@ -80,6 +80,7 @@ def policyCorpus : List (String × Policy) :=
   ,("actions/unlock-agent-trading", defaultPolicy false ["effects/unlock-agent-trading"])
   ,("actions/load-api-wallet-route", defaultPolicy false ["effects/api-load-api-wallets"])
   ,("actions/load-subaccounts-route", defaultPolicy false ["effects/api-load-subaccounts"])
+  ,("actions/refresh-subaccounts", defaultPolicy false ["effects/api-refresh-subaccounts"])
   ,("actions/load-funding-comparison", defaultPolicy false ["effects/api-fetch-predicted-fundings"])
   ,("actions/load-funding-comparison-route", defaultPolicy false ["effects/api-fetch-predicted-fundings", "effects/fetch-asset-selector-markets"])
   ,("actions/load-leaderboard", defaultPolicy false ["effects/api-fetch-leaderboard"])

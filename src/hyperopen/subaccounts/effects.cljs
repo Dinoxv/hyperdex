@@ -56,6 +56,7 @@
           :loaded-for-owner nil
           :rows []
           :error nil
+          :refreshing? false
           :selected-address nil
           :selection-loaded? false
           :create-name ""
@@ -136,6 +137,19 @@
 (defn api-load-subaccounts!
   [deps]
   (load-subaccounts! (merge {:force-refresh? false} deps)))
+
+(defn api-refresh-subaccounts!
+  "Force-refresh load for the Sub-Accounts page Refresh button. Uses the
+   tokenized force path (unique dedupe/cache key) so it bypasses any stale or
+   stuck single-flight entry, and always clears the `:refreshing?` flag once
+   the load settles."
+  [deps]
+  (-> (load-subaccounts! (assoc deps :force-refresh? true))
+      (.finally
+       (fn []
+         (when-let [store (:store deps)]
+           (swap! store assoc-in
+                  [:account-context :subaccounts :refreshing?] false))))))
 
 (def ^:private default-load-subaccounts! load-subaccounts!)
 

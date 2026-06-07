@@ -262,6 +262,7 @@
                  :loaded-for-owner nil
                  :rows []
                  :error nil
+                 :refreshing? false
                  :selected-address nil
                  :selection-loaded? false
                  :create-name ""

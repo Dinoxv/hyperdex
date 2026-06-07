@@ -96,6 +96,7 @@
                                  [[:account-context :subaccounts :loaded-for-owner] nil]
                                  [[:account-context :subaccounts :rows] []]
                                  [[:account-context :subaccounts :error] nil]
+                                 [[:account-context :subaccounts :refreshing?] false]
                                  [[:account-context :subaccounts :selected-address] nil]
                                  [[:account-context :subaccounts :create-name] ""]
                                  [[:account-context :subaccounts :create-popover-open?] false]
@@ -109,6 +110,62 @@
                                  [[:account-context :subaccounts :selection-loaded?] false]]]]
            effects))
     (is (= :idle (path-value effects [:account-context :subaccounts :status])))))
+
+(deftest load-subaccounts-route-is-idempotent-for-same-owner-when-loading-or-loaded-test
+  (doseq [status [:loading :loaded]]
+    (is (= []
+           (actions/load-subaccounts-route
+            {:wallet {:address owner-address}
+             :account-context {:subaccounts {:status status
+                                             :loaded-for-owner owner-address
+                                             :rows [{:name "Desk"
+                                                     :master owner-address
+                                                     :sub-account-user subaccount-address}]}}}
+            "/subAccounts"))
+        (str "Re-entering the route while " status
+             " for the same owner must not blank rows or re-fire the load."))))
+
+(deftest load-subaccounts-route-reloads-when-owner-differs-or-previous-load-errored-test
+  (let [error-effects (actions/load-subaccounts-route
+                       {:wallet {:address owner-address}
+                        :account-context {:subaccounts {:status :error
+                                                        :loaded-for-owner owner-address
+                                                        :error "boom"}}}
+                       "/subAccounts")]
+    (is (= :loading (path-value error-effects [:account-context :subaccounts :status])))
+    (is (= [:effects/api-load-subaccounts] (second error-effects))))
+  (let [stale-owner-effects (actions/load-subaccounts-route
+                             {:wallet {:address owner-address}
+                              :account-context {:subaccounts {:status :loaded
+                                                              :loaded-for-owner other-subaccount-address
+                                                              :rows [{:name "Stale"}]}}}
+                             "/subAccounts")]
+    (is (= :loading (path-value stale-owner-effects [:account-context :subaccounts :status])))
+    (is (= [:effects/api-load-subaccounts] (second stale-owner-effects)))))
+
+(deftest refresh-subaccounts-force-loads-without-clearing-rows-test
+  (let [effects (actions/refresh-subaccounts
+                 {:wallet {:address owner-address}
+                  :account-context {:subaccounts {:status :loaded
+                                                  :loaded-for-owner owner-address
+                                                  :rows [{:name "Desk"
+                                                          :master owner-address
+                                                          :sub-account-user subaccount-address}]}}})]
+    (is (= :effects/save-many (ffirst effects)))
+    (is (true? (path-value effects [:account-context :subaccounts :refreshing?])))
+    (is (= owner-address
+           (path-value effects [:account-context :subaccounts :loaded-for-owner])))
+    (is (nil? (path-value effects [:account-context :subaccounts :error])))
+    (is (nil? (path-value effects [:account-context :subaccounts :status]))
+        "Refresh must not touch :status, so the rendered rows stay visible.")
+    (is (nil? (path-value effects [:account-context :subaccounts :rows]))
+        "Refresh must not clear the rendered rows.")
+    (is (= [:effects/api-refresh-subaccounts] (second effects)))))
+
+(deftest refresh-subaccounts-requires-connected-owner-test
+  (is (= [[:effects/save [:account-context :subaccounts :error]
+           actions/missing-owner-message]]
+         (actions/refresh-subaccounts {:wallet {:address nil}}))))
 
 (deftest select-subaccount-validates-owner-and-persists-selected-address-test
   (let [state {:wallet {:address owner-address}

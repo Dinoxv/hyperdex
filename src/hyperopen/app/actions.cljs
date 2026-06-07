@@ -42,6 +42,7 @@
                  :close-api-wallet-modal api-wallets-actions/close-api-wallet-modal
                  :confirm-api-wallet-modal api-wallets-actions/confirm-api-wallet-modal}
    :subaccounts {:load-subaccounts-route action-adapters/load-subaccounts-route-action
+                 :refresh-subaccounts subaccounts-actions/refresh-subaccounts
                  :select-subaccount subaccounts-actions/select-subaccount
                  :select-master-account subaccounts-actions/select-master-account
                  :set-subaccount-form-field subaccounts-actions/set-subaccount-form-field

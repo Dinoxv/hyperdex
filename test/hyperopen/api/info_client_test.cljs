@@ -1,6 +1,7 @@
 (ns hyperopen.api.info-client-test
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api.info-client :as info-client]
+            [hyperopen.api.info-client.flow :as flow]
             [hyperopen.test-support.info-client :as info-support]))
 
 (deftest request-info-shares-single-flight-for-identical-dedupe-keys-test
@@ -176,4 +177,55 @@
                     (is (= 1 @fetch-calls))
                     (is (= 1 (count @sleep-calls)))
                     (is (true? (aget err "inactiveRequest")))
+                    (done)))))))
+
+(deftest fetch-with-timeout-aborts-and-rejects-when-fetch-stalls-test
+  (async done
+    (let [abort-calls (atom 0)
+          timer-callbacks (atom [])
+          signal #js {:stalled true}
+          controller #js {:signal signal
+                          :abort (fn [] (swap! abort-calls inc))}
+          request-init #js {:method "POST"}
+          result (flow/fetch-with-timeout!
+                  {:fetch-fn (fn [_url _init]
+                               ;; Never settles: simulates a stalled /info connection.
+                               (js/Promise. (fn [_resolve _reject] nil)))
+                   :set-timeout-fn (fn [callback _ms]
+                                     (swap! timer-callbacks conj callback)
+                                     :timer-id)
+                   :clear-timeout-fn (fn [_] nil)
+                   :make-abort-controller (fn [] controller)
+                   :request-timeout-ms 5}
+                  "https://example.test/info"
+                  request-init)]
+      (is (identical? signal (aget request-init "signal"))
+          "The abort signal must be attached to the request init.")
+      (is (= 1 (count @timer-callbacks)))
+      ;; Fire the scheduled timeout to simulate the deadline elapsing.
+      ((first @timer-callbacks))
+      (-> result
+          (.then (fn [_]
+                   (is false "A stalled fetch must reject, not resolve.")
+                   (done)))
+          (.catch (fn [err]
+                    (is (= 1 @abort-calls)
+                        "The stalled fetch's AbortController must be aborted.")
+                    (is (true? (aget err "timeout")))
+                    (done)))))))
+
+(deftest fetch-with-timeout-passes-through-when-no-timeout-configured-test
+  (async done
+    (let [resp #js {:ok true}
+          result (flow/fetch-with-timeout!
+                  {:fetch-fn (fn [_url _init] (js/Promise.resolve resp))
+                   :request-timeout-ms nil}
+                  "https://example.test/info"
+                  #js {:method "POST"})]
+      (-> result
+          (.then (fn [r]
+                   (is (identical? resp r))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected pass-through error: " err))
                     (done)))))))

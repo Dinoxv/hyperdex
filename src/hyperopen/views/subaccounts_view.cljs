@@ -3,7 +3,6 @@
             [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.funding.domain.availability :as funding-availability]
-            [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.views.subaccounts-view.management :as management]))
 
 (def ^:private usd-formatter
@@ -367,6 +366,7 @@
         selected-address (account-context/selected-subaccount-address state)
         selected-master? (nil? selected-address)
         status (:status subaccounts)
+        refreshing? (true? (:refreshing? subaccounts))
         error (:error subaccounts)
         active-transfer (active-transfer-row rows (:transferring-address subaccounts))
         unified-account? (unified-account-mode? state)
@@ -385,9 +385,9 @@
         "Sub-Accounts"]
        [:div {:class ["flex" "w-full" "justify-end" "gap-2" "sm:w-auto"]}
         (action-button {:data-role "subaccounts-refresh"
-                        :label (if (= :loading status) "Refreshing..." "Refresh")
-                        :disabled? (not connected?)
-                        :on-click [[:actions/load-subaccounts-route subaccounts-actions/canonical-route]]})
+                        :label (if (or (= :loading status) refreshing?) "Refreshing..." "Refresh")
+                        :disabled? (or (not connected?) refreshing?)
+                        :on-click [[:actions/refresh-subaccounts]]})
        (management/create-panel {:subaccounts subaccounts
                                   :connected? (boolean connected?)})]]
       [:section {:class ["overflow-hidden" "rounded-lg" "bg-[#0d171a]" "shadow-[0_18px_60px_rgba(0,0,0,0.18)]"]
