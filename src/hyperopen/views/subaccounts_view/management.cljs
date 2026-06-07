@@ -54,15 +54,16 @@
            :on {:input on-input}}])
 
 (defn create-panel
-  [{:keys [subaccounts connected?]}]
+  [{:keys [subaccounts connected? read-only?]}]
   (let [creating? (true? (:creating? subaccounts))
-        open? (true? (:create-popover-open? subaccounts))]
+        open? (and (not read-only?)
+                   (true? (:create-popover-open? subaccounts)))]
     [:div {:class ["relative" "flex" "w-full" "justify-end" "sm:w-auto"]
            :data-role "subaccounts-create-panel"}
      (action-button {:data-role "subaccounts-open-create-popover"
                      :label "Create Sub-Account"
                      :variant :primary
-                     :disabled? (not connected?)
+                     :disabled? (or read-only? (not connected?))
                      :on-click [[:actions/open-subaccount-create-popover]]})
      (when open?
        [:div {:class ["absolute"
@@ -87,7 +88,7 @@
         (text-input {:data-role "subaccounts-create-name"
                      :value (:create-name subaccounts)
                      :placeholder "Name"
-                     :disabled? (or creating? (not connected?))
+                     :disabled? (or read-only? creating? (not connected?))
                      :on-input [[:actions/set-subaccount-form-field
                                  :create-name
                                  [:event.target/value]]]})
@@ -99,7 +100,7 @@
          (action-button {:data-role "subaccounts-create-submit"
                          :label (if creating? "Creating..." "Confirm")
                          :variant :primary
-                         :disabled? (or creating? (not connected?))
+                         :disabled? (or read-only? creating? (not connected?))
                          :on-click [[:actions/submit-create-subaccount]]})]])]))
 
 (defn trade-button
@@ -328,9 +329,10 @@
                         :class []})]))
 
 (defn row-controls
-  [{:keys [address subaccounts]}]
-  [:div {:class ["flex" "min-w-[10rem]" "flex-wrap" "items-start" "justify-end" "gap-2"]}
-   (rename-controls {:address address
-                     :subaccounts subaccounts})
-   (transfer-controls {:address address
-                       :subaccounts subaccounts})])
+  [{:keys [address subaccounts read-only?]}]
+  (when-not read-only?
+    [:div {:class ["flex" "min-w-[10rem]" "flex-wrap" "items-start" "justify-end" "gap-2"]}
+     (rename-controls {:address address
+                       :subaccounts subaccounts})
+     (transfer-controls {:address address
+                         :subaccounts subaccounts})]))

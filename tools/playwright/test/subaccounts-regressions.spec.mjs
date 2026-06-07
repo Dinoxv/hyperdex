@@ -3,6 +3,7 @@ import { debugCall, visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
 const ownerAddress = "0x1234567890abcdef1234567890abcdef12345678";
 const subaccountAddress = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+const spectateAddress = "0x7777777777777777777777777777777777777777";
 
 async function seedAccountSurface(page, options = {}) {
   await page.evaluate(({ accountMode }) => {
@@ -234,17 +235,21 @@ async function seedSubaccountsState(page, options = {}) {
   await seedAccountSurface(page, { accountMode: options.accountMode ?? "classic" });
 }
 
-async function interceptSubaccountsApi(page) {
+async function interceptSubaccountsApi(page, options = {}) {
+  const masterAddress = options.masterAddress ?? ownerAddress;
+  const calls = options.calls;
+
   await page.route("https://api.hyperliquid.xyz/info", async (route) => {
     const payload = JSON.parse(route.request().postData() || "{}");
     if (payload?.type === "subAccounts") {
+      calls?.push(payload);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
           {
             name: "test",
-            master: ownerAddress.toLowerCase(),
+            master: masterAddress.toLowerCase(),
             subAccountUser: subaccountAddress.toLowerCase(),
             clearinghouseState: {
               marginSummary: {
@@ -273,6 +278,45 @@ async function interceptSubaccountsApi(page) {
     await route.continue();
   });
 }
+
+test("subaccounts page loads the spectated master read-only @regression", async ({ page }) => {
+  const subaccountRequests = [];
+  await interceptSubaccountsApi(page, {
+    masterAddress: spectateAddress,
+    calls: subaccountRequests
+  });
+
+  for (const width of [375, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 720 });
+    await visitRoute(page, "/subAccounts");
+    await debugCall(page, "dispatch", [":actions/start-spectate-mode", spectateAddress]);
+    await debugCall(page, "dispatch", [":actions/load-subaccounts-route", "/subAccounts"]);
+    await waitForIdle(page, { quietMs: 350, timeoutMs: 8_000, pollMs: 50 });
+
+    await expect
+      .poll(() => subaccountRequests.map((request) => String(request.user).toLowerCase()), {
+        timeout: 8_000
+      })
+      .toContain(spectateAddress);
+
+    await expect(page.locator("[data-role='subaccounts-read-only-message']"))
+      .toContainText("Spectate Mode is read-only");
+    await expect(page.locator("[data-role='subaccounts-copy-master']"))
+      .toHaveAttribute("title", "Copy address");
+    await expect(page.locator("[data-role='subaccounts-master-row']"))
+      .toContainText(spectateAddress);
+    await expect(page.locator(`[data-role="subaccounts-row-${subaccountAddress}"]`))
+      .toContainText("test");
+    await expect(page.locator("[data-role='subaccounts-open-create-popover']")).toBeDisabled();
+    await expect(page.locator("[data-role='subaccounts-select-master']")).toBeDisabled();
+    await expect(page.locator(`[data-role="subaccounts-select-${subaccountAddress}"]`))
+      .toBeDisabled();
+    await expect(page.locator(`[data-role="subaccounts-rename-${subaccountAddress}"]`))
+      .toHaveCount(0);
+    await expect(page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`))
+      .toHaveCount(0);
+  }
+});
 
 async function readTransferGeometry(page) {
   return page.evaluate((subaccountAddress) => {

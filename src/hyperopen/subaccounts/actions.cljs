@@ -24,6 +24,15 @@
   (str selected-subaccount-storage-prefix ":"
        (or (account-context/normalize-address owner-address) "")))
 
+(defn viewed-master-address
+  "Address whose subaccounts are displayed by the subaccount page.
+  This stays distinct from effective-account-address so an already selected
+  subaccount does not become the parent queried for subaccounts."
+  [state]
+  (or (when (account-context/spectate-mode-active? state)
+        (account-context/spectate-address state))
+      (account-context/owner-address state)))
+
 (defn- split-path-from-query-fragment
   [path]
   (let [path* (if (string? path) path (str (or path "")))]
@@ -96,10 +105,10 @@
 (def submit-transfer-subaccount management/submit-transfer-subaccount)
 
 (defn- load-route-path-values
-  [owner-address]
-  (if (seq owner-address)
+  [master-address]
+  (if (seq master-address)
     [[[:account-context :subaccounts :status] :loading]
-     [[:account-context :subaccounts :loaded-for-owner] owner-address]
+     [[:account-context :subaccounts :loaded-for-owner] master-address]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :create-name] ""]
@@ -131,43 +140,53 @@
 (defn load-subaccounts-route
   [state path]
   (if (subaccounts-route? path)
-    (let [owner-address (account-context/owner-address state)]
-      (cond-> [[:effects/save-many (load-route-path-values owner-address)]]
-        (seq owner-address)
+    (let [master-address (viewed-master-address state)]
+      (cond-> [[:effects/save-many (load-route-path-values master-address)]]
+        (seq master-address)
         (conj [:effects/api-load-subaccounts])))
     []))
 
+(defn- spectate-read-only-effect
+  [state]
+  (when (account-context/spectate-mode-active? state)
+    [[:effects/save [:account-context :subaccounts :error]
+      account-context/spectate-mode-read-only-message]]))
+
 (defn select-subaccount
   [state address]
-  (let [owner-address (account-context/owner-address state)
-        address* (account-context/normalize-address address)]
-    (cond
-      (not (seq owner-address))
-      [[:effects/save [:account-context :subaccounts :error]
-        missing-owner-message]]
+  (if-let [blocked (spectate-read-only-effect state)]
+    blocked
+    (let [owner-address (account-context/owner-address state)
+          address* (account-context/normalize-address address)]
+      (cond
+        (not (seq owner-address))
+        [[:effects/save [:account-context :subaccounts :error]
+          missing-owner-message]]
 
-      (not (and (seq address*)
-                (owned-subaccount-row state owner-address address*)))
-      [[:effects/save [:account-context :subaccounts :error]
-        invalid-subaccount-selection-message]]
+        (not (and (seq address*)
+                  (owned-subaccount-row state owner-address address*)))
+        [[:effects/save [:account-context :subaccounts :error]
+          invalid-subaccount-selection-message]]
 
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :selected-address] address*]
-                            [[:account-context :subaccounts :error] nil]]]
-       [:effects/local-storage-set
-        (selected-subaccount-storage-key owner-address)
-        address*]
-       [:effects/api-load-user-data address*]])))
+        :else
+        [[:effects/save-many [[[:account-context :subaccounts :selected-address] address*]
+                              [[:account-context :subaccounts :error] nil]]]
+         [:effects/local-storage-set
+          (selected-subaccount-storage-key owner-address)
+          address*]
+         [:effects/api-load-user-data address*]]))))
 
 (defn select-master-account
   [state]
-  (let [owner-address (account-context/owner-address state)]
-    (if-not (seq owner-address)
-      [[:effects/save [:account-context :subaccounts :error]
-        missing-owner-message]]
-      [[:effects/save-many [[[:account-context :subaccounts :selected-address] nil]
-                            [[:account-context :subaccounts :error] nil]]]
-       [:effects/local-storage-set
-        (selected-subaccount-storage-key owner-address)
-        ""]
-       [:effects/api-load-user-data owner-address]])))
+  (if-let [blocked (spectate-read-only-effect state)]
+    blocked
+    (let [owner-address (account-context/owner-address state)]
+      (if-not (seq owner-address)
+        [[:effects/save [:account-context :subaccounts :error]
+          missing-owner-message]]
+        [[:effects/save-many [[[:account-context :subaccounts :selected-address] nil]
+                              [[:account-context :subaccounts :error] nil]]]
+         [:effects/local-storage-set
+          (selected-subaccount-storage-key owner-address)
+          ""]
+         [:effects/api-load-user-data owner-address]]))))

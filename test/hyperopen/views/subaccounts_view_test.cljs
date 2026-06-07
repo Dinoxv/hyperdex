@@ -1,5 +1,6 @@
 (ns hyperopen.views.subaccounts-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.account.context :as account-context]
             [hyperopen.test-support.hiccup :as shared-hiccup]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
             [hyperopen.views.subaccounts-view :as view]))
@@ -12,6 +13,9 @@
 
 (def other-subaccount-address
   "0x9999999999999999999999999999999999999999")
+
+(def spectate-address
+  "0x7777777777777777777777777777777777777777")
 
 (defn- base-state []
   {:wallet {:address owner-address}
@@ -222,6 +226,52 @@
            (get-in transfer-trading-option [1 :on :click])))
     (is (= [[:actions/submit-transfer-subaccount other-subaccount-address]]
            (get-in transfer-submit [1 :on :click])))))
+
+(deftest subaccounts-view-renders-spectated-master-read-only-test
+  (let [view-node (view/subaccounts-view
+                   (-> (base-state)
+                       (assoc-in [:account-context :spectate-mode]
+                                 {:active? true
+                                  :address spectate-address})
+                       (assoc-in [:account-context :subaccounts :loaded-for-owner]
+                                 spectate-address)
+                       (assoc-in [:account-context :subaccounts :selected-address]
+                                 nil)
+                       (assoc-in [:account-context :subaccounts :rows]
+                                 [{:name "Spectated Desk"
+                                   :master spectate-address
+                                   :sub-account-user subaccount-address
+                                   :clearinghouse-state
+                                   {:marginSummary {:accountValue "123.45"}}
+                                   :spot-state
+                                   {:balances [{:coin "USDC"
+                                                :total "250.25"}]}}])))
+        strings (set (hiccup/collect-strings view-node))
+        refresh-button (hiccup/find-by-data-role view-node "subaccounts-refresh")
+        create-open (hiccup/find-by-data-role view-node "subaccounts-open-create-popover")
+        copy-master (hiccup/find-by-data-role view-node "subaccounts-copy-master")
+        master-trade (hiccup/find-by-data-role view-node "subaccounts-select-master")
+        subaccount-row (hiccup/find-by-data-role view-node
+                                                 (str "subaccounts-row-" subaccount-address))
+        subaccount-trade (hiccup/find-by-data-role view-node
+                                                   (str "subaccounts-select-" subaccount-address))
+        rename-button (hiccup/find-by-data-role view-node
+                                                (str "subaccounts-rename-" subaccount-address))
+        transfer-button (hiccup/find-by-data-role view-node
+                                                  (str "subaccounts-transfer-" subaccount-address))]
+    (is (contains? strings account-context/spectate-mode-read-only-message))
+    (is (contains? strings "Spectated Desk"))
+    (is (contains? strings "$123.45"))
+    (is (contains? strings "$250.25"))
+    (is (some? subaccount-row))
+    (is (false? (get-in refresh-button [1 :disabled])))
+    (is (= [[:actions/copy-subaccount-address spectate-address]]
+           (get-in copy-master [1 :on :click])))
+    (is (true? (get-in create-open [1 :disabled])))
+    (is (true? (get-in master-trade [1 :disabled])))
+    (is (true? (get-in subaccount-trade [1 :disabled])))
+    (is (nil? rename-button))
+    (is (nil? transfer-button))))
 
 (deftest unified-subaccounts-transfer-popover-offers-trading-account-only-test
   (let [view-node (view/subaccounts-view

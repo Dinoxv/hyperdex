@@ -148,8 +148,8 @@
                    (is (nil? (get-in @store [:account-context :subaccounts :error])))
                    (done)))
           (.catch (fn [err]
-                    (is false (str "Unexpected load-subaccounts success-path error: " err))
-                    (done)))))))
+	                    (is false (str "Unexpected load-subaccounts success-path error: " err))
+	                    (done)))))))
 
 (deftest load-subaccounts-keeps-current-valid-selection-ahead-of-stored-selection-test
   (async done

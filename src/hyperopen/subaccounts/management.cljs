@@ -143,10 +143,13 @@
                           [[:account-context :subaccounts :error] nil]]]]))
 
 (defn open-create-popover
-  [_state]
-  [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] true]
-                        [[:account-context :subaccounts :create-name] ""]
-                        [[:account-context :subaccounts :error] nil]]]])
+  [state]
+  (if (account-context/spectate-mode-active? state)
+    [[:effects/save [:account-context :subaccounts :error]
+      account-context/spectate-mode-read-only-message]]
+    [[:effects/save-many [[[:account-context :subaccounts :create-popover-open?] true]
+                          [[:account-context :subaccounts :create-name] ""]
+                          [[:account-context :subaccounts :error] nil]]]]))
 
 (defn close-create-popover
   [_state]
@@ -179,6 +182,12 @@
   [[:effects/save [:account-context :subaccounts :error]
     missing-owner-message]])
 
+(defn- spectate-read-only-effect
+  [state]
+  (when (account-context/spectate-mode-active? state)
+    [[:effects/save [:account-context :subaccounts :error]
+      account-context/spectate-mode-read-only-message]]))
+
 (defn- invalid-row-effect
   []
   [[:effects/save [:account-context :subaccounts :error]
@@ -198,30 +207,32 @@
 
 (defn submit-create-subaccount
   [state]
-  (let [owner-address (account-context/owner-address state)
-        name* (normalize-subaccount-name
-               (get-in state [:account-context :subaccounts :create-name]))]
-    (cond
-      (not (seq owner-address)) (invalid-owner-effect)
-      (not (valid-subaccount-name? name*)) (invalid-create-name-effect)
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :creating?] true]
-                            [[:account-context :subaccounts :create-popover-open?] true]
-                            [[:account-context :subaccounts :error] nil]]]
-       [:effects/api-create-subaccount {:name name*}]])))
+  (or (spectate-read-only-effect state)
+      (let [owner-address (account-context/owner-address state)
+            name* (normalize-subaccount-name
+                   (get-in state [:account-context :subaccounts :create-name]))]
+        (cond
+          (not (seq owner-address)) (invalid-owner-effect)
+          (not (valid-subaccount-name? name*)) (invalid-create-name-effect)
+          :else
+          [[:effects/save-many [[[:account-context :subaccounts :creating?] true]
+                                [[:account-context :subaccounts :create-popover-open?] true]
+                                [[:account-context :subaccounts :error] nil]]]
+           [:effects/api-create-subaccount {:name name*}]]))))
 
 (defn start-rename-subaccount
   [state address]
-  (let [owner-address (account-context/owner-address state)
-        address* (account-context/normalize-address address)
-        row (owned-subaccount-row state owner-address address*)]
-    (cond
-      (not (seq owner-address)) (invalid-owner-effect)
-      (not row) (invalid-row-effect)
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :renaming-address] address*]
-                            [[:account-context :subaccounts :rename-name] (row-name row)]
-                            [[:account-context :subaccounts :error] nil]]]])))
+  (or (spectate-read-only-effect state)
+      (let [owner-address (account-context/owner-address state)
+            address* (account-context/normalize-address address)
+            row (owned-subaccount-row state owner-address address*)]
+        (cond
+          (not (seq owner-address)) (invalid-owner-effect)
+          (not row) (invalid-row-effect)
+          :else
+          [[:effects/save-many [[[:account-context :subaccounts :renaming-address] address*]
+                                [[:account-context :subaccounts :rename-name] (row-name row)]
+                                [[:account-context :subaccounts :error] nil]]]]))))
 
 (defn cancel-rename-subaccount
   [_state]
@@ -231,37 +242,39 @@
 
 (defn submit-rename-subaccount
   [state address]
-  (let [owner-address (account-context/owner-address state)
-        address* (account-context/normalize-address address)
-        row (owned-subaccount-row state owner-address address*)
-        name* (normalize-subaccount-name
-               (get-in state [:account-context :subaccounts :rename-name]))]
-    (cond
-      (not (seq owner-address)) (invalid-owner-effect)
-      (not row) (invalid-row-effect)
-      (not (valid-subaccount-name? name*)) (invalid-rename-name-effect)
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :renaming-address] address*]
-                            [[:account-context :subaccounts :error] nil]]]
-       [:effects/api-rename-subaccount {:sub-account-user address*
-                                        :name name*}]])))
+  (or (spectate-read-only-effect state)
+      (let [owner-address (account-context/owner-address state)
+            address* (account-context/normalize-address address)
+            row (owned-subaccount-row state owner-address address*)
+            name* (normalize-subaccount-name
+                   (get-in state [:account-context :subaccounts :rename-name]))]
+        (cond
+          (not (seq owner-address)) (invalid-owner-effect)
+          (not row) (invalid-row-effect)
+          (not (valid-subaccount-name? name*)) (invalid-rename-name-effect)
+          :else
+          [[:effects/save-many [[[:account-context :subaccounts :renaming-address] address*]
+                                [[:account-context :subaccounts :error] nil]]]
+           [:effects/api-rename-subaccount {:sub-account-user address*
+                                            :name name*}]]))))
 
 (defn start-transfer-subaccount
   [state address]
-  (let [owner-address (account-context/owner-address state)
-        address* (account-context/normalize-address address)]
-    (cond
-      (not (seq owner-address)) (invalid-owner-effect)
-      (not (owned-subaccount-row state owner-address address*)) (invalid-row-effect)
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
-                            [[:account-context :subaccounts :transfer-amount] ""]
-                            [[:account-context :subaccounts :transfer-direction] :deposit]
-                            [[:account-context :subaccounts :transfer-account] :trading]
-                            [[:account-context :subaccounts :transfer-account-menu-open?] false]
-                            [[:account-context :subaccounts :transfer-token] "USDC"]
-                            [[:account-context :subaccounts :transfer-token-menu-open?] false]
-                            [[:account-context :subaccounts :error] nil]]]])))
+  (or (spectate-read-only-effect state)
+      (let [owner-address (account-context/owner-address state)
+            address* (account-context/normalize-address address)]
+        (cond
+          (not (seq owner-address)) (invalid-owner-effect)
+          (not (owned-subaccount-row state owner-address address*)) (invalid-row-effect)
+          :else
+          [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
+                                [[:account-context :subaccounts :transfer-amount] ""]
+                                [[:account-context :subaccounts :transfer-direction] :deposit]
+                                [[:account-context :subaccounts :transfer-account] :trading]
+                                [[:account-context :subaccounts :transfer-account-menu-open?] false]
+                                [[:account-context :subaccounts :transfer-token] "USDC"]
+                                [[:account-context :subaccounts :transfer-token-menu-open?] false]
+                                [[:account-context :subaccounts :error] nil]]]]))))
 
 (defn cancel-transfer-subaccount
   [_state]
@@ -280,37 +293,38 @@
 
 (defn submit-transfer-subaccount
   [state address]
-  (let [owner-address (account-context/owner-address state)
-        address* (account-context/normalize-address address)
-        row (owned-subaccount-row state owner-address address*)
-        amount-text (str (or (get-in state [:account-context :subaccounts :transfer-amount])
-                             ""))
-        direction (normalize-transfer-direction
-                   (get-in state [:account-context :subaccounts :transfer-direction]))
-        account-kind (effective-transfer-account
-                      state
-                      (get-in state [:account-context :subaccounts :transfer-account]))
-        transfer-token (normalize-transfer-token
-                        (get-in state [:account-context :subaccounts :transfer-token]))
-        amount-result (transfer-amount/normalize-transfer-amount
-                       state
-                       {:subaccount-address address*
-                        :account-kind account-kind
-                        :direction direction
-                        :token transfer-token
-                        :amount-text amount-text})]
-    (cond
-      (not (seq owner-address)) (invalid-owner-effect)
-      (not row) (invalid-row-effect)
-      (not (:ok? amount-result))
-      [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
-                            [[:account-context :subaccounts :error]
-                             (:message amount-result)]]]]
+  (or (spectate-read-only-effect state)
+      (let [owner-address (account-context/owner-address state)
+            address* (account-context/normalize-address address)
+            row (owned-subaccount-row state owner-address address*)
+            amount-text (str (or (get-in state [:account-context :subaccounts :transfer-amount])
+                                 ""))
+            direction (normalize-transfer-direction
+                       (get-in state [:account-context :subaccounts :transfer-direction]))
+            account-kind (effective-transfer-account
+                          state
+                          (get-in state [:account-context :subaccounts :transfer-account]))
+            transfer-token (normalize-transfer-token
+                            (get-in state [:account-context :subaccounts :transfer-token]))
+            amount-result (transfer-amount/normalize-transfer-amount
+                           state
+                           {:subaccount-address address*
+                            :account-kind account-kind
+                            :direction direction
+                            :token transfer-token
+                            :amount-text amount-text})]
+        (cond
+          (not (seq owner-address)) (invalid-owner-effect)
+          (not row) (invalid-row-effect)
+          (not (:ok? amount-result))
+          [[:effects/save-many [[[:account-context :subaccounts :transferring-address] nil]
+                                [[:account-context :subaccounts :error]
+                                 (:message amount-result)]]]]
 
-      :else
-      [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
-                            [[:account-context :subaccounts :error] nil]]]
-       [:effects/api-transfer-subaccount
-        (assoc (:payload amount-result)
-               :sub-account-user address*
-               :is-deposit (= :deposit direction))]])))
+          :else
+          [[:effects/save-many [[[:account-context :subaccounts :transferring-address] address*]
+                                [[:account-context :subaccounts :error] nil]]]
+           [:effects/api-transfer-subaccount
+            (assoc (:payload amount-result)
+                   :sub-account-user address*
+                   :is-deposit (= :deposit direction))]]))))

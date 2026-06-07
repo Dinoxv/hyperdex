@@ -99,7 +99,7 @@
            force-refresh?]
     :or {local-storage-get platform/local-storage-get
          now-ms-fn platform/now-ms}}]
-  (let [owner-address (account-context/owner-address @store)]
+  (let [owner-address (actions/viewed-master-address @store)]
     (if-not (seq owner-address)
       (do
         (reset-subaccounts! store)

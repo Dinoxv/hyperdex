@@ -273,7 +273,7 @@
     message]])
 
 (defn- master-section
-  [{:keys [owner-address selected-master? connected? perps-value spot-value]}]
+  [{:keys [owner-address selected-master? connected? perps-value spot-value read-only?]}]
   [:div
    (section-heading "Master Account")
    [:div {:class ["overflow-x-auto"]}
@@ -290,14 +290,14 @@
        [:td {:class ["px-3" "py-4" "num" "font-medium" "text-white"]} (format-usd perps-value)]
        [:td {:class ["px-3" "py-4" "num" "font-medium" "text-white"]} (format-usd spot-value)]
        [:td {:class ["px-3" "py-4" "text-right"]}
-        (management/trade-button {:data-role "subaccounts-select-master"
-                                  :label "Trade"
-                                  :active? selected-master?
-                                  :disabled? (not connected?)
-                                  :on-click [[:actions/select-master-account]]})]]]]]])
+	        (management/trade-button {:data-role "subaccounts-select-master"
+	                                  :label "Trade"
+	                                  :active? selected-master?
+	                                  :disabled? (or read-only? (not connected?))
+	                                  :on-click [[:actions/select-master-account]]})]]]]]])
 
 (defn- subaccount-row
-  [{:keys [row selected-address subaccounts master-transfer-max]}]
+  [{:keys [row selected-address subaccounts master-transfer-max read-only?]}]
   (let [address (row-address row)
         name (row-name row)
         perps-value (account-value row)
@@ -316,12 +316,14 @@
       (format-usd spot-value)]
      [:td {:class ["px-3" "py-4" "align-top" "text-right"]}
       [:div {:class ["flex" "justify-end" "gap-2"]}
-       (management/trade-button {:data-role (str "subaccounts-select-" address)
-                                 :label "Trade"
-                                 :active? selected?
-                                 :on-click [[:actions/select-subaccount address]]})
-       (management/row-controls {:address address
-                                 :subaccounts subaccounts})]]]))
+	       (management/trade-button {:data-role (str "subaccounts-select-" address)
+	                                 :label "Trade"
+	                                 :active? selected?
+	                                 :disabled? read-only?
+	                                 :on-click [[:actions/select-subaccount address]]})
+	       (management/row-controls {:address address
+	                                 :subaccounts subaccounts
+	                                 :read-only? read-only?})]]]))
 
 (defn- active-transfer-row
   [rows active-address]
@@ -332,7 +334,7 @@
           rows)))
 
 (defn- subaccounts-section
-  [{:keys [rows selected-address status error subaccounts master-transfer-max]}]
+  [{:keys [rows selected-address status error subaccounts master-transfer-max read-only?]}]
   [:div
    (section-heading "Sub-Accounts")
    (when (seq error)
@@ -352,23 +354,27 @@
        (into [:tbody]
              (map (fn [row]
                     ^{:key (row-address row)}
-                    (subaccount-row {:row row
-                                     :selected-address selected-address
-                                     :master-transfer-max master-transfer-max
-                                     :subaccounts subaccounts}))
-                  rows)))]]])
+	                    (subaccount-row {:row row
+	                                     :selected-address selected-address
+	                                     :master-transfer-max master-transfer-max
+	                                     :subaccounts subaccounts
+	                                     :read-only? read-only?}))
+	                  rows)))]]])
 
 (defn subaccounts-view
   [state]
-  (let [owner-address (account-context/owner-address state)
+  (let [owner-address (subaccounts-actions/viewed-master-address state)
         connected? (seq owner-address)
+        read-only-message (account-context/mutations-blocked-message state)
+        read-only? (some? read-only-message)
         subaccounts (get-in state [:account-context :subaccounts])
         rows (vec (or (:rows subaccounts) []))
         selected-address (account-context/selected-subaccount-address state)
         selected-master? (nil? selected-address)
         status (:status subaccounts)
         error (:error subaccounts)
-        active-transfer (active-transfer-row rows (:transferring-address subaccounts))
+        active-transfer (when-not read-only?
+                          (active-transfer-row rows (:transferring-address subaccounts)))
         unified-account? (unified-account-mode? state)
         master-perps-value (account-value {:clearinghouse-state (get-in state [:webdata2 :clearinghouseState])})
         master-spot-state (get-in state [:spot :clearinghouse-state])
@@ -383,26 +389,40 @@
       [:section {:class ["flex" "flex-col" "gap-4" "md:flex-row" "md:items-center" "md:justify-between"]}
        [:h1 {:class ["text-[2rem]" "font-semibold" "leading-tight" "text-white" "sm:text-[2.5rem]"]}
         "Sub-Accounts"]
-       [:div {:class ["flex" "w-full" "justify-end" "gap-2" "sm:w-auto"]}
-        (action-button {:data-role "subaccounts-refresh"
-                        :label (if (= :loading status) "Refreshing..." "Refresh")
-                        :disabled? (not connected?)
-                        :on-click [[:actions/load-subaccounts-route subaccounts-actions/canonical-route]]})
-       (management/create-panel {:subaccounts subaccounts
-                                  :connected? (boolean connected?)})]]
-      [:section {:class ["overflow-hidden" "rounded-lg" "bg-[#0d171a]" "shadow-[0_18px_60px_rgba(0,0,0,0.18)]"]
-                 :data-role "subaccounts-console"}
-       (master-section {:owner-address owner-address
-                        :selected-master? selected-master?
-                        :connected? connected?
-                        :perps-value master-perps-value
-                        :spot-value master-spot-value})
-       (subaccounts-section {:rows rows
-                             :selected-address selected-address
-                             :status status
-                             :error error
-                             :master-transfer-max master-perps-value
-                             :subaccounts subaccounts})]
+	       [:div {:class ["flex" "w-full" "justify-end" "gap-2" "sm:w-auto"]}
+	        (action-button {:data-role "subaccounts-refresh"
+	                        :label (if (= :loading status) "Refreshing..." "Refresh")
+	                        :disabled? (not connected?)
+	                        :on-click [[:actions/load-subaccounts-route subaccounts-actions/canonical-route]]})
+	       (management/create-panel {:subaccounts subaccounts
+	                                  :connected? (boolean connected?)
+	                                  :read-only? read-only?})]]
+	      (when read-only-message
+	        [:div {:class ["rounded-md"
+	                       "border"
+	                       "border-[#294145]"
+	                       "bg-[#0b171b]"
+	                       "px-3"
+	                       "py-2"
+	                       "text-sm"
+	                       "text-[#d6dddf]"]
+	               :data-role "subaccounts-read-only-message"}
+	         read-only-message])
+	      [:section {:class ["overflow-hidden" "rounded-lg" "bg-[#0d171a]" "shadow-[0_18px_60px_rgba(0,0,0,0.18)]"]
+	                 :data-role "subaccounts-console"}
+	       (master-section {:owner-address owner-address
+	                        :selected-master? selected-master?
+	                        :connected? connected?
+	                        :perps-value master-perps-value
+	                        :spot-value master-spot-value
+	                        :read-only? read-only?})
+	       (subaccounts-section {:rows rows
+	                             :selected-address selected-address
+	                             :status status
+	                             :error error
+	                             :master-transfer-max master-perps-value
+	                             :subaccounts subaccounts
+	                             :read-only? read-only?})]
       (when active-transfer
         (let [address (row-address active-transfer)
               perps-value (account-value active-transfer)

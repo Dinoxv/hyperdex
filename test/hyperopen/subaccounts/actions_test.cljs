@@ -1,5 +1,6 @@
 (ns hyperopen.subaccounts.actions-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.account.context :as account-context]
             [hyperopen.subaccounts.actions :as actions]))
 
 (def owner-address
@@ -10,6 +11,9 @@
 
 (def other-subaccount-address
   "0x9999999999999999999999999999999999999999")
+
+(def spectate-address
+  "0x7777777777777777777777777777777777777777")
 
 (defn- path-value
   [effects path]
@@ -83,6 +87,19 @@
     (is (= [:effects/api-load-subaccounts]
            (second effects)))))
 
+(deftest load-subaccounts-route-uses-spectated-master-address-test
+  (let [effects (actions/load-subaccounts-route
+                 {:wallet {:address owner-address}
+                  :account-context
+                  {:spectate-mode {:active? true
+                                    :address spectate-address}}}
+                 "/subaccounts")]
+    (is (= :loading (path-value effects [:account-context :subaccounts :status])))
+    (is (= spectate-address
+           (path-value effects [:account-context :subaccounts :loaded-for-owner])))
+    (is (= [:effects/api-load-subaccounts]
+           (second effects)))))
+
 (deftest load-subaccounts-route-skips-heavy-load-when-route-is-inactive-or-owner-missing-test
   (is (= []
          (actions/load-subaccounts-route {:wallet {:address owner-address}}
@@ -146,6 +163,22 @@
   (is (= [[:effects/save [:account-context :subaccounts :error]
            "Connect your wallet before selecting a subaccount."]]
          (actions/select-master-account {:wallet {:address nil}}))))
+
+(deftest selection-actions-are-read-only-in-spectate-mode-test
+  (let [state {:wallet {:address owner-address}
+               :account-context
+               {:spectate-mode {:active? true
+                                 :address spectate-address}
+                :subaccounts
+                {:rows [{:name "Desk"
+                         :master spectate-address
+                         :sub-account-user subaccount-address}]}}}]
+    (is (= [[:effects/save [:account-context :subaccounts :error]
+             account-context/spectate-mode-read-only-message]]
+           (actions/select-subaccount state subaccount-address)))
+    (is (= [[:effects/save [:account-context :subaccounts :error]
+             account-context/spectate-mode-read-only-message]]
+           (actions/select-master-account state)))))
 
 (deftest subaccount-management-form-fields-normalize-supported-inputs-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :create-name] " Desk "]
@@ -244,6 +277,24 @@
   (is (= [[:effects/save [:account-context :subaccounts :error]
            "Connect your wallet before selecting a subaccount."]]
          (actions/submit-create-subaccount {:wallet {:address nil}}))))
+
+(deftest management-actions-are-read-only-in-spectate-mode-test
+  (let [state (assoc-in (base-management-state)
+                        [:account-context :spectate-mode]
+                        {:active? true
+                         :address spectate-address})
+        blocked [[:effects/save [:account-context :subaccounts :error]
+                  account-context/spectate-mode-read-only-message]]]
+    (is (= blocked (actions/open-create-popover state)))
+    (is (= blocked (actions/submit-create-subaccount state)))
+    (is (= blocked (actions/start-rename-subaccount state subaccount-address)))
+    (is (= blocked (actions/submit-rename-subaccount state subaccount-address)))
+    (is (= blocked (actions/start-transfer-subaccount state subaccount-address)))
+    (is (= blocked (actions/submit-transfer-subaccount
+                    (assoc-in state
+                              [:account-context :subaccounts :transfer-amount]
+                              "1.23")
+                    subaccount-address)))))
 
 (deftest rename-subaccount-actions-validate-ownership-and-emit-management-effect-test
   (is (= [[:effects/save-many [[[:account-context :subaccounts :renaming-address]
