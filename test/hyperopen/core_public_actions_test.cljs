@@ -50,6 +50,8 @@
               :amount-input ""
               :to-perp? true
               :transfer-dex ""
+              :transfer-destination-address ""
+              :transfer-from-subaccount ""
               :destination-input ""
               :hyperunit-lifecycle {:direction nil
                                     :asset-key nil

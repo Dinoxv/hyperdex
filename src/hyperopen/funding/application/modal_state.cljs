@@ -30,6 +30,8 @@
    :amount-input ""
    :to-perp? true
    :transfer-dex ""
+   :transfer-destination-address ""
+   :transfer-from-subaccount ""
    :destination-input ""
    :withdraw-selected-asset-key assets-domain/withdraw-default-asset-key
    :withdraw-generated-address nil

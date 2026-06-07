@@ -60,7 +60,12 @@
            close-funding-modal!
            refresh-after-funding-submit!]}]
   (let [spectate-mode-message (spectate-mode-submit-error store)
+        ;; The connected owner wallet signs, even when the funds source from a
+        ;; selected subaccount (Hyperliquid subaccount actions are owner-signed).
         address (get-in @store [:wallet :address])
+        ;; Balances that change belong to the active/effective account (which may be
+        ;; the selected subaccount), so refresh that rather than only the owner wallet.
+        refresh-address (or (account-context/effective-account-address @store) address)
         action (:action request)
         ;; Named-DEX transfers are `sendAsset` and must be signed with the
         ;; sendAsset signer; default spot <-> perps stays `usdClassTransfer`.
@@ -79,7 +84,7 @@
                      (do
                        (close-funding-modal! store default-funding-modal-state)
                        (show-toast! store :success "Transfer submitted.")
-                       (refresh-after-funding-submit! store dispatch! address)
+                       (refresh-after-funding-submit! store dispatch! refresh-address)
                        resp)
                      (let [error-text (str/trim (str (exchange-response-error resp)))
                            message (str "Transfer failed: "

@@ -192,6 +192,33 @@
   (max 0 (or (clearinghouse-withdrawable (get-in state [:perp-dex-clearinghouse dex]))
              0)))
 
+(defn pooled-perps-collateral?
+  "True when the account holds perps USDC as a single pooled balance shared across
+  DEXs rather than siloed per HIP-3 DEX. For pooled accounts the exchange rejects a
+  per-DEX `sendAsset` (named `sourceDex`/`destinationDex`) with \"Unified account
+  only supports sending assets through spot\": their perps<->spot moves must use the
+  *default* perps DEX (`sourceDex`/`destinationDex` in {\"\", \"spot\"}). Verified
+  against the live ledger of the reporting unified account `0x999e9a39…`, whose 2026
+  perps<->spot transfers are all `sendAsset` with `sourceDex:\"\"`/`destinationDex:\"spot\"`
+  (and the reverse) — never a named dex, and no `usdClassTransfer` since the unified
+  migration.
+
+  Covers two account shapes the rest of the app otherwise treats differently:
+  - unified / portfolio-margin accounts (`:account :mode` is `:unified`), and
+  - the deprecated DEX Abstraction mode (raw `userAbstraction` = `dexAbstraction`),
+    which `normalize-user-abstraction-mode` folds into `:classic` even though its
+    USDC defaults to the (pooled) perps balance.
+
+  Genuine Standard/manual accounts (`default`/`disabled`/nil/unknown) return false
+  and keep the per-DEX `sendAsset` path, where their collateral really is siloed."
+  [state]
+  (or (= :unified (get-in state [:account :mode]))
+      (= "dexabstraction"
+         (some-> (get-in state [:account :abstraction-raw])
+                 str
+                 str/trim
+                 str/lower-case))))
+
 (defn transfer-max-amount
   [state {:keys [to-perp? transfer-dex]}]
   (if (true? to-perp?)

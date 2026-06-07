@@ -56,21 +56,45 @@
       hyperliquid-mainnet-usdc-token))
 
 (defn- named-dex-transfer-request
-  [state dex to-perp? amount]
-  (when-let [destination (amounts/normalize-evm-address (get-in state [:wallet :address]))]
-    {:action {:type "sendAsset"
-              :destination destination
-              :sourceDex (if to-perp? "spot" dex)
-              :destinationDex (if to-perp? dex "spot")
-              :token (usdc-transfer-token state)
-              :amount (amounts/amount->text amount)
-              :fromSubAccount ""}}))
+  "Builds the `sendAsset` for a named-DEX (or default-perp, when `dex` is \"\")
+  transfer. The source/destination identity comes from the modal: when a selected,
+  owner-controlled subaccount holds the balance, `:transfer-from-subaccount` and
+  `:transfer-destination-address` carry that subaccount so the action sources from
+  it and lands in its own spot; otherwise they default to the connected wallet and
+  an empty `fromSubAccount`. The owner wallet still signs (see submit-effects)."
+  [state modal dex to-perp? amount]
+  (let [destination (or (amounts/normalize-evm-address (:transfer-destination-address modal))
+                        (amounts/normalize-evm-address (get-in state [:wallet :address])))
+        from-subaccount (or (amounts/normalize-evm-address (:transfer-from-subaccount modal))
+                            "")]
+    (when destination
+      {:action {:type "sendAsset"
+                :destination destination
+                :sourceDex (if to-perp? "spot" dex)
+                :destinationDex (if to-perp? dex "spot")
+                :token (usdc-transfer-token state)
+                :amount (amounts/amount->text amount)
+                :fromSubAccount from-subaccount}})))
 
 (defn transfer-preview
   [state modal]
   (let [amount (amounts/parse-input-amount (:amount-input modal))
         to-perp? (true? (:to-perp? modal))
         dex (availability/transfer-dex-name (:transfer-dex modal))
+        pooled? (availability/pooled-perps-collateral? state)
+        ;; A selected subaccount source must use `sendAsset` — it is the only action that
+        ;; carries `fromSubAccount`. `usdClassTransfer` has no subaccount field and is posted
+        ;; without a `vaultAddress`, so it would move the signing OWNER's USDC instead of the
+        ;; subaccount's (and the post-success refresh of the untouched subaccount would hide
+        ;; it). So `usdClassTransfer` is used only for a plain master-account default transfer.
+        subaccount-source? (some? (amounts/normalize-evm-address (:transfer-from-subaccount modal)))
+        ;; A named dex always needs `sendAsset`. Pooled accounts (unified / portfolio margin /
+        ;; DEX Abstraction) also need it and must collapse any named dex to the default perps
+        ;; DEX (""), because the exchange rejects a per-DEX `sendAsset` for them ("Unified
+        ;; account only supports sending assets through spot"). Verified against the reporting
+        ;; accounts' live ledgers (sourceDex/destinationDex in {"", "spot"}).
+        use-send-asset? (or (some? dex) pooled? subaccount-source?)
+        transfer-perps-dex (if pooled? "" (or dex ""))
         max-amount (availability/transfer-max-amount state modal)]
     (cond
       (not (amounts/finite-number? max-amount))
@@ -95,8 +119,8 @@
       {:ok? false
        :display-message "Amount exceeds available balance."}
 
-      dex
-      (if-let [request (named-dex-transfer-request state dex to-perp? amount)]
+      use-send-asset?
+      (if-let [request (named-dex-transfer-request state modal transfer-perps-dex to-perp? amount)]
         {:ok? true
          :request request}
         {:ok? false

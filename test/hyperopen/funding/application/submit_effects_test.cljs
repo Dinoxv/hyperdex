@@ -246,6 +246,51 @@
                     (is false (str "Unexpected send-asset transfer error: " err))
                     (done)))))))
 
+(deftest api-submit-funding-transfer-subaccount-source-signs-owner-refreshes-effective-test
+  ;; A selected classic subaccount under a unified master: the sendAsset carries
+  ;; fromSubAccount = subaccount, the OWNER wallet signs (not the subaccount), and the
+  ;; post-success refresh targets the effective (subaccount) account whose balance changed.
+  (async done
+    (let [owner "0x999e9a397b703d68af21113abededd827b309068"
+          subaccount "0xbce774ef2382a4eb9376ea6f20408b318b10b63e"
+          default-modal (effects-support/default-funding-modal-state)
+          store (atom {:wallet {:address owner}
+                       :account-context {:subaccounts {:selected-address subaccount
+                                                       :rows [{:sub-account-user subaccount
+                                                               :master owner}]}}
+                       :funding-ui {:modal (effects-support/seed-modal :transfer)}})
+          send-asset-calls (atom [])
+          toasts (atom [])
+          dispatches (atom [])]
+      (-> (effects/api-submit-funding-transfer!
+           (submit-deps
+            {:store store
+            :request {:action {:type "sendAsset"
+                               :destination subaccount
+                               :sourceDex "xyz"
+                               :destinationDex "spot"
+                               :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                               :amount "100"
+                               :fromSubAccount subaccount}}
+            :submit-send-asset! (fn [_store address action]
+                                  (swap! send-asset-calls conj [address action])
+                                  (js/Promise.resolve {:status "ok"}))
+            :show-toast! (effects-support/capture-toast! toasts)
+            :dispatch! (effects-support/capture-dispatch! dispatches)
+            :default-funding-modal-state (fn [] default-modal)}))
+          (.then (fn [resp]
+                   (is (= {:status "ok"} resp))
+                   ;; Owner wallet signs, not the subaccount.
+                   (is (= [owner] (mapv first @send-asset-calls)))
+                   (is (= subaccount (:fromSubAccount (second (first @send-asset-calls)))))
+                   ;; Refresh targets the effective (subaccount) account.
+                   (is (= [[[[:actions/load-user-data subaccount]]]]
+                          (mapv (fn [[_store event]] [event]) @dispatches)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected subaccount transfer error: " err))
+                    (done)))))))
+
 (deftest api-submit-funding-withdraw-no-wallet-sets-error-test
   (let [store (atom {:wallet {}
                      :funding-ui {:modal (effects-support/seed-modal :withdraw)}})

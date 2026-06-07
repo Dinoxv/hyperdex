@@ -41,6 +41,8 @@
    :amount-input ""
    :to-perp? true
    :transfer-dex ""
+   :transfer-destination-address ""
+   :transfer-from-subaccount ""
    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
    :withdraw-selected-asset-key :usdc
    :withdraw-generated-address nil
@@ -76,7 +78,10 @@
            (funding-actions/open-funding-deposit-modal state)))
     (is (= [funding-modal-surface-load-effect
             [:effects/save [:funding-ui :modal]
-             (expected-open-modal :transfer)]]
+             ;; With no selected subaccount, the transfer modal sources from the
+             ;; connected wallet: destination defaults to it, fromSubAccount empty.
+             (assoc (expected-open-modal :transfer)
+                    :transfer-destination-address "0x1234567890abcdef1234567890abcdef12345678")]]
            (funding-actions/open-funding-transfer-modal state)))
     (is (= [funding-modal-surface-load-effect
             [:effects/save [:funding-ui :modal]

@@ -96,7 +96,19 @@
         transfer-dex (or (some-> (:dex context) str str/trim) "")
         to-perp? (if (contains? context :to-perp?)
                    (true? (:to-perp? context))
-                   true)]
+                   true)
+        ;; A named-DEX balance shown for a selected owner-controlled subaccount belongs
+        ;; to it: source from it (`fromSubAccount`) and land in its own spot; owner still
+        ;; signs. `nil` vault = master active (wallet destination, empty fromSubAccount).
+        ;; Explicit context addresses (normalized) win, for direct request-builder tests.
+        vault (account-context/exchange-vault-address state)
+        ctx-destination (some-> (:destination context) account-context/normalize-address)
+        ctx-from-subaccount (some-> (:from-subaccount context) account-context/normalize-address)
+        transfer-from-subaccount (or ctx-from-subaccount vault "")
+        transfer-destination-address (or ctx-destination
+                                         vault
+                                         (wallet-address state)
+                                         "")]
     [[:effects/load-surface-module :funding-modal]
      [:effects/save funding-modal-path
       (-> (default-funding-modal-state)
@@ -107,6 +119,8 @@
                  :withdraw-search-input ""
                  :to-perp? to-perp?
                  :transfer-dex transfer-dex
+                 :transfer-destination-address transfer-destination-address
+                 :transfer-from-subaccount transfer-from-subaccount
                  :destination-input (or (wallet-address state) ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]]))
 (defn open-funding-withdraw-modal
