@@ -111,7 +111,7 @@ Out of scope:
 
 ## Validation And Acceptance
 
-- `npm test` — PASS (4250 tests, 0 failures, 0 errors).
+- `npm test` — PASS (4252 tests, 0 failures, 0 errors).
 - `npm run test:websocket` — PASS (531 tests, 0 failures, 0 errors).
 - `app`/`portfolio` compile with 0 warnings; `lint:namespace-sizes` passes (modal_commands
   exception bumped 545 -> 560, split still retire-by 2026-06-30).
@@ -145,6 +145,17 @@ Out of scope:
   on the signing owner. For a selected subaccount that silently moves the owner's USDC (or
   fails), while the post-success refresh of the untouched subaccount hides the regression.
   Surfaced by /ultrareview (bug_001); fixed by a single `use-send-asset?` branch.
+  Date/Author: 2026-06-07 / Claude
+
+- Decision: Make `transfer-max-amount` pooled-aware so a pooled account's named-DEX
+  perps->spot validates/displays the max against the default pooled perps balance
+  (`perps-withdrawable`), matching the collapsed `sourceDex ""` it submits with — not the
+  (possibly empty) named bucket.
+  Rationale: Otherwise a pooled account (reachable for `dexAbstraction`, which is `:classic`
+  so named rows are not unified-gated) with pooled default-perps collateral but an empty
+  `xyz` bucket fails with "No perps balance available" before the fixed request path runs.
+  `transfer-max-amount` drives both the displayed MAX and the preview validation, so fixing
+  it there keeps both consistent. Surfaced by a second external review.
   Date/Author: 2026-06-07 / Claude
 
 ## Surprises & Discoveries

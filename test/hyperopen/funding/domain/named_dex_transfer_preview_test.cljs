@@ -31,6 +31,19 @@
     (is (= 78.22 (availability/transfer-max-amount state {:to-perp? true
                                                           :transfer-dex "xyz"})))))
 
+(deftest transfer-max-amount-pooled-named-dex-reads-default-perps-not-named-bucket-test
+  ;; Pooled accounts submit a named-DEX perps -> spot from the default perps DEX, so the
+  ;; max must read the default pooled balance, not the (here empty) named bucket.
+  (let [state (-> (named-dex-state)
+                  (assoc :account {:mode :classic :abstraction-raw "dexAbstraction"})
+                  (assoc :perp-dex-clearinghouse {})
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:withdrawable "500.0"
+                             :marginSummary {:accountValue "500.0"
+                                             :totalMarginUsed "0.0"}}))]
+    (is (= 500.0 (availability/transfer-max-amount state {:to-perp? false
+                                                          :transfer-dex "xyz"})))))
+
 (deftest transfer-dex-name-normalizes-default-and-spot-aliases-test
   (is (nil? (availability/transfer-dex-name nil)))
   (is (nil? (availability/transfer-dex-name "")))
@@ -116,8 +129,14 @@
   ;; perps -> spot move collapses to the default perps DEX ("") and stays a
   ;; `sendAsset` (sourceDex:""/destinationDex:"spot"). Matches the reporting
   ;; account's live 2026 ledger.
-  (let [state (assoc (named-dex-state)
-                     :account {:mode :unified :abstraction-raw "unifiedAccount"})]
+  ;; Pooled USDC lives in the default perps balance, so seed it nonzero: the pooled
+  ;; perps -> spot max now reads the default bucket (matching the collapsed sourceDex "").
+  (let [state (-> (named-dex-state)
+                  (assoc :account {:mode :unified :abstraction-raw "unifiedAccount"})
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:withdrawable "2000.0"
+                             :marginSummary {:accountValue "2000.0"
+                                             :totalMarginUsed "0.0"}}))]
     (is (= {:ok? true
             :request {:action {:type "sendAsset"
                                :destination "0x1234567890abcdef1234567890abcdef12345678"
@@ -162,6 +181,32 @@
            (policy/transfer-preview state
                                     {:amount-input "25"
                                      :to-perp? true})))))
+
+(deftest transfer-preview-pooled-dex-abstraction-empty-named-bucket-uses-default-perps-test
+  ;; dexAbstraction folds to :classic, so named rows are NOT hidden by the unified-row
+  ;; gating; `pooled-perps-collateral?` is still true. Its USDC pools in the default perps
+  ;; balance, and the named `xyz` bucket can be empty/missing. A `Perps (xyz) -> Spot` must
+  ;; build `sourceDex ""` AND validate against the default pooled balance, not the empty
+  ;; named bucket (which would otherwise fail with "No perps balance available").
+  (let [state (-> (named-dex-state)
+                  (assoc :account {:mode :classic :abstraction-raw "dexAbstraction"})
+                  (assoc :perp-dex-clearinghouse {})
+                  (assoc-in [:webdata2 :clearinghouseState]
+                            {:withdrawable "500.0"
+                             :marginSummary {:accountValue "500.0"
+                                             :totalMarginUsed "0.0"}}))]
+    (is (= {:ok? true
+            :request {:action {:type "sendAsset"
+                               :destination "0x1234567890abcdef1234567890abcdef12345678"
+                               :sourceDex ""
+                               :destinationDex "spot"
+                               :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                               :amount "100"
+                               :fromSubAccount ""}}}
+           (policy/transfer-preview state
+                                    {:amount-input "100"
+                                     :to-perp? false
+                                     :transfer-dex "xyz"})))))
 
 (def ^:private subaccount-address "0xbce774ef2382a4eb9376ea6f20408b318b10b63e")
 
@@ -246,7 +291,11 @@
          (policy/transfer-preview (-> (named-dex-state)
                                       (assoc :wallet {})
                                       (assoc :account {:mode :unified
-                                                       :abstraction-raw "unifiedAccount"}))
+                                                       :abstraction-raw "unifiedAccount"})
+                                      (assoc-in [:webdata2 :clearinghouseState]
+                                                {:withdrawable "2000.0"
+                                                 :marginSummary {:accountValue "2000.0"
+                                                                 :totalMarginUsed "0.0"}}))
                                   {:amount-input "100"
                                    :to-perp? false
                                    :transfer-dex "xyz"}))))
