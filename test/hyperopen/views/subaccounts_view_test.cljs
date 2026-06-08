@@ -29,6 +29,13 @@
    {:subaccounts
     {:status :loaded
      :loaded-for-owner owner-address
+     :owner-snapshot {:owner owner-address
+                      :clearinghouse-state {:marginSummary {:accountValue "999.99"}
+                                            :withdrawable "999.99"}
+                      :spot-state {:balances [{:coin "USDC"
+                                                :total "50.50"}]}
+                      :loading? false
+                      :error nil}
      :rows [{:name "Desk"
              :master owner-address
              :sub-account-user subaccount-address
@@ -96,6 +103,84 @@
            (get-in copy-selected [1 :on :click])))
     (is (= [[:actions/select-subaccount other-subaccount-address]]
            (get-in select-other [1 :on :click])))))
+
+(deftest selected-subaccount-active-state-does-not-render-as-master-balance-test
+  (let [view-node (view/subaccounts-view
+                   (-> (base-state)
+                       ;; In the user report the header is already trading as the
+                       ;; selected subaccount, so top-level account state belongs
+                       ;; to Tenor/Desk, not to the master wallet.
+                       (assoc-in [:webdata2 :clearinghouseState]
+                                 {:marginSummary {:accountValue "2002.20"
+                                                  :totalMarginUsed "0"}
+                                  :withdrawable "2002.19691"})
+                       (assoc-in [:account-context :subaccounts :owner-snapshot]
+                                 {:owner owner-address
+                                  :clearinghouse-state
+                                  {:marginSummary {:accountValue "0"
+                                                   :totalMarginUsed "0"}
+                                   :withdrawable "0"}
+                                  :spot-state {:balances [{:coin "USDC"
+                                                           :total "0"
+                                                           :hold "0"}]}
+                                  :loading? false
+                                  :error nil})
+                       (assoc-in [:account-context :subaccounts :rows 0 :clearinghouse-state]
+                                 {:marginSummary {:accountValue "2002.20"
+                                                  :totalMarginUsed "0"}
+                                  :withdrawable "2002.19691"})
+                       (assoc-in [:account-context :subaccounts :transferring-address]
+                                 subaccount-address)))
+        master-row (hiccup/find-by-data-role view-node "subaccounts-master-row")
+        selected-row (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address))
+        transfer-max (hiccup/find-by-data-role view-node
+                                               (str "subaccounts-transfer-max-" subaccount-address))
+        transfer-submit (hiccup/find-by-data-role view-node
+                                                  (str "subaccounts-transfer-submit-" subaccount-address))
+        master-strings (set (hiccup/collect-strings master-row))
+        selected-strings (set (hiccup/collect-strings selected-row))]
+    (is (contains? selected-strings "$2,002.20")
+        "The selected subaccount row still shows the selected account's row balance.")
+    (is (contains? master-strings "$0.00")
+        "The master row must come from the owner snapshot, not the active selected subaccount.")
+    (is (not (contains? master-strings "$2,002.20"))
+        "The selected subaccount's active top-level state must not be duplicated into the master row.")
+    (is (contains? (set (hiccup/collect-strings transfer-max))
+                   "MAX: 0 USDC"))
+    (is (true? (get-in transfer-submit [1 :disabled]))
+        "A zero master source max must disable the default Master -> subaccount submit.")))
+
+(deftest subaccounts-transfer-max-uses-withdrawable-source-not-equity-test
+  (let [base (-> (base-state)
+                 (assoc-in [:account-context :subaccounts :owner-snapshot]
+                           {:owner owner-address
+                            :clearinghouse-state
+                            {:marginSummary {:accountValue "2002.20"
+                                             :totalMarginUsed "0"}
+                             :withdrawable "12.34"}
+                            :spot-state {:balances [{:coin "USDC"
+                                                     :total "50.50"}]}
+                            :loading? false
+                            :error nil})
+                 (assoc-in [:account-context :subaccounts :rows 0 :clearinghouse-state]
+                           {:marginSummary {:accountValue "2002.20"
+                                            :totalMarginUsed "0"}
+                            :withdrawable "7.89"})
+                 (assoc-in [:account-context :subaccounts :transferring-address]
+                           subaccount-address))
+        deposit-node (view/subaccounts-view base)
+        withdraw-node (view/subaccounts-view
+                       (assoc-in base
+                                 [:account-context :subaccounts :transfer-direction]
+                                 :withdraw))
+        deposit-max (hiccup/find-by-data-role deposit-node
+                                              (str "subaccounts-transfer-max-" subaccount-address))
+        withdraw-max (hiccup/find-by-data-role withdraw-node
+                                               (str "subaccounts-transfer-max-" subaccount-address))]
+    (is (contains? (set (hiccup/collect-strings deposit-max))
+                   "MAX: 12.34 USDC"))
+    (is (contains? (set (hiccup/collect-strings withdraw-max))
+                   "MAX: 7.89 USDC"))))
 
 (deftest subaccounts-view-renders-empty-and-error-states-test
   (let [empty-node (view/subaccounts-view
@@ -177,8 +262,8 @@
                                                        (str "subaccounts-transfer-account-option-"
                                                             subaccount-address
                                                             "-spot"))]
-    (is (contains? (set (hiccup/collect-strings transfer-account-menu)) "Trading Account"))
-    (is (not (contains? (set (hiccup/collect-strings transfer-account-menu)) "Spot Account")))
+    (is (contains? (set (hiccup/collect-strings transfer-account-menu)) "Spot Account"))
+    (is (not (contains? (set (hiccup/collect-strings transfer-account-menu)) "Trading Account")))
     (is (nil? transfer-spot-option)
         "A unified master must not expose the spot transfer option, regardless of the active account mode.")))
 
@@ -352,6 +437,18 @@
                                  {:withdrawable "0.01"
                                   :marginSummary {:accountValue "999.99"
                                                   :totalMarginUsed "0"}})
+                       (assoc-in [:account-context :subaccounts :owner-snapshot]
+                                 {:owner owner-address
+                                  :clearinghouse-state
+                                  {:withdrawable "0.01"
+                                   :marginSummary {:accountValue "999.99"
+                                                   :totalMarginUsed "0"}}
+                                  :spot-state {:balances [{:coin "USDC"
+                                                           :available "301.12859"
+                                                           :total "301.12859"
+                                                           :hold "0"}]}
+                                  :loading? false
+                                  :error nil})
                        (assoc-in [:account-context :subaccounts :transfer-account] :spot)
                        (assoc-in [:account-context :subaccounts :transfer-account-menu-open?] true)
                        (assoc-in [:account-context :subaccounts :transferring-address] subaccount-address)))
@@ -366,11 +463,11 @@
         transfer-max (hiccup/find-by-data-role view-node
                                                (str "subaccounts-transfer-max-" subaccount-address))]
     (is (contains? (set (hiccup/collect-strings transfer-direction))
-                   "Trading Account"))
+                   "Spot Account"))
     (is (contains? (set (hiccup/collect-strings transfer-account-menu))
-                   "Trading Account"))
+                   "Spot Account"))
     (is (not (contains? (set (hiccup/collect-strings transfer-account-menu))
-                        "Spot Account")))
+                        "Trading Account")))
     (is (nil? transfer-spot-option))
     (is (contains? (set (hiccup/collect-strings transfer-max))
                    "MAX: 301.12859 USDC"))))

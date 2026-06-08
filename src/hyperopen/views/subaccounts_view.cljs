@@ -152,7 +152,7 @@
           :available-display "0"}])))
 
 (defn- transfer-assets
-  [{:keys [subaccounts active-transfer master-spot-state deposit-max withdraw-max unified-account?]}]
+  [{:keys [subaccounts active-transfer owner-spot-state deposit-max-value withdraw-max-value deposit-max withdraw-max unified-account?]}]
   (let [direction (or (:transfer-direction subaccounts) :deposit)
         account-kind (if unified-account?
                        :trading
@@ -162,27 +162,38 @@
       (spot-transfer-assets
        (if withdrawing?
          (spot-state active-transfer)
-         master-spot-state))
+         owner-spot-state))
       [{:symbol "USDC"
         :token "USDC"
+        :available (if withdrawing? withdraw-max-value deposit-max-value)
         :available-display (if withdrawing? withdraw-max deposit-max)}])))
 
 (defn- unified-account-mode?
   [state]
   (account-context/subaccounts-owner-unified? state))
 
-(defn- subaccount-availability-state
-  [state row]
-  {:account {:mode (get-in state [:account :mode])}
-   :spot {:clearinghouse-state (spot-state row)}
-   :webdata2 {:clearinghouseState (clearinghouse-state row)}})
+(defn- owner-snapshot
+  [state owner-address]
+  (let [snapshot (get-in state [:account-context :subaccounts :owner-snapshot])]
+    (when (and (map? snapshot)
+               (= owner-address (normalize-address (:owner snapshot))))
+      snapshot)))
 
-(defn- trading-transfer-max
-  [state fallback-value]
-  (if (unified-account-mode? state)
-    (or (funding-availability/unified-spot-usdc-available state)
-        fallback-value)
-    fallback-value))
+(defn- account-source-state
+  [{:keys [mode clearinghouse-state spot-state]}]
+  {:account {:mode mode}
+   :spot {:clearinghouse-state spot-state}
+   :webdata2 {:clearinghouseState clearinghouse-state}})
+
+(defn- source-trading-transfer-max
+  [{:keys [unified-account? clearinghouse-state spot-state]}]
+  (let [source-state (account-source-state
+                      {:mode (if unified-account? :unified :classic)
+                       :clearinghouse-state clearinghouse-state
+                       :spot-state spot-state})]
+    (if unified-account?
+      (or (funding-availability/spot-usdc-available source-state) 0)
+      (funding-availability/perps-withdrawable source-state))))
 
 (defn- lucide-node->hiccup
   [node]
@@ -377,10 +388,17 @@
         active-transfer (when-not read-only?
                           (active-transfer-row rows (:transferring-address subaccounts)))
         unified-account? (unified-account-mode? state)
-        master-perps-value (account-value {:clearinghouse-state (get-in state [:webdata2 :clearinghouseState])})
-        master-spot-state (get-in state [:spot :clearinghouse-state])
-        master-spot-value (spot-account-value {:spot-state master-spot-state})
-        master-transfer-max-value (trading-transfer-max state master-perps-value)]
+        owner-snapshot* (owner-snapshot state owner-address)
+        owner-clearinghouse-state (:clearinghouse-state owner-snapshot*)
+        owner-spot-state (:spot-state owner-snapshot*)
+        master-row {:clearinghouse-state owner-clearinghouse-state
+                    :spot-state owner-spot-state}
+        master-perps-value (account-value master-row)
+        master-spot-value (spot-account-value master-row)
+        master-transfer-max-value (source-trading-transfer-max
+                                   {:unified-account? unified-account?
+                                    :clearinghouse-state owner-clearinghouse-state
+                                    :spot-state owner-spot-state})]
     [:div {:class ["app-shell-gutter" "flex" "min-h-[calc(100vh-4rem)]" "w-full" "flex-col" "gap-5" "pt-8" "pb-16"]
            :style {:background-color "#061b20"
                    :background-image "radial-gradient(120% 80% at 15% -10%, rgba(0, 148, 111, 0.24), rgba(6, 30, 34, 0.04) 55%, transparent 70%), radial-gradient(circle at 15% 0%, rgba(0, 212, 170, 0.10), transparent 35%), radial-gradient(circle at 85% 100%, rgba(0, 212, 170, 0.08), transparent 40%)"
@@ -421,15 +439,16 @@
                              :selected-address selected-address
                              :status status
                              :error error
-                             :master-transfer-max master-perps-value
+                             :master-transfer-max master-transfer-max-value
                              :subaccounts subaccounts
                              :read-only? read-only?})]
       (when active-transfer
         (let [address (row-address active-transfer)
-              perps-value (account-value active-transfer)
-              subaccount-transfer-max-value (trading-transfer-max
-                                             (subaccount-availability-state state active-transfer)
-                                             perps-value)
+              subaccount-transfer-max-value
+              (source-trading-transfer-max
+               {:unified-account? unified-account?
+                :clearinghouse-state (clearinghouse-state active-transfer)
+                :spot-state (spot-state active-transfer)})
               deposit-max (format-usdc-amount master-transfer-max-value)
               withdraw-max (format-usdc-amount subaccount-transfer-max-value)]
           (management/transfer-popover-layer
@@ -439,7 +458,9 @@
             :withdraw-max withdraw-max
             :transfer-assets (transfer-assets {:subaccounts subaccounts
                                                :active-transfer active-transfer
-                                               :master-spot-state master-spot-state
+                                               :owner-spot-state owner-spot-state
+                                               :deposit-max-value master-transfer-max-value
+                                               :withdraw-max-value subaccount-transfer-max-value
                                                :deposit-max deposit-max
                                                :withdraw-max withdraw-max
                                                :unified-account? unified-account?})

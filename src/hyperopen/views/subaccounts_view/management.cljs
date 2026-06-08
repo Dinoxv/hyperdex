@@ -216,6 +216,8 @@
         selected-asset (transfer-dropdowns/selected-transfer-token subaccounts transfer-assets)
         max-label (or (:available-display selected-asset)
                       (if withdrawing? withdraw-max deposit-max))
+        selected-available (:available selected-asset)
+        submit-disabled? (not (pos? (or selected-available 0)))
         symbol (or (:symbol selected-asset) "USDC")]
     [:div {:data-role (str "subaccounts-transfer-popover-" address)
            :class (into ["relative"
@@ -297,6 +299,7 @@
       (action-button {:data-role (str "subaccounts-transfer-submit-" address)
                       :label "Send"
                       :variant :primary
+                      :disabled? submit-disabled?
                       :class ["w-full"]
                       :on-click [[:actions/submit-transfer-subaccount address]]})]]))
 

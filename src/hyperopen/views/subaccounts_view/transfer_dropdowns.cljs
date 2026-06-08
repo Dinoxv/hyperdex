@@ -54,10 +54,13 @@
   (let [selected (if unified-account?
                    :trading
                    (or (:transfer-account subaccounts) :trading))
-        selected-label (if (= :spot selected) "Spot Account" "Trading Account")
+        selected-label (cond
+                         unified-account? "Spot Account"
+                         (= :spot selected) "Spot Account"
+                         :else "Trading Account")
         open? (true? (:transfer-account-menu-open? subaccounts))
         options (if unified-account?
-                  [{:value :trading :label "Trading Account"}]
+                  [{:value :trading :label "Spot Account"}]
                   [{:value :trading :label "Trading Account"}
                    {:value :spot :label "Spot Account"}])]
     [:div {:class ["relative" "h-full" "w-full"]}

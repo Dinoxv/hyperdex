@@ -3,8 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.subaccounts.actions :as actions]))
 
-(def owner-address
-  "0x1234567890abcdef1234567890abcdef12345678")
+(def owner-address "0x1234567890abcdef1234567890abcdef12345678")
 
 (def subaccount-address
   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
@@ -112,6 +111,7 @@
     (is (= [[:effects/save-many [[[:account-context :subaccounts :status] :idle]
                                  [[:account-context :subaccounts :loaded-for-owner] nil]
                                  [[:account-context :subaccounts :owner-mode] nil]
+                                 [[:account-context :subaccounts :owner-snapshot] nil]
                                  [[:account-context :subaccounts :rows] []]
                                  [[:account-context :subaccounts :error] nil]
                                  [[:account-context :subaccounts :refreshing?] false]

@@ -87,6 +87,7 @@
                    (is (= {:status :idle
                            :loaded-for-owner nil
                            :owner-mode nil
+                           :owner-snapshot nil
                            :rows []
                            :error nil
                            :refreshing? false
@@ -152,6 +153,56 @@
           (.catch (fn [err]
 	                    (is false (str "Unexpected load-subaccounts success-path error: " err))
 	                    (done)))))))
+
+(deftest load-subaccounts-loads-owner-snapshot-for-viewed-master-test
+  (async done
+    (let [calls (atom [])
+          store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context
+                       {:subaccounts {:status :loading
+                                      :loaded-for-owner owner-address
+                                      :rows []
+                                      :selected-address subaccount-address
+                                      :error nil
+                                      :selection-loaded? false}}})]
+      (-> (effects/load-subaccounts!
+           {:store store
+            :request-sub-accounts! (fn [address opts]
+                                     (swap! calls conj [:subaccounts address opts])
+                                     (js/Promise.resolve
+                                      [{:name "Desk"
+                                        :master owner-address
+                                        :sub-account-user subaccount-address}]))
+            :request-owner-clearinghouse-state! (fn [address opts]
+                                                  (swap! calls conj [:owner-clearinghouse address opts])
+                                                  (js/Promise.resolve
+                                                   {:withdrawable "12.34"
+                                                    :marginSummary {:accountValue "99.99"}}))
+            :request-owner-spot-state! (fn [address opts]
+                                         (swap! calls conj [:owner-spot address opts])
+                                         (js/Promise.resolve
+                                          {:balances [{:coin "USDC"
+                                                       :total "0"}]}))
+            :local-storage-get (constantly nil)})
+          (.then (fn [result]
+                   (is (nil? result))
+                   (is (some #(= [:owner-clearinghouse owner-address {:priority :high}] %)
+                             @calls))
+                   (is (some #(= [:owner-spot owner-address {:priority :high}] %)
+                             @calls))
+                   (is (= {:owner owner-address
+                           :clearinghouse-state {:withdrawable "12.34"
+                                                 :marginSummary {:accountValue "99.99"}}
+                           :spot-state {:balances [{:coin "USDC"
+                                                    :total "0"}]}
+                           :loading? false
+                           :error nil}
+                          (get-in @store [:account-context :subaccounts :owner-snapshot])))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected owner-snapshot load error: " err))
+                    (done)))))))
 
 (deftest load-subaccounts-keeps-current-valid-selection-ahead-of-stored-selection-test
   (async done

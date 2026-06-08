@@ -55,6 +55,7 @@
          {:status :idle
           :loaded-for-owner nil
           :owner-mode nil
+          :owner-snapshot nil
           :rows []
           :error nil
           :refreshing? false
@@ -98,6 +99,14 @@
   {:owner owner-address
    :mode mode})
 
+(defn- owner-snapshot-record
+  [owner-address clearinghouse-state spot-state loading? error]
+  {:owner owner-address
+   :clearinghouse-state clearinghouse-state
+   :spot-state spot-state
+   :loading? (boolean loading?)
+   :error error})
+
 (defn- prepare-owner-mode!
   [store owner-address]
   (swap! store
@@ -109,6 +118,21 @@
                        (account-context/normalize-address (:owner current))))
              (owner-mode-record owner-address (:mode current))
              (owner-mode-record owner-address nil)))))
+
+(defn- prepare-owner-snapshot!
+  [store owner-address]
+  (swap! store
+         update-in
+         [:account-context :subaccounts :owner-snapshot]
+         (fn [current]
+           (if (and (map? current)
+                    (= owner-address
+                       (account-context/normalize-address (:owner current))))
+             (assoc current
+                    :owner owner-address
+                    :loading? true
+                    :error nil)
+             (owner-snapshot-record owner-address nil nil true nil)))))
 
 (defn- apply-owner-mode!
   [store owner-address mode]
@@ -123,6 +147,40 @@
                          (owner-mode-record owner-address mode))
                state)))))
 
+(defn- apply-owner-snapshot!
+  [store owner-address clearinghouse-state spot-state]
+  (swap! store
+         (fn [state]
+           (if (= owner-address (actions/viewed-master-address state))
+             (assoc-in state
+                       [:account-context :subaccounts :owner-snapshot]
+                       (owner-snapshot-record owner-address
+                                              clearinghouse-state
+                                              spot-state
+                                              false
+                                              nil))
+             state))))
+
+(defn- apply-owner-snapshot-error!
+  [store owner-address err]
+  (swap! store
+         (fn [state]
+           (if (= owner-address (actions/viewed-master-address state))
+             (update-in state
+                        [:account-context :subaccounts :owner-snapshot]
+                        (fn [current]
+                          (let [current* (if (and (map? current)
+                                                  (= owner-address
+                                                     (account-context/normalize-address
+                                                      (:owner current))))
+                                           current
+                                           (owner-snapshot-record owner-address nil nil true nil))]
+                            (assoc current*
+                                   :owner owner-address
+                                   :loading? false
+                                   :error (error-message err)))))
+             state))))
+
 (defn- load-owner-mode!
   "Fetches the master/owner account abstraction mode so the Sub-Accounts page
    can decide whether to use unified (`sendAsset`) transfers based on the
@@ -135,6 +193,55 @@
                  (apply-owner-mode! store owner-address mode)
                  nil))
         (.catch (fn [_] nil)))))
+
+(defn- owner-snapshot-request-opts
+  [owner-address request-kind force-refresh? now-ms-fn]
+  (if force-refresh?
+    (let [token (now-ms-fn)]
+      {:priority :high
+       :cache-ttl-ms 1
+       :force-refresh? true
+       :dedupe-key [:subaccounts-owner-snapshot owner-address request-kind token]
+       :cache-key [:subaccounts-owner-snapshot owner-address request-kind token]})
+    {:priority :high}))
+
+(defn- load-owner-snapshot!
+  [{:keys [store
+           request-owner-clearinghouse-state!
+           request-owner-spot-state!
+           force-refresh?
+           now-ms-fn]
+    :or {now-ms-fn platform/now-ms}}
+   owner-address]
+  (if (and (fn? request-owner-clearinghouse-state!)
+           (fn? request-owner-spot-state!))
+    (let [clearinghouse-promise
+          (js/Promise.resolve
+           (request-owner-clearinghouse-state!
+            owner-address
+            (owner-snapshot-request-opts owner-address
+                                         :clearinghouse
+                                         force-refresh?
+                                         now-ms-fn)))
+          spot-promise
+          (js/Promise.resolve
+           (request-owner-spot-state!
+            owner-address
+            (owner-snapshot-request-opts owner-address
+                                         :spot
+                                         force-refresh?
+                                         now-ms-fn)))]
+      (-> (js/Promise.all #js [clearinghouse-promise spot-promise])
+          (.then (fn [results]
+                   (apply-owner-snapshot! store
+                                          owner-address
+                                          (aget results 0)
+                                          (aget results 1))
+                   nil))
+          (.catch (fn [err]
+                    (apply-owner-snapshot-error! store owner-address err)
+                    nil))))
+    (js/Promise.resolve nil)))
 
 (defn load-subaccounts!
   [{:keys [store
@@ -152,35 +259,42 @@
         (js/Promise.resolve nil))
       (do
         (prepare-owner-mode! store owner-address)
-        (load-owner-mode! deps owner-address)
-        (-> (request-sub-accounts! owner-address
-                                  (request-opts owner-address force-refresh? now-ms-fn))
-          (.then (fn [rows]
-                   (let [rows* (->> (or rows [])
-                                    (keep normalize-subaccount-row)
-                                    vec)
-                         selected (next-selected-address @store
-                                                         owner-address
-                                                         rows*
-                                                         local-storage-get)]
-                     (swap! store
-                            (fn [state]
-                              (-> state
-                                  (assoc-in [:account-context :subaccounts :status] :loaded)
-                                  (assoc-in [:account-context :subaccounts :loaded-for-owner] owner-address)
-                                  (assoc-in [:account-context :subaccounts :rows] rows*)
-                                  (assoc-in [:account-context :subaccounts :error] nil)
-                                  (assoc-in [:account-context :subaccounts :selected-address] selected)
-                                  (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
-                     nil)))
-          (.catch (fn [err]
-                    (swap! store
-                           (fn [state]
-                             (-> state
-                                 (assoc-in [:account-context :subaccounts :status] :error)
-                                 (assoc-in [:account-context :subaccounts :error] (error-message err))
-                                 (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
-                    nil)))))))
+        (prepare-owner-snapshot! store owner-address)
+        (let [owner-mode-promise (or (load-owner-mode! deps owner-address)
+                                     (js/Promise.resolve nil))
+              owner-snapshot-promise (load-owner-snapshot! deps owner-address)
+              rows-promise (-> (request-sub-accounts! owner-address
+                                                       (request-opts owner-address
+                                                                     force-refresh?
+                                                                     now-ms-fn))
+                               (.then (fn [rows]
+                                        (let [rows* (->> (or rows [])
+                                                         (keep normalize-subaccount-row)
+                                                         vec)
+                                              selected (next-selected-address @store
+                                                                              owner-address
+                                                                              rows*
+                                                                              local-storage-get)]
+                                          (swap! store
+                                                 (fn [state]
+                                                   (-> state
+                                                       (assoc-in [:account-context :subaccounts :status] :loaded)
+                                                       (assoc-in [:account-context :subaccounts :loaded-for-owner] owner-address)
+                                                       (assoc-in [:account-context :subaccounts :rows] rows*)
+                                                       (assoc-in [:account-context :subaccounts :error] nil)
+                                                       (assoc-in [:account-context :subaccounts :selected-address] selected)
+                                                       (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
+                                          nil)))
+                               (.catch (fn [err]
+                                         (swap! store
+                                                (fn [state]
+                                                  (-> state
+                                                      (assoc-in [:account-context :subaccounts :status] :error)
+                                                      (assoc-in [:account-context :subaccounts :error] (error-message err))
+                                                      (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
+                                         nil)))]
+          (-> (js/Promise.all #js [rows-promise owner-mode-promise owner-snapshot-promise])
+              (.then (fn [_] nil))))))))
 
 (defn api-load-subaccounts!
   [deps]

@@ -423,6 +423,12 @@
                           (api/request-user-account-mode!
                            owner-address
                            (owner-mode-request-opts owner-address force-refresh?)))
+   :request-owner-clearinghouse-state! (fn [owner-address opts]
+                                         (api/request-clearinghouse-state!
+                                          owner-address
+                                          nil
+                                          opts))
+   :request-owner-spot-state! api/request-spot-clearinghouse-state!
    :local-storage-get platform/local-storage-get
    :now-ms-fn platform/now-ms})
 

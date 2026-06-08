@@ -114,6 +114,23 @@
         {:owner owner-address
          :mode nil}))))
 
+(defn- owner-snapshot-record
+  [state owner-address]
+  (when (seq owner-address)
+    (let [current (get-in state [:account-context :subaccounts :owner-snapshot])]
+      (if (and (map? current)
+               (= owner-address
+                  (account-context/normalize-address (:owner current))))
+        (assoc current
+               :owner owner-address
+               :loading? true
+               :error nil)
+        {:owner owner-address
+         :clearinghouse-state nil
+         :spot-state nil
+         :loading? true
+         :error nil}))))
+
 (defn- load-route-path-values
   [state master-address]
   (if (seq master-address)
@@ -121,6 +138,8 @@
      [[:account-context :subaccounts :loaded-for-owner] master-address]
      [[:account-context :subaccounts :owner-mode]
       (owner-mode-record state master-address)]
+     [[:account-context :subaccounts :owner-snapshot]
+      (owner-snapshot-record state master-address)]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :refreshing?] false]
@@ -137,6 +156,7 @@
     [[[:account-context :subaccounts :status] :idle]
      [[:account-context :subaccounts :loaded-for-owner] nil]
      [[:account-context :subaccounts :owner-mode] nil]
+     [[:account-context :subaccounts :owner-snapshot] nil]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :refreshing?] false]
@@ -191,6 +211,8 @@
                             [[:account-context :subaccounts :loaded-for-owner] master-address]
                             [[:account-context :subaccounts :owner-mode]
                              (owner-mode-record state master-address)]
+                            [[:account-context :subaccounts :owner-snapshot]
+                             (owner-snapshot-record state master-address)]
                             [[:account-context :subaccounts :error] nil]]]
        [:effects/api-refresh-subaccounts]])))
 

@@ -89,7 +89,33 @@ async function seedAccountSurface(page, options = {}) {
 }
 
 async function seedSubaccountsState(page, options = {}) {
-  await page.evaluate(({ ownerAddress: owner, subaccountAddress: sub, accountMode }) => {
+  const ownerSnapshot = options.ownerSnapshot ?? {
+    owner: ownerAddress.toLowerCase(),
+    "clearinghouse-state": {
+      withdrawable: "300.61686499",
+      marginSummary: {
+        accountValue: "300.61686499"
+      }
+    },
+    "spot-state": {
+      balances: [
+        {
+          coin: "USDC",
+          total: "358.56"
+        }
+      ]
+    },
+    "loading?": false,
+    error: null
+  };
+  await page.evaluate(({
+    ownerAddress: owner,
+    subaccountAddress: sub,
+    accountMode,
+    ownerSnapshot,
+    selectedAddress,
+    subaccountSpotUsdc
+  }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -125,7 +151,7 @@ async function seedSubaccountsState(page, options = {}) {
             balances: [
               {
                 coin: "USDC",
-                total: "0"
+                total: subaccountSpotUsdc
               },
               {
                 coin: "MEOW",
@@ -190,6 +216,7 @@ async function seedSubaccountsState(page, options = {}) {
       ],
       opts
     );
+    const ownerSnapshotClj = c.js__GT_clj(ownerSnapshot, opts);
 
     let nextState = c.deref(store);
     nextState = c.assoc_in(nextState, kwPath("wallet", "address"), owner);
@@ -199,6 +226,11 @@ async function seedSubaccountsState(page, options = {}) {
       kwPath("account-context", "subaccounts", "owner-mode"),
       ownerModeRecord
     );
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "owner-snapshot"),
+      ownerSnapshotClj
+    );
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "rows"), rows);
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "status"), keyword("loaded"));
     nextState = c.assoc_in(
@@ -207,7 +239,11 @@ async function seedSubaccountsState(page, options = {}) {
       String(owner).toLowerCase()
     );
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "error"), null);
-    nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "selected-address"), null);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "selected-address"),
+      selectedAddress ? String(selectedAddress).toLowerCase() : null
+    );
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "selection-loaded?"), true);
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "transfer-amount"), "");
     nextState = c.assoc_in(
@@ -244,7 +280,14 @@ async function seedSubaccountsState(page, options = {}) {
     if (typeof renderApp === "function") {
       renderApp(c.deref(store));
     }
-  }, { ownerAddress, subaccountAddress, accountMode: options.accountMode ?? "classic" });
+  }, {
+    ownerAddress,
+    subaccountAddress,
+    accountMode: options.accountMode ?? "classic",
+    ownerSnapshot,
+    selectedAddress: options.selectedAddress ?? null,
+    subaccountSpotUsdc: options.subaccountSpotUsdc ?? "0"
+  });
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await seedAccountSurface(page, { accountMode: options.accountMode ?? "classic" });
 }
@@ -330,6 +373,52 @@ test("subaccounts page loads the spectated master read-only @regression", async 
     await expect(page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`))
       .toHaveCount(0);
   }
+});
+
+test("selected subaccount does not duplicate master balance or enable empty master deposit @regression", async ({
+  page
+}) => {
+  await interceptSubaccountsApi(page);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await visitRoute(page, "/subAccounts");
+  await seedSubaccountsState(page, {
+    selectedAddress: subaccountAddress,
+    ownerSnapshot: {
+      owner: ownerAddress.toLowerCase(),
+      "clearinghouse-state": {
+        withdrawable: "0",
+        marginSummary: {
+          accountValue: "0"
+        }
+      },
+      "spot-state": {
+        balances: [
+          {
+            coin: "USDC",
+            total: "0",
+            hold: "0"
+          }
+        ]
+      },
+      "loading?": false,
+      error: null
+    }
+  });
+  await seedAccountSurface(page, { accountMode: "classic" });
+
+  await expect(page.locator("[data-role='subaccounts-master-row']")).toContainText("$0.00");
+  await expect(page.locator("[data-role='subaccounts-master-row']")).not.toContainText("$300.62");
+  await expect(page.locator(`[data-role="subaccounts-row-${subaccountAddress}"]`))
+    .toContainText("$300.62");
+
+  await page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`).click();
+  await expect(page.locator(`[data-role="subaccounts-transfer-source-${subaccountAddress}"]`))
+    .toContainText("Master Account");
+  await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
+    .toContainText("MAX: 0 USDC");
+  await expect(page.locator(`[data-role="subaccounts-transfer-submit-${subaccountAddress}"]`))
+    .toBeDisabled();
 });
 
 async function readTransferGeometry(page) {
@@ -466,7 +555,7 @@ test("subaccounts transfer opens a compact send tokens popover @regression", asy
   }
 });
 
-test("subaccounts transfer uses trading-only controls for unified accounts @regression", async ({ page }) => {
+test("subaccounts transfer uses spot-only controls for unified accounts @regression", async ({ page }) => {
   await interceptSubaccountsApi(page);
 
   await page.setViewportSize({ width: 768, height: 720 });
@@ -478,7 +567,7 @@ test("subaccounts transfer uses trading-only controls for unified accounts @regr
 
   const accountTrigger = page.locator(`[data-role="subaccounts-transfer-direction-${subaccountAddress}"]`);
   await expect(accountTrigger).toBeVisible();
-  await expect(accountTrigger).toContainText("Trading Account");
+  await expect(accountTrigger).toContainText("Spot Account");
   await expect(page.locator(`[data-role="subaccounts-transfer-max-${subaccountAddress}"]`))
     .toContainText("MAX: 358.56 USDC");
 
@@ -486,7 +575,7 @@ test("subaccounts transfer uses trading-only controls for unified accounts @regr
 
   const accountMenu = page.locator(`[data-role="subaccounts-transfer-account-menu-${subaccountAddress}"]`);
   await expect(accountMenu).toBeVisible();
-  await expect(accountMenu).toContainText("Trading Account");
+  await expect(accountMenu).toContainText("Spot Account");
   await expect(page.locator(`[data-role="subaccounts-transfer-account-option-${subaccountAddress}-spot"]`))
     .toHaveCount(0);
 
@@ -668,7 +757,10 @@ test("unified master withdraw uses sendAsset even when a classic sub-account is 
     }
   });
   // The active trading account is a classic sub-account.
-  await seedSubaccountsState(page, { accountMode: "classic" });
+  await seedSubaccountsState(page, {
+    accountMode: "classic",
+    subaccountSpotUsdc: "300.61686499"
+  });
 
   await page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`).click();
   await seedAccountSurface(page, { accountMode: "classic" });
