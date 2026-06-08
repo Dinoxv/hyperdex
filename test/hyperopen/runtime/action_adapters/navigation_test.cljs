@@ -4,6 +4,7 @@
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.optimizer.actions :as portfolio-optimizer-actions]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
             [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.staking.actions :as staking-actions]
@@ -68,6 +69,23 @@
             [:effects/load-route-module "/staking"]
             [:effects/api-fetch-staking-validator-summaries]]
            (navigation-adapters/navigate {} "/staking")))))
+
+(deftest navigate-appends-referrals-route-effects-after-route-projection-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                subaccounts-actions/load-subaccounts-route (fn [_state _path] [])
+                referrals-actions/load-referrals-route
+                (fn [_state _path]
+                  [[:effects/save-many [[[:referrals-ui :pending-code] "ABC123"]]]
+                   [:effects/api-fetch-referral "0xabc"]])]
+    (is (= [[:effects/save [:router :path] "/join/ABC123"]
+            [:effects/save-many [[[:referrals-ui :pending-code] "ABC123"]]]
+            [:effects/push-state "/join/ABC123"]
+            [:effects/load-route-module "/join/ABC123"]
+            [:effects/api-fetch-referral "0xabc"]]
+           (navigation-adapters/navigate {} "/join/ABC123")))))
 
 (deftest navigate-appends-api-wallet-route-effects-after-route-projection-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])

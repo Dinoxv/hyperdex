@@ -30,6 +30,7 @@
             [hyperopen.api.endpoints.account-funding-history-test]
             [hyperopen.api.endpoints.account-identity-test]
             [hyperopen.api.endpoints.account-portfolio-test]
+            [hyperopen.api.endpoints.account-referrals-test]
             [hyperopen.api.endpoints.account-staking-test]
             [hyperopen.api.endpoints.funding-hyperunit-test]
             [hyperopen.api.endpoints.leaderboard-test]
@@ -66,6 +67,7 @@
             [hyperopen.api.projections.market-test]
             [hyperopen.api.projections.orders-test]
             [hyperopen.api.projections.portfolio-test]
+            [hyperopen.api.projections.referrals-test]
             [hyperopen.api.projections.staking-test]
             [hyperopen.api.projections.user-abstraction-test]
             [hyperopen.api.projections.user-fees-test]
@@ -78,6 +80,7 @@
             [hyperopen.api.trading.cancel-request-test]
             [hyperopen.api.trading.debug-exchange-simulator-test]
             [hyperopen.api.trading.internal-seams-test]
+            [hyperopen.api.trading.referral-signing-test]
             [hyperopen.api.trading.session-invalidation-test]
             [hyperopen.api.trading.sign-and-submit-test]
             [hyperopen.api.trading.subaccount-management-signing-test]
@@ -282,6 +285,8 @@
             [hyperopen.portfolio.query-state-test]
             [hyperopen.portfolio.routes-test]
             [hyperopen.portfolio.worker-test]
+            [hyperopen.referrals.actions-test]
+            [hyperopen.referrals.effects-test]
             [hyperopen.registry.runtime-test]
             [hyperopen.route-modules-test]
             [hyperopen.route-query-state-test]
@@ -312,6 +317,7 @@
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test]
+            [hyperopen.runtime.effect-adapters.referrals-test]
             [hyperopen.runtime.effect-adapters.staking-test]
             [hyperopen.runtime.effect-adapters.vaults-test]
             [hyperopen.runtime.effect-adapters.wallet-test]
@@ -532,6 +538,7 @@
             [hyperopen.views.portfolio.vm.volume-helpers-test]
             [hyperopen.views.portfolio.vm.volume-test]
             [hyperopen.views.portfolio.volume-history-popover-test]
+            [hyperopen.views.referrals-view-test]
             [hyperopen.views.spectate-mode-modal-test]
             [hyperopen.views.staking-view-test]
             [hyperopen.views.subaccounts-view-test]
@@ -719,6 +726,7 @@
              'hyperopen.api.endpoints.account-funding-history-test
              'hyperopen.api.endpoints.account-identity-test
              'hyperopen.api.endpoints.account-portfolio-test
+             'hyperopen.api.endpoints.account-referrals-test
              'hyperopen.api.endpoints.account-staking-test
              'hyperopen.api.endpoints.funding-hyperunit-test
              'hyperopen.api.endpoints.leaderboard-test
@@ -755,6 +763,7 @@
              'hyperopen.api.projections.market-test
              'hyperopen.api.projections.orders-test
              'hyperopen.api.projections.portfolio-test
+             'hyperopen.api.projections.referrals-test
              'hyperopen.api.projections.staking-test
              'hyperopen.api.projections.user-abstraction-test
              'hyperopen.api.projections.user-fees-test
@@ -767,6 +776,7 @@
              'hyperopen.api.trading.cancel-request-test
              'hyperopen.api.trading.debug-exchange-simulator-test
              'hyperopen.api.trading.internal-seams-test
+             'hyperopen.api.trading.referral-signing-test
              'hyperopen.api.trading.session-invalidation-test
              'hyperopen.api.trading.sign-and-submit-test
              'hyperopen.api.trading.subaccount-management-signing-test
@@ -971,6 +981,8 @@
              'hyperopen.portfolio.query-state-test
              'hyperopen.portfolio.routes-test
              'hyperopen.portfolio.worker-test
+             'hyperopen.referrals.actions-test
+             'hyperopen.referrals.effects-test
              'hyperopen.registry.runtime-test
              'hyperopen.route-modules-test
              'hyperopen.route-query-state-test
@@ -1001,6 +1013,7 @@
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test
+             'hyperopen.runtime.effect-adapters.referrals-test
              'hyperopen.runtime.effect-adapters.staking-test
              'hyperopen.runtime.effect-adapters.vaults-test
              'hyperopen.runtime.effect-adapters.wallet-test
@@ -1221,6 +1234,7 @@
              'hyperopen.views.portfolio.vm.volume-helpers-test
              'hyperopen.views.portfolio.vm.volume-test
              'hyperopen.views.portfolio.volume-history-popover-test
+             'hyperopen.views.referrals-view-test
              'hyperopen.views.spectate-mode-modal-test
              'hyperopen.views.staking-view-test
              'hyperopen.views.subaccounts-view-test

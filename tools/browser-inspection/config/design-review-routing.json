@@ -146,6 +146,23 @@
       "nativeControlAllowlist": []
     },
     {
+      "id": "referrals-route",
+      "route": "/referrals",
+      "url": "http://localhost:8080/referrals",
+      "selectors": [
+        "[data-parity-id='referrals-root']",
+        "[data-role='referrals-hero']",
+        "[data-role='referrals-table-panel']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/referrals-page-parity-prd.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
       "id": "vaults-route",
       "route": "/vaults",
       "url": "http://localhost:8080/vaults",
@@ -305,6 +322,11 @@
       "id": "leaderboard-view",
       "glob": "src/hyperopen/views/leaderboard_view.cljs",
       "targets": ["leaderboard-route"]
+    },
+    {
+      "id": "referrals-view",
+      "glob": "src/hyperopen/views/referrals_view.cljs",
+      "targets": ["referrals-route"]
     },
     {
       "id": "vaults-list",

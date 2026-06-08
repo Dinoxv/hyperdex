@@ -1,6 +1,7 @@
 (ns hyperopen.app.actions
   (:require [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
             [hyperopen.subaccounts.actions :as subaccounts-actions]))
@@ -33,6 +34,14 @@
    :vaults {:load-vault-route action-adapters/load-vault-route-action}
    :funding-comparison {:load-funding-comparison-route action-adapters/load-funding-comparison-route-action}
    :staking {:load-staking-route action-adapters/load-staking-route-action}
+   :referrals {:load-referrals-route action-adapters/load-referrals-route-action
+               :set-referrals-active-tab referrals-actions/set-active-tab
+               :set-referrals-form-field referrals-actions/set-form-field
+               :open-referrals-modal referrals-actions/open-referrals-modal
+               :close-referrals-modal referrals-actions/close-referrals-modal
+               :submit-set-referrer referrals-actions/submit-set-referrer
+               :submit-register-referrer referrals-actions/submit-register-referrer
+               :submit-claim-referral-rewards referrals-actions/submit-claim-rewards}
    :api-wallets {:load-api-wallet-route action-adapters/load-api-wallet-route-action
                  :set-api-wallet-form-field api-wallets-actions/set-api-wallet-form-field
                  :set-api-wallet-sort api-wallets-actions/set-api-wallet-sort

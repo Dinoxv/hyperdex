@@ -33,6 +33,24 @@
   [payload allowed-keys]
   (= allowed-keys (set (keys payload))))
 
+(defn- api-referral-fetch-args?
+  [args]
+  (and (= 1 (count args))
+       (common/non-empty-string? (first args))))
+
+(defn- api-referral-code-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload #{:owner :code})
+       (common/non-empty-string? (:owner payload))
+       (common/non-empty-string? (:code payload))))
+
+(defn- api-referral-owner-request?
+  [payload]
+  (and (map? payload)
+       (exact-keys? payload #{:owner})
+       (common/non-empty-string? (:owner payload))))
+
 (defn- safe-positive-integer?
   [value]
   (and (integer? value)
@@ -183,6 +201,9 @@
 
 (s/def ::fetch-asset-selector-markets-args fetch-asset-selector-markets-args?)
 (s/def ::api-fetch-leaderboard-args api-fetch-leaderboard-args?)
+(s/def ::api-fetch-referral-args api-referral-fetch-args?)
+(s/def ::api-referral-code-args (s/tuple api-referral-code-request?))
+(s/def ::api-referral-owner-args (s/tuple api-referral-owner-request?))
 (s/def ::request-id ::common/non-negative-int)
 (s/def ::request-id-args (s/tuple ::request-id))
 (s/def ::export-funding-history-csv-args (s/tuple ::common/map-vector))
@@ -293,6 +314,10 @@
    :effects/api-fetch-staking-rewards ::common/address-args
    :effects/api-fetch-staking-history ::common/address-args
    :effects/api-fetch-staking-spot-state ::common/address-args
+   :effects/api-fetch-referral ::api-fetch-referral-args
+   :effects/api-set-referrer ::api-referral-code-args
+   :effects/api-register-referrer ::api-referral-code-args
+   :effects/api-claim-referral-rewards ::api-referral-owner-args
    :effects/api-submit-staking-deposit ::api-submit-order-args
    :effects/api-submit-staking-withdraw ::api-submit-order-args
    :effects/api-submit-staking-delegate ::api-submit-order-args

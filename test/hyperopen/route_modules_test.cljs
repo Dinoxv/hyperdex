@@ -15,6 +15,8 @@
   (is (= :leaderboard (route-modules/route-module-id "/leaderboard")))
   (is (= :funding-comparison (route-modules/route-module-id "/funding-comparison")))
   (is (= :staking (route-modules/route-module-id "/staking")))
+  (is (= :referrals (route-modules/route-module-id "/referrals")))
+  (is (= :referrals (route-modules/route-module-id "/join/ABC123")))
   (is (= :api-wallets (route-modules/route-module-id "/api")))
   (is (= :subaccounts (route-modules/route-module-id "/subAccounts")))
   (is (= :subaccounts (route-modules/route-module-id "/subaccounts")))

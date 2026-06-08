@@ -11,6 +11,7 @@
             [hyperopen.runtime.effect-adapters.leaderboard :as leaderboard-adapters]
             [hyperopen.runtime.effect-adapters.order :as order-adapters]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer :as portfolio-optimizer-adapters]
+            [hyperopen.runtime.effect-adapters.referrals :as referrals-adapters]
             [hyperopen.runtime.effect-adapters.route-query :as route-query-adapters]
             [hyperopen.runtime.effect-adapters.staking :as staking-adapters]
             [hyperopen.runtime.effect-adapters.vaults :as vault-adapters]
@@ -365,6 +366,9 @@
 (def api-fetch-staking-spot-state-effect
   staking-adapters/api-fetch-staking-spot-state-effect)
 
+(def api-fetch-referral-effect
+  referrals-adapters/api-fetch-referral-effect)
+
 (defn- api-wallets-load-deps
   [store]
   {:store store
@@ -538,6 +542,30 @@
 (defn api-submit-staking-undelegate-effect
   [_ store request]
   (apply staking-adapters/api-submit-staking-undelegate-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-set-referrer-effect
+  [_ store request]
+  (apply referrals-adapters/api-set-referrer-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-register-referrer-effect
+  [_ store request]
+  (apply referrals-adapters/api-register-referrer-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
+(defn api-claim-referral-rewards-effect
+  [_ store request]
+  (apply referrals-adapters/api-claim-referral-rewards-effect
          [nil
           store
           request

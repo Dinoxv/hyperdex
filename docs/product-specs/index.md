@@ -19,6 +19,7 @@ source_of_truth: true
 - [Portfolio Page Parity PRD](/hyperopen/docs/product-specs/portfolio-page-parity-prd.md)
 - [Phase 1 Trade Parity Notes](/hyperopen/docs/product-specs/phase1-trade-parity-notes.md)
 - [Product Roadmap](/hyperopen/docs/product-specs/product-roadmap.md)
+- [Referrals Page Parity PRD](/hyperopen/docs/product-specs/referrals-page-parity-prd.md)
 - [Sente WebSocket Implementation PRD](/hyperopen/docs/product-specs/sente-websocket-implementation-prd.md)
 - [Technical Implementation Guide](/hyperopen/docs/product-specs/technical-implementation-guide.md)
 - [Trading Chart Component PRD](/hyperopen/docs/product-specs/trading-chart-component-prd.md)
