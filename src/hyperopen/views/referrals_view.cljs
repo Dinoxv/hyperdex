@@ -1,6 +1,6 @@
 (ns hyperopen.views.referrals-view
-  (:require [clojure.string :as str]
-            [hyperopen.referrals.vm :as referrals-vm]
+  (:require [hyperopen.referrals.vm :as referrals-vm]
+            [hyperopen.views.referrals.modals :as referrals-modals]
             [hyperopen.wallet.core :as wallet]))
 
 (defn- button
@@ -85,52 +85,49 @@
            :data-role "referrals-disconnected"}
      "Connect your wallet to load referral status."]))
 
-(defn- code-input
-  [{:keys [id label value field placeholder disabled? submit-action submit-label submit-role]}]
-  [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-4" "space-y-3"]
-         :data-role (str id "-panel")}
-   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]
-            :for id}
-    label]
-   [:div {:class ["flex" "flex-col" "gap-2" "sm:flex-row"]}
-    [:input {:id id
-             :type "text"
-             :value value
-             :placeholder placeholder
-             :disabled disabled?
-             :class ["h-9"
-                     "min-w-0"
-                     "flex-1"
-                     "rounded-lg"
-                     "border"
-                     "border-[#263338]"
-                     "bg-[#071317]"
-                     "px-3"
-                     "text-sm"
-                     "text-[#f6fefd]"
-                     "outline-none"
-                     "placeholder:text-[#596568]"
-                     "focus:border-[#50d2c1]"]
-             :data-role id
-             :on {:input [[:actions/set-referrals-form-field field [:event.target/value]]]}}]
-    (button {:label submit-label
-             :role submit-role
-             :primary? true
-             :disabled? disabled?
-             :action submit-action})]])
+(defn- action-card
+  [{:keys [role title body value value-role secondary-value secondary-value-role
+           action-label action disabled?]}]
+  [:div {:class ["rounded-lg"
+                 "border"
+                 "border-[#1b2429]"
+                 "bg-[#0f1a1f]"
+                 "p-4"
+                 "space-y-3"]
+         :data-role (str role "-panel")}
+   [:div {:class ["space-y-1"]}
+    [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+     title]
+    (when body
+      [:div {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
+       body])]
+   (when value
+     [:div {:class ["text-xl" "text-[#f6fefd]" "num"]
+            :data-role value-role}
+      value])
+   (when secondary-value
+     [:div {:class ["break-all" "text-sm" "text-[#b7d3d0]"]
+            :data-role secondary-value-role}
+      secondary-value])
+   (button {:label action-label
+            :role role
+            :primary? true
+            :disabled? disabled?
+            :action action})])
 
 (defn- hero
   [view-state]
   (let [{:keys [connected?
                 mutation-blocked-message
-                form
                 submitting?
                 stage
                 stage-label
                 referral-code
                 join-link]} view-state
         mutation-disabled? (or (not connected?)
-                               (seq mutation-blocked-message))]
+                               (seq mutation-blocked-message))
+        create-disabled? (or mutation-disabled?
+                             (= :need-to-trade stage))]
     [:div {:class ["bg-[#04251f]" "px-4" "py-4" "space-y-4" "rounded-lg"]
            :data-role "referrals-hero"}
      [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
@@ -149,39 +146,35 @@
              :data-role "referrals-stage"}
        stage-label]]
      [:div {:class ["grid" "gap-3" "lg:grid-cols-2"]}
-      (code-input {:id "referrals-code"
-                   :label "Enter Referral Code"
-                   :value (:code form)
-                   :field :code
-                   :placeholder "CODE"
-                   :disabled? (or mutation-disabled?
-                                  (= :set-referrer submitting?))
-                   :submit-label (if (= :set-referrer submitting?) "Entering..." "Enter Code")
-                   :submit-role "referrals-submit-code"
-                   :submit-action [:actions/submit-set-referrer]})
+      (action-card {:role "referrals-open-enter-code"
+                    :title "Enter Referral Code"
+                    :body "Apply another trader's code to this master account."
+                    :action-label "Enter Code"
+                    :disabled? (or mutation-disabled?
+                                   (= :set-referrer submitting?))
+                    :action [:actions/open-referrals-modal :enter-code]})
       (if (= :ready stage)
-        [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-4" "space-y-3"]
-               :data-role "referrals-share-panel"}
-         [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
-          "Share Code"]
-         [:div {:class ["text-xl" "text-[#f6fefd]" "num"]
-                :data-role "referrals-own-code"}
-          (or referral-code "Unavailable")]
-         (when join-link
-           [:div {:class ["text-sm" "text-[#b7d3d0]" "break-all"]
-                  :data-role "referrals-join-link"}
-            join-link])]
-        (code-input {:id "referrals-new-code"
-                     :label "Create Referral Code"
-                     :value (:new-code form)
-                     :field :new-code
-                     :placeholder "MYCODE"
-                     :disabled? (or mutation-disabled?
-                                    (= :need-to-trade stage)
-                                    (= :register-referrer submitting?))
-                     :submit-label (if (= :register-referrer submitting?) "Creating..." "Create Code")
-                     :submit-role "referrals-create-code"
-                     :submit-action [:actions/submit-register-referrer]}))]]))
+        (action-card {:role "referrals-open-share-code"
+                      :title "Share Code"
+                      :body "Send your Hyperopen join link to referred traders."
+                      :value (or referral-code "Unavailable")
+                      :value-role "referrals-own-code"
+                      :secondary-value join-link
+                      :secondary-value-role "referrals-join-link"
+                      :action-label "Share Code"
+                      :disabled? mutation-disabled?
+                      :action [:actions/open-referrals-modal :share-code]})
+        (action-card {:role "referrals-open-create-code"
+                      :title "Create Referral Code"
+                      :body (if (= :need-to-trade stage)
+                              stage-label
+                              "Choose the code traders will use when joining.")
+                      :action-label (if (= :register-referrer submitting?)
+                                      "Creating..."
+                                      "Create Code")
+                      :disabled? (or create-disabled?
+                                     (= :register-referrer submitting?))
+                      :action [:actions/open-referrals-modal :create-code]}))]]))
 
 (defn- rewards-panel
   [{:keys [rewards connected? mutation-blocked-message submitting?]}]
@@ -195,10 +188,10 @@
      [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
       [:div]
       (button {:label (if (= :claim-rewards submitting?) "Claiming..." "Claim Rewards")
-               :role "referrals-claim-rewards"
+               :role "referrals-open-claim-rewards"
                :primary? true
                :disabled? disabled?
-               :action [:actions/submit-claim-referral-rewards]})]
+               :action [:actions/open-referrals-modal :claim-rewards]})]
      (if (seq (:rows rewards))
        [:div {:class ["grid" "gap-2"]}
         (for [{:keys [token unclaimed claimed]} (:rows rewards)]
@@ -208,7 +201,7 @@
            [:span {:class ["text-[#b7d3d0]"]} token]
            [:span {:class ["num" "text-[#f6fefd]"]}
             "Claimable " unclaimed " | Claimed " claimed]])]
-       [:div {:class ["text-sm" "text-[#878c8f]"]
+      [:div {:class ["text-sm" "text-[#878c8f]"]
               :data-role "referrals-no-rewards"}
         "No claimable rewards."])]))
 
@@ -326,6 +319,7 @@
        (stat-card "Rewards Earned" (:earned-label rewards) "referrals-stat-rewards")
        (stat-card "Claimable Rewards" (:claimable-label rewards) "referrals-stat-claimable")]
       (rewards-panel view-state)
-      (table-panel view-state)]]))
+      (table-panel view-state)]
+     (referrals-modals/referrals-modal view-state)]))
 
 (def route-view referrals-view)

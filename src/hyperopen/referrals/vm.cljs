@@ -127,6 +127,7 @@
      :error (get-in state [:referrals :error])
      :last-error (get-in state [:referrals-ui :last-error])
      :submitting? (get-in state [:referrals-ui :submitting?])
+     :active-modal (get-in state [:referrals-ui :active-modal])
      :active-tab (or (get-in state [:referrals-ui :active-tab]) :referrals)
      :form {:code (or (get-in state [:referrals-ui :form :code]) "")
             :new-code (or (get-in state [:referrals-ui :form :new-code]) "")}

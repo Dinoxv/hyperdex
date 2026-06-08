@@ -57,6 +57,8 @@
   (async done
     (let [store (atom {:wallet {:address owner-address}
                        :referrals-ui {:submitting? :set-referrer
+                                      :active-modal :enter-code
+                                      :pending-code "ABC123"
                                       :last-error "old"}})
           dispatch-calls (atom [])
           refresh-calls (atom [])
@@ -81,6 +83,8 @@
           (.then (fn [response]
                    (is (= {:status "ok"} response))
                    (is (nil? (get-in @store [:referrals-ui :submitting?])))
+                   (is (nil? (get-in @store [:referrals-ui :active-modal])))
+                   (is (nil? (get-in @store [:referrals-ui :pending-code])))
                    (is (nil? (get-in @store [:referrals-ui :last-error])))
                    (is (= [[store [[:effects/api-fetch-referral owner-address]]]]
                           @dispatch-calls))

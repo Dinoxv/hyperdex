@@ -57,6 +57,7 @@
                  "/join/abc123")]
     (is (= :effects/save-many (ffirst effects)))
     (is (= "ABC123" (path-value effects [:referrals-ui :pending-code])))
+    (is (= :enter-code (path-value effects [:referrals-ui :active-modal])))
     (is (= "ABC123" (path-value effects [:referrals-ui :form :code])))
     (is (nil? (path-value effects [:referrals-ui :last-error])))
     (is (= false (path-value effects [:referrals-ui :submitting?])))
@@ -68,13 +69,37 @@
                  {:wallet {:address nil}}
                  "/join/abc123")]
     (is (= "ABC123" (path-value effects [:referrals-ui :pending-code])))
+    (is (= :enter-code (path-value effects [:referrals-ui :active-modal])))
     (is (= "ABC123" (path-value effects [:referrals-ui :form :code])))
     (is (= 1 (count effects)))))
+
+(deftest load-referrals-route-clears-modal-for-plain-referrals-route-test
+  (let [effects (actions/load-referrals-route
+                 {:wallet {:address owner-address}
+                  :referrals-ui {:active-modal :claim-rewards
+                                 :form {:code "OLD"}}}
+                 "/referrals")]
+    (is (nil? (path-value effects [:referrals-ui :pending-code])))
+    (is (nil? (path-value effects [:referrals-ui :active-modal])))
+    (is (= "OLD" (path-value effects [:referrals-ui :form :code])))))
 
 (deftest load-referrals-route-skips-inactive-route-test
   (is (= []
          (actions/load-referrals-route {:wallet {:address owner-address}}
                                        "/trade"))))
+
+(deftest modal-actions-open-valid-modal-and-clear-errors-test
+  (is (= [[:effects/save-many [[[:referrals-ui :active-modal] :enter-code]
+                               [[:referrals-ui :last-error] nil]]]]
+         (actions/open-referrals-modal {:referrals-ui {:last-error "old"}}
+                                       :enter-code)))
+  (is (= [[:effects/save-many [[[:referrals-ui :active-modal] :create-code]
+                               [[:referrals-ui :last-error] nil]]]]
+         (actions/open-referrals-modal {} :unknown)))
+  (is (= [[:effects/save-many [[[:referrals-ui :active-modal] nil]
+                               [[:referrals-ui :last-error] nil]]]]
+         (actions/close-referrals-modal {:referrals-ui {:active-modal :claim-rewards
+                                                        :last-error "old"}}))))
 
 (deftest submit-set-referrer-builds-master-scoped-effect-test
   (is (= [[:effects/save-many [[[:referrals-ui :last-error] nil]

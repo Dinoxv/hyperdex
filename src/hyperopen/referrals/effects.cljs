@@ -80,6 +80,8 @@
          (fn [state]
            (-> state
                (assoc-in [:referrals-ui :submitting?] nil)
+               (assoc-in [:referrals-ui :active-modal] nil)
+               (assoc-in [:referrals-ui :pending-code] nil)
                (assoc-in [:referrals-ui :last-error] nil)))))
 
 (defn- invoke-submit!

@@ -22,6 +22,12 @@
   #{:code
     :new-code})
 
+(def ^:private valid-modals
+  #{:enter-code
+    :create-code
+    :share-code
+    :claim-rewards})
+
 (def ^:private valid-tabs
   #{:referrals
     :legacy-reward-history})
@@ -71,6 +77,7 @@
           owner (account-context/owner-address state)]
       (cond-> [[:effects/save-many
                 [[[:referrals-ui :pending-code] join-code]
+                 [[:referrals-ui :active-modal] (when join-code :enter-code)]
                  [[:referrals-ui :form :code]
                   (or join-code
                       (get-in state [:referrals-ui :form :code] ""))]
@@ -89,6 +96,19 @@
                tab
                :referrals)]
     [[:effects/save [:referrals-ui :active-tab] tab*]]))
+
+(defn open-referrals-modal
+  [_state modal]
+  (let [modal* (if (contains? valid-modals modal)
+                 modal
+                 :create-code)]
+    [[:effects/save-many [[[:referrals-ui :active-modal] modal*]
+                          [[:referrals-ui :last-error] nil]]]]))
+
+(defn close-referrals-modal
+  [_state]
+  [[:effects/save-many [[[:referrals-ui :active-modal] nil]
+                        [[:referrals-ui :last-error] nil]]]])
 
 (defn- referral-mutation-blocked-message
   [state]

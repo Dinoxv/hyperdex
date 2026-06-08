@@ -38,12 +38,19 @@ Local scratch refs, non-authoritative:
 - [x] (2026-06-08 15:24Z) Implemented the domain, action, API, projection, and signed-action foundation needed to pass the RED tests.
 - [x] (2026-06-08 15:41Z) Wired route module, startup route refresh, runtime action adapters, runtime effect adapters, app action registry, app effect registry, and shadow modules.
 - [x] (2026-06-08 15:58Z) Built the first dedicated `/referrals` view with header, action panels, KPI cards, tab shell, empty/loading/error states, Hyperliquid table column labels, and claim refresh behavior.
-- [ ] Add the modal layer for Enter Code, Create/Share Code, and Claim Rewards, including explicit `/join/:code` confirmation copy.
-- [ ] Add interaction tests and Playwright coverage for `/referrals`, modal validation, tab switching, mobile layout, and `/join/:code` confirmation.
+- [x] (2026-06-08 final pass) Added the modal layer for Enter Code, Create Code, Share Code, and Claim Rewards, including explicit `/join/:code` confirmation copy.
+- [x] (2026-06-08 final pass) Added interaction tests and deterministic Playwright coverage for `/referrals`, modal validation, tab switching, mobile layout, and `/join/:code` confirmation.
 - [x] (2026-06-08 15:59Z) Ran `npm test` after the first implementation pass; result was 4311 tests / 23792 assertions / 0 failures / 0 errors.
 - [x] (2026-06-08 16:05Z) Ran `npm run check`; result was clean after updating governed namespace-size exceptions for the touched oversized facades/tests.
 - [x] (2026-06-08 16:06Z) Ran `npm run test:websocket`; result was 534 tests / 3090 assertions / 0 failures / 0 errors.
 - [x] (2026-06-08 16:06Z) Ran `bb tools/formal.clj verify --surface effect-order-contract` and `git diff --check`; both passed.
+- [x] (2026-06-08 final pass) Ran `npx shadow-cljs --force-spawn compile test` after splitting modal rendering; result was 1781 files / 7 compiled / 0 warnings.
+- [x] (2026-06-08 final pass) Ran `npx playwright test tools/playwright/test/referrals-regressions.spec.mjs`; result was 4 passed.
+- [x] (2026-06-08 final pass) Ran `npx playwright test tools/playwright/test/routes.smoke.spec.mjs --grep "[Rr]eferrals"`; result was 4 passed.
+- [x] (2026-06-08 final pass) Ran `npm run qa:design-ui -- --targets referrals-route --manage-local-app`; result was PASS for visual evidence, native controls, styling consistency, interaction, layout regression, and jank/perf across 375, 768, 1280, and 1440 widths.
+- [x] (2026-06-08 final pass) Ran `npm run check` after the modal split and governed namespace-size update; result was clean with Shadow app, portfolio, worker, and test builds at 0 warnings.
+- [x] (2026-06-08 final pass) Ran final `npm test`; result was 4316 tests / 23815 assertions / 0 failures / 0 errors.
+- [x] (2026-06-08 final pass) Ran final `npm run test:websocket`; result was 534 tests / 3090 assertions / 0 failures / 0 errors.
 
 ## Surprises & Discoveries
 
@@ -65,6 +72,15 @@ Local scratch refs, non-authoritative:
 - Observation: The required `npm run check` gate enforces namespace-size exceptions for oversized central facades and shared test suites.
   Evidence: the first `npm run check` attempt failed only on size policy for `src/hyperopen/api/instance.cljs`, `src/hyperopen/schema/contracts/action_args.cljs`, `src/hyperopen/runtime/effect_order_contract.cljs`, `src/hyperopen/runtime/effect_adapters.cljs`, `test/hyperopen/views/app_view_test.cljs`, and `test/hyperopen/views/header_view_test.cljs`. Updating `dev/namespace_size_exceptions.edn` with referral-specific rationale made the rerun pass.
 
+- Observation: Modal rendering pushed `src/hyperopen/views/referrals_view.cljs` over the namespace-size limit when kept inline.
+  Evidence: the final `npm run check` pass initially failed with `src/hyperopen/views/referrals_view.cljs` at 588 lines and `src/hyperopen/schema/contracts/action_args.cljs` at 582 lines against a 575-line exception. Moving modal rendering into `src/hyperopen/views/referrals/modals.cljs` reduced the route view to 325 lines; the central action-args exception was bumped narrowly to 590 lines with referrals modal rationale.
+
+- Observation: Browser design review routing did not know about the new referrals route.
+  Evidence: `npm run qa:design-ui -- --targets referrals-route --manage-local-app` required adding `referrals-route` to `tools/browser-inspection/config/design-review-routing.json`; the final run produced PASS evidence for the governed browser-QA passes across 375, 768, 1280, and 1440 widths.
+
+- Observation: The first Playwright attempt was blocked by a stale dev server from another Hyperopen worktree.
+  Evidence: Playwright reported port 8080 in use. Running `npm run dev:kill` stopped stale dev server processes from `/Users/barry/.codex/worktrees/bc1d/hyperopen`, after which the referrals Playwright specs ran against this worktree.
+
 ## Decision Log
 
 - Decision: Implement referrals as a first-class Hyperopen account route rather than linking users to Hyperliquid.
@@ -85,7 +101,7 @@ Local scratch refs, non-authoritative:
 
 ## Outcomes & Retrospective
 
-Implementation has advanced through the first route/API/signing/view slice. `/referrals` is now a lazy route module with nav, route refresh, account referral loading, master-only mutation guards, signed referral actions with nil vault address, referral projection state, a first responsive view, and unit coverage. Required non-browser gates pass. The plan remains active because modal workflows and deterministic browser coverage are still outstanding.
+The referrals parity slice is implemented. `/referrals` is now a lazy route module with nav, route refresh, account referral loading, master-only mutation guards, signed referral actions with nil vault address, referral projection state, KPI cards, referral and legacy-history tabs, explicit modal workflows, `/join/:code` confirmation behavior, deterministic Playwright route/modal coverage, and governed design-review routing. Required repo gates and browser-QA passes were recorded before moving this plan to completed.
 
 ## Context and Orientation
 

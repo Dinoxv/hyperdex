@@ -32,6 +32,11 @@
 (s/def ::staking-form-field-args (s/tuple ::staking-form-field any?))
 (s/def ::referrals-form-field #{:code :new-code})
 (s/def ::referrals-form-field-args (s/tuple ::referrals-form-field any?))
+(s/def ::referrals-modal #{:enter-code
+                           :create-code
+                           :share-code
+                           :claim-rewards})
+(s/def ::referrals-modal-args (s/tuple ::referrals-modal))
 (s/def ::set-hyperunit-lifecycle-args (s/tuple ::state/hyperunit-lifecycle-input))
 (s/def ::set-hyperunit-lifecycle-error-args (s/tuple (s/nilable string?)))
 (s/def ::position-tpsl-open-args
@@ -509,6 +514,8 @@
    :actions/load-referrals-route ::common/path-args
    :actions/set-referrals-active-tab ::common/keyword-or-string-args
    :actions/set-referrals-form-field ::referrals-form-field-args
+   :actions/open-referrals-modal ::referrals-modal-args
+   :actions/close-referrals-modal ::common/no-args
    :actions/submit-set-referrer ::common/no-args
    :actions/submit-register-referrer ::common/no-args
    :actions/submit-claim-referral-rewards ::common/no-args

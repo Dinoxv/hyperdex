@@ -16,6 +16,8 @@
   [[:actions/load-referrals-route :load-referrals-route]
    [:actions/set-referrals-active-tab :set-referrals-active-tab]
    [:actions/set-referrals-form-field :set-referrals-form-field]
+   [:actions/open-referrals-modal :open-referrals-modal]
+   [:actions/close-referrals-modal :close-referrals-modal]
    [:actions/submit-set-referrer :submit-set-referrer]
    [:actions/submit-register-referrer :submit-register-referrer]
    [:actions/submit-claim-referral-rewards :submit-claim-referral-rewards]])

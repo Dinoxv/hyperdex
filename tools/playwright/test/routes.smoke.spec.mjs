@@ -11,6 +11,7 @@ const routeCases = [
     parityId: "portfolio-root"
   },
   { name: "leaderboard", route: "/leaderboard", parityId: "leaderboard-root" },
+  { name: "referrals", route: "/referrals", parityId: "referrals-root" },
   { name: "vaults", route: "/vaults", parityId: "vaults-root" },
   { name: "subaccounts", route: "/subAccounts", parityId: "subaccounts-root" }
 ];
@@ -29,15 +30,15 @@ test.describe("main route smoke @smoke", () => {
   }
 });
 
-test("trade desktop header omits dead Earn and Referrals links @smoke", async ({ page }) => {
+test("trade desktop header omits dead Earn and includes Referrals link @smoke", async ({ page }) => {
   await visitRoute(page, "/trade");
 
   const headerNav = page.locator("[data-parity-id='header-nav']");
 
   await expect(headerNav.getByRole("link", { name: "Trade", exact: true })).toBeVisible();
   await expect(headerNav.getByRole("link", { name: "Vaults", exact: true })).toBeVisible();
+  await expect(headerNav.getByRole("link", { name: "Referrals", exact: true })).toBeVisible();
   await expect(headerNav.getByRole("link", { name: "Earn", exact: true })).toHaveCount(0);
-  await expect(headerNav.getByRole("link", { name: "Referrals", exact: true })).toHaveCount(0);
 });
 
 test("trade desktop Vaults click stays in-app and shows the vault-shaped loader only @smoke", async ({ page }) => {
@@ -235,15 +236,15 @@ test.describe("main route smoke mobile @smoke", () => {
     });
   }
 
-  test("trade mobile header menu omits dead Earn and Referrals links @smoke", async ({ page }) => {
+  test("trade mobile header menu omits dead Earn and includes Referrals link @smoke", async ({ page }) => {
     await visitRoute(page, "/trade");
 
     await page.locator("[data-role='mobile-header-menu-trigger']").click();
 
     await expect(page.locator("[data-role='mobile-header-menu-link-trade']")).toBeVisible();
     await expect(page.locator("[data-role='mobile-header-menu-link-vaults']")).toBeVisible();
+    await expect(page.locator("[data-role='mobile-header-menu-link-referrals']")).toBeVisible();
     await expect(page.locator("[data-role='mobile-header-menu-link-earn']")).toHaveCount(0);
-    await expect(page.locator("[data-role='mobile-header-menu-link-referrals']")).toHaveCount(0);
   });
 });
 
