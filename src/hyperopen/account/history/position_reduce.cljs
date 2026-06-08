@@ -1,6 +1,7 @@
 (ns hyperopen.account.history.position-reduce
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-identity :as position-identity]
+            [hyperopen.account.history.position-reduce-pricing :as position-reduce-pricing]
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.domain.trading :as trading-domain]
@@ -384,7 +385,12 @@
         market-by-key (get-in state [:asset-selector :market-by-key] {})
         market (resolve-market market-by-key popover)
         asset-id (resolve-market-asset-id market)
-        form (submit-form popover market)
+        form (position-reduce-pricing/market-close-form
+              state
+              popover
+              market
+              asset-id
+              (submit-form popover market))
         request (when (number? asset-id)
                   (order-commands/build-order-request
                    {:active-asset (:coin popover)

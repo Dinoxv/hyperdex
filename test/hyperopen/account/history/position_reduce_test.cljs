@@ -1,6 +1,7 @@
 (ns hyperopen.account.history.position-reduce-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.account.history.actions :as history-actions]))
+            [hyperopen.account.history.actions :as history-actions]
+            [hyperopen.account.history.position-reduce :as position-reduce]))
 
 (deftest position-reduce-opens-and-submits-outcome-side-sell-order-test
   (let [row {:key "outcome-#10"
@@ -57,3 +58,60 @@
     (is (= false (:r submitted-order)))
     (is (= "8.5" (:s submitted-order)))
     (is (= "0.59" (:p submitted-order)))))
+
+(deftest position-reduce-market-close-uses-orderbook-protection-price-for-short-test
+  (let [row {:key "CFX"
+             :position {:coin "CFX"
+                        :szi "-526.0"
+                        :entryPx "0.053943"
+                        :positionValue "24.588396"
+                        :unrealizedPnl "3.785622"
+                        :returnOnEquity "0.6670930427"
+                        :liquidationPx "0.5810973954"
+                        :markPx 0.046731}
+             :mark-price "0.046676"}
+        popover (position-reduce/from-position-row row)
+        result (position-reduce/prepare-submit
+                {:asset-selector {:market-by-key {"perp:CFX"
+                                                  {:coin "CFX"
+                                                   :market-type :perp
+                                                   :asset-id 21
+                                                   :mark 0.046677
+                                                   :szDecimals 0}}}
+                 :orderbooks {"CFX" {:bids [{:px "0.046744" :sz "1500.0"}]
+                                      :asks [{:px "0.046819" :sz "8078.0"}]}}}
+                popover)
+        submitted-order (get-in result [:request :action :orders 0])]
+    (is (true? (:ok? result)))
+    (is (= 21 (:a submitted-order)))
+    (is (= true (:b submitted-order)))
+    (is (= true (:r submitted-order)))
+    (is (= "526" (:s submitted-order)))
+    (is (= "Ioc" (get-in submitted-order [:t :limit :tif])))
+    (is (= "0.049159" (:p submitted-order)))))
+
+(deftest position-reduce-market-close-uses-mark-protection-price-without-target-orderbook-test
+  (let [row {:key "CFX"
+             :position {:coin "CFX"
+                        :szi "-526.0"
+                        :markPx 0.046731}
+             :mark-price "0.046676"}
+        popover (position-reduce/from-position-row row)
+        result (position-reduce/prepare-submit
+                {:asset-selector {:market-by-key {"perp:CFX"
+                                                  {:coin "CFX"
+                                                   :market-type :perp
+                                                   :asset-id 21
+                                                   :mark 0.046677
+                                                   :szDecimals 0}}}
+                 :orderbooks {"KAITO" {:bids [{:px "1.23" :sz "1"}]
+                                        :asks [{:px "1.24" :sz "1"}]}}}
+                popover)
+        submitted-order (get-in result [:request :action :orders 0])]
+    (is (true? (:ok? result)))
+    (is (= 21 (:a submitted-order)))
+    (is (= true (:b submitted-order)))
+    (is (= true (:r submitted-order)))
+    (is (= "526" (:s submitted-order)))
+    (is (= "Ioc" (get-in submitted-order [:t :limit :tif])))
+    (is (= "0.049067" (:p submitted-order)))))
