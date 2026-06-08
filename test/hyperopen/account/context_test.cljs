@@ -78,6 +78,64 @@
     (is (true? (account-context/trader-portfolio-route-active?
                 {:router {:path (str "/portfolio/trader/" trader)}})))))
 
+(deftest subaccounts-owner-unified-uses-mode-for-current-owner-only-test
+  (let [owner-a "0x1111111111111111111111111111111111111111"
+        owner-b "0x2222222222222222222222222222222222222222"]
+    (is (false?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :classic}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode {:owner owner-a
+                                                        :mode :unified}}}}))
+        "A stale unified owner-mode from another owner must not force sendAsset.")
+    (is (false?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :unified}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode {:owner owner-a
+                                                        :mode :classic}}}}))
+        "A mismatched scoped owner-mode must not fall back to possibly stale active account mode.")
+    (is (true?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :classic}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode {:owner owner-b
+                                                        :mode :unified}}}}))
+        "A matching unified owner-mode is authoritative over the active account mode.")
+    (is (false?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :unified}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode {:owner owner-b
+                                                        :mode :classic}}}}))
+        "A matching classic owner-mode is authoritative over the active account mode.")
+    (is (false?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :unified}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode {:owner owner-b
+                                                        :mode nil}}}}))
+        "A pending scoped owner-mode must wait for the current owner's loaded mode.")
+    (is (true?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :unified}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode nil}}}))
+        "Minimal legacy state without an owner-mode record still falls back to active account mode.")
+    (is (false?
+         (account-context/subaccounts-owner-unified?
+          {:wallet {:address owner-b}
+           :account {:mode :unified}
+           :account-context {:subaccounts {:loaded-for-owner owner-b
+                                           :owner-mode :unified}}}))
+        "Unscoped legacy owner-mode must not override active account mode.")))
+
 (defn- subaccount-state
   [overrides]
   (let [owner "0x1111111111111111111111111111111111111111"

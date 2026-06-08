@@ -93,6 +93,23 @@
       :else
       nil)))
 
+(defn- owner-mode-record
+  [owner-address mode]
+  {:owner owner-address
+   :mode mode})
+
+(defn- prepare-owner-mode!
+  [store owner-address]
+  (swap! store
+         update-in
+         [:account-context :subaccounts :owner-mode]
+         (fn [current]
+           (if (and (map? current)
+                    (= owner-address
+                       (account-context/normalize-address (:owner current))))
+             (owner-mode-record owner-address (:mode current))
+             (owner-mode-record owner-address nil)))))
+
 (defn- apply-owner-mode!
   [store owner-address mode]
   (when mode
@@ -100,8 +117,10 @@
            (fn [state]
              ;; Guard against the owner changing while the abstraction request
              ;; was in flight so we never stamp a stale master's mode.
-             (if (= owner-address (account-context/owner-address state))
-               (assoc-in state [:account-context :subaccounts :owner-mode] mode)
+             (if (= owner-address (actions/viewed-master-address state))
+               (assoc-in state
+                         [:account-context :subaccounts :owner-mode]
+                         (owner-mode-record owner-address mode))
                state)))))
 
 (defn- load-owner-mode!
@@ -132,6 +151,7 @@
         (reset-subaccounts! store)
         (js/Promise.resolve nil))
       (do
+        (prepare-owner-mode! store owner-address)
         (load-owner-mode! deps owner-address)
         (-> (request-sub-accounts! owner-address
                                   (request-opts owner-address force-refresh? now-ms-fn))

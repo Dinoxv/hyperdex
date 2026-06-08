@@ -161,7 +161,9 @@
                        ;; Active trading account is classic, but the master/owner
                        ;; is unified: the popover must follow the master.
                        (assoc :account {:mode :classic})
-                       (assoc-in [:account-context :subaccounts :owner-mode] :unified)
+                       (assoc-in [:account-context :subaccounts :owner-mode]
+                                 {:owner owner-address
+                                  :mode :unified})
                        (assoc-in [:spot :clearinghouse-state :balances]
                                  [{:coin "USDC"
                                    :total "301.12859"

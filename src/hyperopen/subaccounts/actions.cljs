@@ -29,9 +29,7 @@
   This stays distinct from effective-account-address so an already selected
   subaccount does not become the parent queried for subaccounts."
   [state]
-  (or (when (account-context/spectate-mode-active? state)
-        (account-context/spectate-address state))
-      (account-context/owner-address state)))
+  (account-context/subaccounts-viewed-owner-address state))
 
 (defn- split-path-from-query-fragment
   [path]
@@ -104,11 +102,25 @@
 (def cancel-transfer-subaccount management/cancel-transfer-subaccount)
 (def submit-transfer-subaccount management/submit-transfer-subaccount)
 
+(defn- owner-mode-record
+  [state owner-address]
+  (when (seq owner-address)
+    (let [current (get-in state [:account-context :subaccounts :owner-mode])]
+      (if (and (map? current)
+               (= owner-address
+                  (account-context/normalize-address (:owner current))))
+        {:owner owner-address
+         :mode (:mode current)}
+        {:owner owner-address
+         :mode nil}))))
+
 (defn- load-route-path-values
-  [master-address]
+  [state master-address]
   (if (seq master-address)
     [[[:account-context :subaccounts :status] :loading]
      [[:account-context :subaccounts :loaded-for-owner] master-address]
+     [[:account-context :subaccounts :owner-mode]
+      (owner-mode-record state master-address)]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :refreshing?] false]
@@ -124,6 +136,7 @@
      [[:account-context :subaccounts :selection-loaded?] false]]
     [[[:account-context :subaccounts :status] :idle]
      [[:account-context :subaccounts :loaded-for-owner] nil]
+     [[:account-context :subaccounts :owner-mode] nil]
      [[:account-context :subaccounts :rows] []]
      [[:account-context :subaccounts :error] nil]
      [[:account-context :subaccounts :refreshing?] false]
@@ -153,14 +166,14 @@
           (get-in state [:account-context :subaccounts])]
       (cond
         (not (seq master-address))
-        [[:effects/save-many (load-route-path-values nil)]]
+        [[:effects/save-many (load-route-path-values state nil)]]
 
         (and (= master-address loaded-for-owner)
              (contains? #{:loading :loaded} status))
         []
 
         :else
-        [[:effects/save-many (load-route-path-values master-address)]
+        [[:effects/save-many (load-route-path-values state master-address)]
          [:effects/api-load-subaccounts]]))))
 
 (defn refresh-subaccounts
@@ -176,6 +189,8 @@
         missing-owner-message]]
       [[:effects/save-many [[[:account-context :subaccounts :refreshing?] true]
                             [[:account-context :subaccounts :loaded-for-owner] master-address]
+                            [[:account-context :subaccounts :owner-mode]
+                             (owner-mode-record state master-address)]
                             [[:account-context :subaccounts :error] nil]]]
        [:effects/api-refresh-subaccounts]])))
 

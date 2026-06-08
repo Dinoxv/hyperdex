@@ -360,6 +360,7 @@
             [hyperopen.subaccounts.actions-test]
             [hyperopen.subaccounts.effects-spectate-test]
             [hyperopen.subaccounts.effects-test]
+            [hyperopen.subaccounts.owner-mode-test]
             [hyperopen.subaccounts.transfer-amount-test]
             [hyperopen.system-test]
             [hyperopen.telemetry-test]
@@ -1048,6 +1049,7 @@
              'hyperopen.subaccounts.actions-test
              'hyperopen.subaccounts.effects-spectate-test
              'hyperopen.subaccounts.effects-test
+             'hyperopen.subaccounts.owner-mode-test
              'hyperopen.subaccounts.transfer-amount-test
              'hyperopen.system-test
              'hyperopen.telemetry-test

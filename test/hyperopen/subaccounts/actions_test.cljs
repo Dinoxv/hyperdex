@@ -111,6 +111,7 @@
                                                "/subAccounts")]
     (is (= [[:effects/save-many [[[:account-context :subaccounts :status] :idle]
                                  [[:account-context :subaccounts :loaded-for-owner] nil]
+                                 [[:account-context :subaccounts :owner-mode] nil]
                                  [[:account-context :subaccounts :rows] []]
                                  [[:account-context :subaccounts :error] nil]
                                  [[:account-context :subaccounts :refreshing?] false]

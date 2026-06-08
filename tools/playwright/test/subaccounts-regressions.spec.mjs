@@ -100,6 +100,15 @@ async function seedSubaccountsState(page, options = {}) {
     const keyword = c.keyword;
     const kwPath = (...segments) =>
       c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const ownerModeRecord = c.PersistentArrayMap.fromArray(
+      [
+        keyword("owner"),
+        String(owner).toLowerCase(),
+        keyword("mode"),
+        keyword(accountMode)
+      ],
+      true
+    );
     const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
     const rows = c.js__GT_clj(
       [
@@ -185,6 +194,11 @@ async function seedSubaccountsState(page, options = {}) {
     let nextState = c.deref(store);
     nextState = c.assoc_in(nextState, kwPath("wallet", "address"), owner);
     nextState = c.assoc_in(nextState, kwPath("account", "mode"), keyword(accountMode));
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "owner-mode"),
+      ownerModeRecord
+    );
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "rows"), rows);
     nextState = c.assoc_in(nextState, kwPath("account-context", "subaccounts", "status"), keyword("loaded"));
     nextState = c.assoc_in(
@@ -567,8 +581,8 @@ test("unified subaccounts transfer submits sendAsset instead of subAccountTransf
   expect(submittedRequests.some((request) => Object.hasOwn(request, "vaultAddress"))).toBe(false);
 });
 
-async function seedMasterOwnerMode(page, { ownerMode, selectedAddress }) {
-  await page.evaluate(({ ownerMode: mode, selectedAddress: selected }) => {
+async function seedMasterOwnerMode(page, { ownerMode, selectedAddress, masterAddress = ownerAddress }) {
+  await page.evaluate(({ ownerMode: mode, selectedAddress: selected, masterAddress: owner }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -579,12 +593,21 @@ async function seedMasterOwnerMode(page, { ownerMode, selectedAddress }) {
     const keyword = c.keyword;
     const kwPath = (...segments) =>
       c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const ownerModeRecord = c.PersistentArrayMap.fromArray(
+      [
+        keyword("owner"),
+        String(owner).toLowerCase(),
+        keyword("mode"),
+        keyword(mode)
+      ],
+      true
+    );
 
     let nextState = c.deref(store);
     nextState = c.assoc_in(
       nextState,
       kwPath("account-context", "subaccounts", "owner-mode"),
-      keyword(mode)
+      ownerModeRecord
     );
     nextState = c.assoc_in(
       nextState,
@@ -596,7 +619,7 @@ async function seedMasterOwnerMode(page, { ownerMode, selectedAddress }) {
     if (typeof renderApp === "function") {
       renderApp(c.deref(store));
     }
-  }, { ownerMode, selectedAddress });
+  }, { ownerMode, selectedAddress, masterAddress });
 }
 
 // Reviewer regression: the master/owner is unified, but a classic sub-account

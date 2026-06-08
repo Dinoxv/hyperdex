@@ -155,6 +155,15 @@
   [state]
   (normalize-address (get-in state [:account-context :subaccounts :selected-address])))
 
+(defn subaccounts-viewed-owner-address
+  "Address whose master mode should govern the Sub-Accounts page.
+   This mirrors the displayed Sub-Accounts master: spectate address when
+   spectating, otherwise the connected wallet owner."
+  [state]
+  (or (when (spectate-mode-active? state)
+        (spectate-address state))
+      (owner-address state)))
+
 (defn subaccounts-owner-unified?
   "True when the Sub-Accounts master/owner account is a unified
    (portfolio-margin) account, which must move funds via `sendAsset` rather
@@ -167,11 +176,25 @@
    while the master is unified. Without this distinction a withdraw back to a
    unified master, made while a classic sub-account is the active trading
    account, would fall through to the legacy transfer primitive and fail. Falls
-   back to the active-account mode only until the owner mode has loaded."
+   back to the active-account mode only for legacy/minimal state where no
+   owner-mode record has been loaded at all."
   [state]
-  (if-some [owner-mode (get-in state [:account-context :subaccounts :owner-mode])]
-    (= :unified owner-mode)
-    (= :unified (get-in state [:account :mode]))))
+  (let [owner-mode (get-in state [:account-context :subaccounts :owner-mode])
+        active-unified? (= :unified (get-in state [:account :mode]))]
+    (cond
+      (map? owner-mode)
+      (if (= (subaccounts-viewed-owner-address state)
+             (normalize-address (:owner owner-mode)))
+        (if-some [mode (:mode owner-mode)]
+          (= :unified mode)
+          false)
+        false)
+
+      (some? owner-mode)
+      false
+
+      :else
+      active-unified?)))
 
 (defn- subaccount-row-address
   [row]
