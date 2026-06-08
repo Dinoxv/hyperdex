@@ -87,6 +87,55 @@
     (aset err "status" status)
     err))
 
+(defn make-timeout-error
+  [timeout-ms]
+  (let [err (js/Error. (str "Hyperliquid /info request timed out after " timeout-ms "ms"))]
+    (aset err "timeout" true)
+    err))
+
+(defn fetch-with-timeout!
+  "Performs the /info fetch with an abort-on-timeout guard. A stalled
+   connection rejects (so the caller can retry and ultimately surface an
+   error) instead of hanging forever and permanently poisoning the
+   single-flight cache for that dedupe key. Falls back to a plain fetch when
+   no positive timeout or timer is configured."
+  [{:keys [fetch-fn set-timeout-fn clear-timeout-fn make-abort-controller
+           request-timeout-ms]}
+   url
+   request-init]
+  (let [timeout-ms (request-policy/normalize-ttl-ms request-timeout-ms)]
+    (if-not (and timeout-ms (fn? set-timeout-fn))
+      (fetch-fn url request-init)
+      (let [controller (when (fn? make-abort-controller)
+                         (make-abort-controller))
+            _ (when controller
+                (aset request-init "signal" (.-signal controller)))
+            timer (atom nil)
+            clear-timer! (fn []
+                           (when-let [timer-id @timer]
+                             (reset! timer nil)
+                             (when (fn? clear-timeout-fn)
+                               (clear-timeout-fn timer-id))))]
+        (js/Promise.
+         (fn [resolve reject]
+           (reset! timer
+                   (set-timeout-fn
+                    (fn []
+                      (reset! timer nil)
+                      (when controller
+                        (try
+                          (.abort controller)
+                          (catch :default _ nil)))
+                      (reject (make-timeout-error timeout-ms)))
+                    timeout-ms))
+           (-> (js/Promise.resolve (fetch-fn url request-init))
+               (.then (fn [resp]
+                        (clear-timer!)
+                        (resolve resp)))
+               (.catch (fn [err]
+                         (clear-timer!)
+                         (reject err))))))))))
+
 (defn with-single-flight!
   [single-flight-promises dedupe-key promise-fn]
   (if (nil? dedupe-key)
@@ -140,7 +189,8 @@
            priority
            (fn []
              (if (stats/request-active? opts*)
-               (fetch-fn
+               (fetch-with-timeout!
+                env
                 info-url
                 (clj->js {:method "POST"
                           :headers {"Content-Type" "application/json"}

@@ -120,6 +120,43 @@
           (is false (str "request-sub-accounts! should exist and return a promise: " err))
           (done))))))
 
+(deftest request-sub-accounts-unwraps-wrapped-payload-shapes-test
+  (async done
+    (let [owner "0x1111111111111111111111111111111111111111"
+          subaccount "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          row {:name "Desk A"
+               :subAccountUser "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+               :master owner}
+          expected [{:name "Desk A"
+                     :sub-account-user subaccount
+                     :master owner
+                     :clearinghouse-state nil
+                     :spot-state nil}]
+          run-request (fn [payload]
+                        (account/request-sub-accounts!
+                         (api-stubs/post-info-stub payload)
+                         owner
+                         {}))]
+      ;; A bare array is the canonical Hyperliquid shape, but a proxy/gateway
+      ;; that wraps rows in `{:subAccounts [...]}` must not silently collapse
+      ;; the page to "No subaccounts found".
+      (-> (js/Promise.all
+           #js [(run-request {:subAccounts [row]})
+                (run-request {"subAccounts" [row]})
+                (run-request {:sub-accounts [row]})
+                (run-request {:subAccounts []})
+                (run-request {:unexpected :shape})])
+          (.then
+           (fn [results]
+             (let [results* (vec (array-seq results))]
+               (is (= expected (nth results* 0)))
+               (is (= expected (nth results* 1)))
+               (is (= expected (nth results* 2)))
+               (is (= [] (nth results* 3)))
+               (is (= [] (nth results* 4))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-sub-accounts-short-circuits-without-owner-test
   (async done
     (let [calls (atom 0)

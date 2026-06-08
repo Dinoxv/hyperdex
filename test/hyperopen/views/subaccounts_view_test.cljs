@@ -86,7 +86,7 @@
     (is (some? copy-selected))
     (is (some? selected-row))
     (is (some? other-row))
-    (is (= [[:actions/load-subaccounts-route "/subAccounts"]]
+    (is (= [[:actions/refresh-subaccounts]]
            (get-in refresh-button [1 :on :click])))
     (is (= [[:actions/select-master-account]]
            (get-in select-master [1 :on :click])))
@@ -118,6 +118,67 @@
                    "boom"))
     (is (contains? (set (hiccup/collect-strings disconnected-node))
                    "Not connected"))))
+
+(deftest subaccounts-view-keeps-rows-visible-while-refreshing-test
+  (let [view-node (view/subaccounts-view
+                   (assoc-in (base-state)
+                             [:account-context :subaccounts :refreshing?] true))
+        refresh-button (hiccup/find-by-data-role view-node "subaccounts-refresh")
+        strings (set (hiccup/collect-strings view-node))]
+    (is (some? (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address)))
+        "A refresh must keep the rendered subaccount rows visible.")
+    (is (contains? strings "Desk"))
+    (is (not (contains? strings "Loading subaccounts...")))
+    (is (= "Refreshing..." (last refresh-button)))
+    (is (true? (get-in refresh-button [1 :disabled])))
+    (is (= [[:actions/refresh-subaccounts]]
+           (get-in refresh-button [1 :on :click])))))
+
+(deftest subaccounts-view-keeps-rows-visible-while-status-is-loading-test
+  (let [view-node (view/subaccounts-view
+                   (assoc-in (base-state)
+                             [:account-context :subaccounts :status] :loading))
+        strings (set (hiccup/collect-strings view-node))]
+    (is (some? (hiccup/find-by-data-role view-node (str "subaccounts-row-" subaccount-address)))
+        "Rows (and their transfer controls) must stay reachable even while a load is in flight.")
+    (is (contains? strings "Desk"))
+    (is (not (contains? strings "Loading subaccounts..."))
+        "The loading placeholder must not replace already-rendered rows.")))
+
+(deftest subaccounts-view-shows-loading-placeholder-only-when-no-rows-test
+  (let [view-node (view/subaccounts-view
+                   {:wallet {:address owner-address}
+                    :account-context {:subaccounts {:status :loading
+                                                    :rows []
+                                                    :selected-address nil}}})
+        strings (set (hiccup/collect-strings view-node))]
+    (is (contains? strings "Loading subaccounts...")
+        "With no rows yet, the loading placeholder is the right empty state.")))
+
+(deftest unified-owner-mode-popover-offers-trading-only-even-when-active-account-classic-test
+  (let [view-node (view/subaccounts-view
+                   (-> (base-state)
+                       ;; Active trading account is classic, but the master/owner
+                       ;; is unified: the popover must follow the master.
+                       (assoc :account {:mode :classic})
+                       (assoc-in [:account-context :subaccounts :owner-mode] :unified)
+                       (assoc-in [:spot :clearinghouse-state :balances]
+                                 [{:coin "USDC"
+                                   :total "301.12859"
+                                   :hold "0"}])
+                       (assoc-in [:account-context :subaccounts :transfer-account] :spot)
+                       (assoc-in [:account-context :subaccounts :transfer-account-menu-open?] true)
+                       (assoc-in [:account-context :subaccounts :transferring-address] subaccount-address)))
+        transfer-account-menu (hiccup/find-by-data-role view-node
+                                                        (str "subaccounts-transfer-account-menu-" subaccount-address))
+        transfer-spot-option (hiccup/find-by-data-role view-node
+                                                       (str "subaccounts-transfer-account-option-"
+                                                            subaccount-address
+                                                            "-spot"))]
+    (is (contains? (set (hiccup/collect-strings transfer-account-menu)) "Trading Account"))
+    (is (not (contains? (set (hiccup/collect-strings transfer-account-menu)) "Spot Account")))
+    (is (nil? transfer-spot-option)
+        "A unified master must not expose the spot transfer option, regardless of the active account mode.")))
 
 (deftest subaccounts-view-renders-create-rename-and-transfer-controls-test
   (let [view-node (view/subaccounts-view

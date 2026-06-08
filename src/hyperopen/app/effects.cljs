@@ -51,6 +51,7 @@
                  :api-authorize-api-wallet effect-adapters/api-authorize-api-wallet-effect
                  :api-remove-api-wallet effect-adapters/api-remove-api-wallet-effect}
    :subaccounts {:api-load-subaccounts effect-adapters/api-load-subaccounts-effect
+                 :api-refresh-subaccounts effect-adapters/api-refresh-subaccounts-effect
                  :api-create-subaccount effect-adapters/api-create-subaccount-effect
                  :api-rename-subaccount effect-adapters/api-rename-subaccount-effect
                  :api-transfer-subaccount effect-adapters/api-transfer-subaccount-effect}

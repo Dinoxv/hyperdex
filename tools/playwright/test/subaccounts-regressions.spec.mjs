@@ -566,3 +566,130 @@ test("unified subaccounts transfer submits sendAsset instead of subAccountTransf
   expect(submittedTypes).not.toContain("subAccountTransfer");
   expect(submittedRequests.some((request) => Object.hasOwn(request, "vaultAddress"))).toBe(false);
 });
+
+async function seedMasterOwnerMode(page, { ownerMode, selectedAddress }) {
+  await page.evaluate(({ ownerMode: mode, selectedAddress: selected }) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "owner-mode"),
+      keyword(mode)
+    );
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "subaccounts", "selected-address"),
+      selected ? String(selected).toLowerCase() : null
+    );
+    c.reset_BANG_(store, nextState);
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  }, { ownerMode, selectedAddress });
+}
+
+// Reviewer regression: the master/owner is unified, but a classic sub-account
+// is the active trading account (so [:account :mode] is :classic). Withdrawing
+// back to the master must still route through sendAsset, driven by the MASTER's
+// mode — not the active account's mode, which previously fell through to the
+// legacy subAccountTransfer and failed for a unified master.
+test("unified master withdraw uses sendAsset even when a classic sub-account is active @regression", async ({
+  page
+}) => {
+  const signature = `0x${"a".repeat(64)}${"b".repeat(64)}1c`;
+
+  await interceptSubaccountsApi(page);
+  await visitRoute(page, "/subAccounts");
+  await debugCall(page, "installWalletSimulator", {
+    accounts: [ownerAddress],
+    requestAccounts: [ownerAddress],
+    chainId: "0xa4b1",
+    typedDataSignature: signature
+  });
+  await debugCall(page, "installExchangeSimulator", {
+    signedActions: {
+      sendAsset: {
+        responses: [{ status: "ok", response: { type: "default" } }]
+      },
+      subAccountTransfer: {
+        responses: [
+          { status: "err", response: "Action disabled when unified account is active" }
+        ]
+      }
+    },
+    info: {
+      subAccounts: {
+        responses: [
+          [
+            {
+              name: "test",
+              master: ownerAddress.toLowerCase(),
+              subAccountUser: subaccountAddress.toLowerCase(),
+              clearinghouseState: { marginSummary: { accountValue: "300.61686499" } },
+              spotState: { balances: [] }
+            }
+          ]
+        ]
+      }
+    }
+  });
+  // The active trading account is a classic sub-account.
+  await seedSubaccountsState(page, { accountMode: "classic" });
+
+  await page.locator(`[data-role="subaccounts-transfer-${subaccountAddress}"]`).click();
+  await seedAccountSurface(page, { accountMode: "classic" });
+  // The master/owner itself is unified, and the sub-account is the active account.
+  await seedMasterOwnerMode(page, { ownerMode: "unified", selectedAddress: subaccountAddress });
+
+  // Withdraw: sub-account -> master.
+  await page
+    .locator(`[data-role="subaccounts-transfer-toggle-direction-${subaccountAddress}"]`)
+    .click();
+  await page.locator(`[data-role="subaccounts-transfer-amount-${subaccountAddress}"]`).fill("1.23");
+  await page.locator(`[data-role="subaccounts-transfer-submit-${subaccountAddress}"]`).click();
+  await waitForIdle(page, { quietMs: 350, timeoutMs: 8_000, pollMs: 50 });
+
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+        return (snapshot?.calls ?? [])
+          .map((call) => call?.request)
+          .filter((request) => request?.action?.type);
+      },
+      { timeout: 10_000 }
+    )
+    .toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: expect.objectContaining({
+            type: "sendAsset",
+            destination: ownerAddress,
+            sourceDex: "spot",
+            destinationDex: "spot",
+            token: "USDC:0x6d1e7cde53ba9467b783cb7c530ce054",
+            amount: "1.23",
+            fromSubAccount: subaccountAddress
+          })
+        })
+      ])
+    );
+
+  const snapshot = await debugCall(page, "exchangeSimulatorSnapshot");
+  const submittedTypes = (snapshot?.calls ?? [])
+    .map((call) => call?.request)
+    .filter((request) => request?.action?.type)
+    .map((request) => request.action.type);
+  expect(submittedTypes).not.toContain("subAccountTransfer");
+});

@@ -85,13 +85,9 @@
     :spot
     :trading))
 
-(defn- unified-account-mode?
-  [state]
-  (= :unified (get-in state [:account :mode])))
-
 (defn- effective-transfer-account
   [state value]
-  (if (unified-account-mode? state)
+  (if (account-context/subaccounts-owner-unified? state)
     :trading
     (normalize-transfer-account value)))
 

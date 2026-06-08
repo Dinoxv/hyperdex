@@ -86,8 +86,10 @@
                    (is (= 0 @calls))
                    (is (= {:status :idle
                            :loaded-for-owner nil
+                           :owner-mode nil
                            :rows []
                            :error nil
+                           :refreshing? false
                            :selected-address nil
                            :selection-loaded? false
                            :create-name ""
@@ -233,6 +235,79 @@
               :request-sub-accounts! :request
               :force-refresh? false}
              @captured-opts)))))
+
+(deftest api-refresh-subaccounts-uses-force-path-and-clears-refreshing-flag-test
+  (async done
+    (let [captured-opts (atom nil)
+          store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context
+                       {:subaccounts {:status :loaded
+                                      :loaded-for-owner owner-address
+                                      :rows [{:name "Stale"
+                                              :master owner-address
+                                              :sub-account-user subaccount-address}]
+                                      :refreshing? true}}})]
+      (-> (effects/api-refresh-subaccounts!
+           {:store store
+            :now-ms-fn (constantly 999)
+            :request-sub-accounts! (fn [_address opts]
+                                     (reset! captured-opts opts)
+                                     (js/Promise.resolve
+                                      [{:name "Fresh"
+                                        :master owner-address
+                                        :sub-account-user subaccount-address}]))})
+          (.then (fn [_]
+                   (is (= [:sub-accounts owner-address 999]
+                          (:dedupe-key @captured-opts))
+                       "Force refresh must use a unique tokenized dedupe key to bypass any stuck single-flight entry.")
+                   (is (= [:sub-accounts owner-address 999]
+                          (:cache-key @captured-opts)))
+                   (is (= :loaded
+                          (get-in @store [:account-context :subaccounts :status])))
+                   (is (= "Fresh"
+                          (-> @store
+                              (get-in [:account-context :subaccounts :rows])
+                              first
+                              :name)))
+                   (is (false? (get-in @store [:account-context :subaccounts :refreshing?]))
+                       "Refreshing flag must be cleared once the force load settles.")
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected api-refresh-subaccounts! error: " err))
+                    (done)))))))
+
+(deftest api-refresh-subaccounts-clears-refreshing-flag-and-keeps-rows-on-error-test
+  (async done
+    (let [store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context
+                       {:subaccounts {:status :loaded
+                                      :loaded-for-owner owner-address
+                                      :rows [{:name "Stale"
+                                              :master owner-address
+                                              :sub-account-user subaccount-address}]
+                                      :refreshing? true}}})]
+      (-> (effects/api-refresh-subaccounts!
+           {:store store
+            :request-sub-accounts! (fn [_address _opts]
+                                     (js/Promise.reject (js/Error. "boom")))})
+          (.then (fn [_]
+                   (is (= :error
+                          (get-in @store [:account-context :subaccounts :status])))
+                   (is (= "boom"
+                          (get-in @store [:account-context :subaccounts :error])))
+                   (is (false? (get-in @store [:account-context :subaccounts :refreshing?])))
+                   (is (= "Stale"
+                          (-> @store
+                              (get-in [:account-context :subaccounts :rows])
+                              first
+                              :name))
+                       "A failed refresh must keep the previously rendered rows visible.")
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected refresh error rejection: " err))
+                    (done)))))))
 
 (deftest create-subaccount-success-clears-form-and-force-refreshes-rows-test
   (async done
@@ -496,4 +571,117 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected spot transfer success error: " err))
+                    (done)))))))
+
+(deftest transfer-deposit-uses-send-asset-from-owner-mode-even-when-active-account-classic-test
+  (async done
+    (let [store (management-store)
+          l1-calls (atom [])
+          send-asset-calls (atom [])]
+      ;; The master/owner is unified, but a classic sub-account is the active
+      ;; trading account (so [:account :mode] is :classic). The transfer must
+      ;; follow the MASTER's mode and use sendAsset, not the legacy primitive.
+      (swap! store assoc-in [:account :mode] :classic)
+      (swap! store assoc-in [:account-context :subaccounts :owner-mode] :unified)
+      (-> (effects/transfer-subaccount!
+           {:store store
+            :request {:sub-account-user subaccount-address
+                      :is-deposit true
+                      :usd 1230000
+                      :amount "1.23"}
+            :transfer-sub-account! (fn [& args]
+                                     (swap! l1-calls conj args)
+                                     (js/Promise.resolve {:status "err"
+                                                          :response "Should not submit L1 transfer"}))
+            :submit-send-asset! (fn [store* owner action]
+                                  (swap! send-asset-calls conj [store* owner action])
+                                  (js/Promise.resolve {:status "ok"
+                                                       :response {:type "default"}}))
+            :load-subaccounts! (fn [_opts] (js/Promise.resolve :reloaded))
+            :dispatch! (fn [_store _ctx _effects] nil)
+            :runtime-error-message (fn [err] (str err))})
+          (.then (fn [_result]
+                   (is (= [] @l1-calls)
+                       "A unified master must never use the legacy L1 sub-account transfer.")
+                   (is (= [[store
+                            owner-address
+                            {:type "sendAsset"
+                             :destination subaccount-address
+                             :sourceDex "spot"
+                             :destinationDex "spot"
+                             :token "USDC:0x6d1e7cde53ba9467b783cb7c530ce054"
+                             :amount "1.23"
+                             :fromSubAccount ""}]]
+                          @send-asset-calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected mixed-mode deposit error: " err))
+                    (done)))))))
+
+(deftest transfer-uses-legacy-path-when-owner-mode-classic-even-if-active-account-unified-test
+  (async done
+    (let [store (management-store)
+          l1-calls (atom [])
+          send-asset-calls (atom [])]
+      ;; Inverse guard: the active trading account is unified, but the MASTER is
+      ;; classic. The transfer must follow the master's mode (legacy transfer),
+      ;; never sendAsset against a classic master.
+      (swap! store assoc-in [:account :mode] :unified)
+      (swap! store assoc-in [:account-context :subaccounts :owner-mode] :classic)
+      (-> (effects/transfer-subaccount!
+           {:store store
+            :request {:sub-account-user subaccount-address
+                      :is-deposit true
+                      :usd 1230000
+                      :amount "1.23"}
+            :transfer-sub-account! (fn [store* owner address is-deposit? usd]
+                                     (swap! l1-calls conj [store* owner address is-deposit? usd])
+                                     (js/Promise.resolve {:status "ok"
+                                                          :response {:type "default"}}))
+            :submit-send-asset! (fn [& args]
+                                  (swap! send-asset-calls conj args)
+                                  (js/Promise.resolve {:status "ok"
+                                                       :response {:type "default"}}))
+            :load-subaccounts! (fn [_opts] (js/Promise.resolve :reloaded))
+            :dispatch! (fn [_store _ctx _effects] nil)
+            :runtime-error-message (fn [err] (str err))})
+          (.then (fn [_result]
+                   (is (= [] @send-asset-calls)
+                       "A classic master must use the legacy transfer even if the active account is unified.")
+                   (is (= [[store owner-address subaccount-address true 1230000]]
+                          @l1-calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected classic-master transfer error: " err))
+                    (done)))))))
+
+(deftest load-subaccounts-records-owner-mode-from-abstraction-test
+  (async done
+    (let [owner-mode-calls (atom [])
+          store (atom {:router {:path "/subAccounts"}
+                       :wallet {:address owner-address}
+                       :account-context {:subaccounts {:status :loading}}})]
+      (-> (effects/load-subaccounts!
+           {:store store
+            :request-sub-accounts! (fn [_address _opts]
+                                     (js/Promise.resolve
+                                      [{:name "Desk"
+                                        :master owner-address
+                                        :sub-account-user subaccount-address}]))
+            :request-owner-mode! (fn [owner force-refresh?]
+                                   (swap! owner-mode-calls conj [owner force-refresh?])
+                                   (js/Promise.resolve :unified))
+            :local-storage-get (fn [_] nil)})
+          (.then (fn [_result]
+                   ;; owner-mode is fetched best-effort in parallel; let the
+                   ;; microtask queue drain before asserting.
+                   (js/setTimeout
+                    (fn []
+                      (is (= [[owner-address false]] @owner-mode-calls))
+                      (is (= :unified
+                             (get-in @store [:account-context :subaccounts :owner-mode])))
+                      (done))
+                    0)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected owner-mode load error: " err))
                     (done)))))))

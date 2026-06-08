@@ -11,6 +11,7 @@
    :max-retry-ms 5000
    :max-inflight 4
    :high-priority-burst 3
+   :request-timeout-ms 15000
    :default-priority :high})
 
 (defn default-sleep-ms
@@ -18,6 +19,11 @@
   (js/Promise.
    (fn [resolve _]
      (platform/set-timeout! resolve ms))))
+
+(defn default-make-abort-controller
+  []
+  (when (exists? js/AbortController)
+    (js/AbortController.)))
 
 (defn normalize-client-config
   [config]
@@ -163,18 +169,23 @@
   (reset! request-runtime (stats/default-request-runtime)))
 
 (defn make-info-client
-  [{:keys [config fetch-fn now-ms-fn sleep-ms-fn log-fn]
+  [{:keys [config fetch-fn now-ms-fn sleep-ms-fn log-fn
+           set-timeout-fn clear-timeout-fn make-abort-controller]
     :or {config default-config
          fetch-fn js/fetch
          now-ms-fn platform/now-ms
          sleep-ms-fn default-sleep-ms
-         log-fn telemetry/log!}}]
+         log-fn telemetry/log!
+         set-timeout-fn platform/set-timeout!
+         clear-timeout-fn platform/clear-timeout!
+         make-abort-controller default-make-abort-controller}}]
   (let [{:keys [info-url
                 max-retries
                 base-retry-ms
                 max-retry-ms
                 max-inflight
                 high-priority-burst
+                request-timeout-ms
                 default-priority]} (normalize-client-config config)
         cooldown-until-ms (atom 0)
         single-flight-promises (atom {})
@@ -252,6 +263,10 @@
                                       :max-retry-ms max-retry-ms
                                       :sleep-ms-fn sleep-ms-fn
                                       :log-fn log-fn
+                                      :set-timeout-fn set-timeout-fn
+                                      :clear-timeout-fn clear-timeout-fn
+                                      :make-abort-controller make-abort-controller
+                                      :request-timeout-ms request-timeout-ms
                                       :track-rate-limit! track-rate-limit-fn
                                       :mark-rate-limit-cooldown! mark-rate-limit-cooldown-fn}
                                      body

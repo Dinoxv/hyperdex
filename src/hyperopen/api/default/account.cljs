@@ -78,6 +78,10 @@
   [{:keys [post-info!]} address opts]
   (account-gateway/request-user-abstraction! {:post-info! post-info!} address opts))
 
+(defn normalize-user-abstraction-mode
+  [abstraction]
+  (account-gateway/normalize-user-abstraction-mode abstraction))
+
 (defn request-portfolio!
   [{:keys [post-info!]} address opts]
   (account-gateway/request-portfolio! {:post-info! post-info!} address opts))

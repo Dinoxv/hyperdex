@@ -404,16 +404,36 @@
   (api-wallets-effects/api-load-api-wallets!
    (api-wallets-load-deps store)))
 
+(defn- owner-mode-request-opts
+  [owner-address force-refresh?]
+  (if force-refresh?
+    (let [token (platform/now-ms)]
+      {:priority :high
+       :cache-ttl-ms 1
+       :force-refresh? true
+       :dedupe-key [:user-abstraction owner-address token]
+       :cache-key [:user-abstraction owner-address token]})
+    {:priority :high}))
+
 (defn- subaccounts-load-deps
   [store]
   {:store store
    :request-sub-accounts! api/request-sub-accounts!
+   :request-owner-mode! (fn [owner-address force-refresh?]
+                          (api/request-user-account-mode!
+                           owner-address
+                           (owner-mode-request-opts owner-address force-refresh?)))
    :local-storage-get platform/local-storage-get
    :now-ms-fn platform/now-ms})
 
 (defn api-load-subaccounts-effect
   [_ store]
   (subaccounts-effects/api-load-subaccounts!
+   (subaccounts-load-deps store)))
+
+(defn api-refresh-subaccounts-effect
+  [_ store]
+  (subaccounts-effects/api-refresh-subaccounts!
    (subaccounts-load-deps store)))
 
 (defn- subaccounts-management-deps

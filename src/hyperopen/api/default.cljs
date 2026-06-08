@@ -416,6 +416,14 @@
   ([address] (request-user-abstraction! address {}))
   ([address opts] (account/request-user-abstraction! {:post-info! post-info!} address opts)))
 
+(defn request-user-account-mode!
+  "Requests the account abstraction for `address` and resolves to the
+   normalized account-mode keyword (`:unified` / `:classic`)."
+  ([address] (request-user-account-mode! address {}))
+  ([address opts]
+   (-> (request-user-abstraction! address opts)
+       (.then account/normalize-user-abstraction-mode))))
+
 (defn request-portfolio!
   ([address] (request-portfolio! address {}))
   ([address opts] (account/request-portfolio! {:post-info! post-info!} address opts)))

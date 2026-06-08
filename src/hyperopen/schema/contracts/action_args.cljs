@@ -482,6 +482,7 @@
    :actions/close-api-wallet-modal ::common/no-args
    :actions/confirm-api-wallet-modal ::common/no-args
    :actions/load-subaccounts-route ::common/path-args
+   :actions/refresh-subaccounts ::common/no-args
    :actions/select-subaccount ::common/address-args
    :actions/select-master-account ::common/no-args
    :actions/set-subaccount-form-field ::subaccount-form-field-args

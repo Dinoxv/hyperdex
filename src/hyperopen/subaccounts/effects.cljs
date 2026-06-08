@@ -54,8 +54,10 @@
   (swap! store assoc-in [:account-context :subaccounts]
          {:status :idle
           :loaded-for-owner nil
+          :owner-mode nil
           :rows []
           :error nil
+          :refreshing? false
           :selected-address nil
           :selection-loaded? false
           :create-name ""
@@ -91,6 +93,30 @@
       :else
       nil)))
 
+(defn- apply-owner-mode!
+  [store owner-address mode]
+  (when mode
+    (swap! store
+           (fn [state]
+             ;; Guard against the owner changing while the abstraction request
+             ;; was in flight so we never stamp a stale master's mode.
+             (if (= owner-address (account-context/owner-address state))
+               (assoc-in state [:account-context :subaccounts :owner-mode] mode)
+               state)))))
+
+(defn- load-owner-mode!
+  "Fetches the master/owner account abstraction mode so the Sub-Accounts page
+   can decide whether to use unified (`sendAsset`) transfers based on the
+   master — not the active trading account, which may be a classic
+   sub-account. Best-effort: failures never reject the subaccounts load."
+  [{:keys [store request-owner-mode! force-refresh?]} owner-address]
+  (when (fn? request-owner-mode!)
+    (-> (js/Promise.resolve (request-owner-mode! owner-address (boolean force-refresh?)))
+        (.then (fn [mode]
+                 (apply-owner-mode! store owner-address mode)
+                 nil))
+        (.catch (fn [_] nil)))))
+
 (defn load-subaccounts!
   [{:keys [store
            request-sub-accounts!
@@ -98,13 +124,16 @@
            now-ms-fn
            force-refresh?]
     :or {local-storage-get platform/local-storage-get
-         now-ms-fn platform/now-ms}}]
+         now-ms-fn platform/now-ms}
+    :as deps}]
   (let [owner-address (actions/viewed-master-address @store)]
     (if-not (seq owner-address)
       (do
         (reset-subaccounts! store)
         (js/Promise.resolve nil))
-      (-> (request-sub-accounts! owner-address
+      (do
+        (load-owner-mode! deps owner-address)
+        (-> (request-sub-accounts! owner-address
                                   (request-opts owner-address force-refresh? now-ms-fn))
           (.then (fn [rows]
                    (let [rows* (->> (or rows [])
@@ -131,11 +160,24 @@
                                  (assoc-in [:account-context :subaccounts :status] :error)
                                  (assoc-in [:account-context :subaccounts :error] (error-message err))
                                  (assoc-in [:account-context :subaccounts :selection-loaded?] true))))
-                    nil))))))
+                    nil)))))))
 
 (defn api-load-subaccounts!
   [deps]
   (load-subaccounts! (merge {:force-refresh? false} deps)))
+
+(defn api-refresh-subaccounts!
+  "Force-refresh load for the Sub-Accounts page Refresh button. Uses the
+   tokenized force path (unique dedupe/cache key) so it bypasses any stale or
+   stuck single-flight entry, and always clears the `:refreshing?` flag once
+   the load settles."
+  [deps]
+  (-> (load-subaccounts! (assoc deps :force-refresh? true))
+      (.finally
+       (fn []
+         (when-let [store (:store deps)]
+           (swap! store assoc-in
+                  [:account-context :subaccounts :refreshing?] false))))))
 
 (def ^:private default-load-subaccounts! load-subaccounts!)
 
@@ -300,14 +342,6 @@
                                        amount
                                        token)))
 
-(defn- unified-account-mode?
-  [state]
-  (= :unified
-     (some-> (get-in state [:account :mode])
-             name
-             str/lower-case
-             keyword)))
-
 (def ^:private hyperliquid-mainnet-usdc-token
   "USDC:0x6d1e7cde53ba9467b783cb7c530ce054")
 
@@ -353,7 +387,7 @@
         address (account-context/normalize-address (:sub-account-user request))
         is-deposit? (boolean (:is-deposit request))
         spot? (= :spot (:account-kind request))
-        unified? (unified-account-mode? @store)
+        unified? (account-context/subaccounts-owner-unified? @store)
         usd (:usd request)
         token (:token request)
         amount (:amount request)

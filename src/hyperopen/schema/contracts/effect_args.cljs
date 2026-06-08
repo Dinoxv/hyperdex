@@ -255,6 +255,7 @@
    :effects/sync-active-asset-funding-predictability ::common/coin-args
    :effects/api-load-api-wallets ::common/no-args
    :effects/api-load-subaccounts ::common/no-args
+   :effects/api-refresh-subaccounts ::common/no-args
    :effects/api-create-subaccount ::api-create-subaccount-args
    :effects/api-rename-subaccount ::api-rename-subaccount-args
    :effects/api-transfer-subaccount ::api-transfer-subaccount-args
