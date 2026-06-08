@@ -36,6 +36,7 @@
   (is (fn? action-adapters/prev-leaderboard-page-action))
   (is (fn? action-adapters/load-funding-comparison-route-action))
   (is (fn? action-adapters/load-staking-route-action))
+  (is (fn? action-adapters/load-referrals-route-action))
   (is (fn? action-adapters/load-api-wallet-route-action))
   (is (fn? action-adapters/load-subaccounts-route-action))
   (is (fn? action-adapters/connect-wallet-action))

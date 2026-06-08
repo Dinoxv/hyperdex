@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.router :as router]
             [hyperopen.subaccounts.actions :as subaccounts-actions]))
 
@@ -41,6 +42,11 @@
     :route "/staking"
     :placements #{:desktop :mobile-secondary}
     :active-fn #(exact-or-child-route? % "/staking")}
+   {:id :referrals
+    :label "Referrals"
+    :route referrals-actions/canonical-route
+    :placements #{:desktop :mobile-secondary}
+    :active-fn referrals-actions/referrals-route?}
    {:id :leaderboard
     :label "Leaderboard"
     :route "/leaderboard"

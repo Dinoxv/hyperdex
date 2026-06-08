@@ -5,6 +5,7 @@
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.leaderboard.actions :as leaderboard-actions]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.subaccounts.actions :as subaccounts-actions]
@@ -15,6 +16,7 @@
   {:portfolio "portfolio_route"
    :leaderboard "leaderboard_route"
    :funding-comparison "funding_comparison_route"
+   :referrals "referrals_route"
    :staking "staking_route"
    :api-wallets "api_wallets_route"
    :subaccounts "subaccounts_route"
@@ -24,6 +26,7 @@
   {:portfolio [["hyperopen" "views" "portfolio_view" "route_view"]]
    :leaderboard [["hyperopen" "views" "leaderboard_view" "route_view"]]
    :funding-comparison [["hyperopen" "views" "funding_comparison_view" "route_view"]]
+   :referrals [["hyperopen" "views" "referrals_view" "route_view"]]
    :staking [["hyperopen" "views" "staking_view" "route_view"]]
    :api-wallets [["hyperopen" "views" "api_wallets_view" "route_view"]]
    :subaccounts [["hyperopen" "views" "subaccounts_view" "route_view"]]
@@ -51,6 +54,7 @@
       (portfolio-routes/portfolio-route? route) :portfolio
       (leaderboard-actions/leaderboard-route? route) :leaderboard
       (funding-comparison-actions/funding-comparison-route? route) :funding-comparison
+      (referrals-actions/referrals-route? route) :referrals
       (staking-actions/staking-route? route) :staking
       (api-wallets-actions/api-wallet-route? route) :api-wallets
       (subaccounts-actions/subaccounts-route? route) :subaccounts

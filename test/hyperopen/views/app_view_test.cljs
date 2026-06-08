@@ -170,6 +170,20 @@
         funding-root (hiccup/find-by-parity-id view-node "funding-comparison-root")]
     (is (some? funding-root))))
 
+(deftest app-view-renders-referrals-route-with-referrals-root-test
+  (let [view-node (with-redefs [route-modules/route-ready? (constantly true)
+                                route-modules/render-route-view
+                                (fn [_state route]
+                                  (when (= "/referrals" route)
+                                    [:div {:data-parity-id "referrals-root"}]))]
+                    (app-view/app-view (assoc (base-state)
+                                              :router {:path "/referrals"}
+                                              :wallet {})))
+        referrals-root (hiccup/find-by-parity-id view-node "referrals-root")
+        trade-root (hiccup/find-by-parity-id view-node "trade-root")]
+    (is (some? referrals-root))
+    (is (nil? trade-root))))
+
 (deftest app-view-renders-leaderboard-route-with-leaderboard-root-test
   (let [view-node (with-redefs [route-modules/route-ready? (constantly true)
                                 route-modules/render-route-view

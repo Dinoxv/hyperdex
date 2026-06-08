@@ -36,6 +36,12 @@
            (route-refresh/current-route-refresh-effects
             {:router {:path "/staking"}}
             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))))
+  (testing "referrals route refreshes only referrals"
+    (is (= [[:actions/load-referrals-route "/join/ABC123"]
+            [:effects/api-load-subaccounts]]
+           (route-refresh/current-route-refresh-effects
+            {:router {:path "/join/ABC123"}}
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))))
   (testing "api route refreshes only api wallets"
     (is (= [[:actions/load-api-wallet-route "/api"]
             [:effects/api-load-subaccounts]]

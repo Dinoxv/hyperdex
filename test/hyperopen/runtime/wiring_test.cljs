@@ -47,6 +47,8 @@
                     (get-in deps [:api :api-fetch-vault-ledger-updates])))
     (is (identical? effect-adapters/api-fetch-staking-validator-summaries-effect
                     (get-in deps [:api :api-fetch-staking-validator-summaries])))
+    (is (identical? effect-adapters/api-fetch-referral-effect
+                    (get-in deps [:api :api-fetch-referral])))
     (is (fn? (get-in deps [:portfolio-optimizer :run-portfolio-optimizer])))
     (is (fn? (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-pipeline])))
     (is (identical? (:load-portfolio-optimizer-history optimizer-effect-deps)
@@ -88,6 +90,8 @@
                     (get-in deps [:leaderboard :load-leaderboard-route])))
     (is (identical? action-adapters/load-staking-route-action
                     (get-in deps [:staking :load-staking-route])))
+    (is (identical? action-adapters/load-referrals-route-action
+                    (get-in deps [:referrals :load-referrals-route])))
     (is (identical? action-adapters/navigate
                     (get-in deps [:core :navigate])))
     (is (identical? (:run-portfolio-optimizer optimizer-action-deps)

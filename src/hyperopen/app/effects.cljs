@@ -86,6 +86,10 @@
          :api-fetch-staking-rewards effect-adapters/api-fetch-staking-rewards-effect
          :api-fetch-staking-history effect-adapters/api-fetch-staking-history-effect
          :api-fetch-staking-spot-state effect-adapters/api-fetch-staking-spot-state-effect
+         :api-fetch-referral effect-adapters/api-fetch-referral-effect
+         :api-set-referrer effect-adapters/api-set-referrer-effect
+         :api-register-referrer effect-adapters/api-register-referrer-effect
+         :api-claim-referral-rewards effect-adapters/api-claim-referral-rewards-effect
          :api-submit-staking-deposit effect-adapters/api-submit-staking-deposit-effect
          :api-submit-staking-withdraw effect-adapters/api-submit-staking-withdraw-effect
          :api-submit-staking-delegate effect-adapters/api-submit-staking-delegate-effect

@@ -2,6 +2,7 @@
   (:require [hyperopen.api.endpoints.account.agents :as agents]
             [hyperopen.api.endpoints.account.funding-history :as funding-history]
             [hyperopen.api.endpoints.account.portfolio :as portfolio]
+            [hyperopen.api.endpoints.account.referrals :as referrals]
             [hyperopen.api.endpoints.account.staking :as staking]
             [hyperopen.api.endpoints.account.subaccounts :as subaccounts]))
 
@@ -75,6 +76,10 @@
 (defn request-user-fees!
   [post-info! address opts]
   (portfolio/request-user-fees! post-info! address opts))
+
+(defn request-referral!
+  [post-info! address opts]
+  (referrals/request-referral! post-info! address opts))
 
 (defn request-user-non-funding-ledger-updates!
   [post-info! address start-time-ms end-time-ms opts]

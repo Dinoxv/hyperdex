@@ -334,6 +334,14 @@
               {:post-info! post-info!}
               address
               opts)))
+          (request-referral!
+            ([address]
+             (request-referral! address {}))
+            ([address opts]
+             (account-gateway/request-referral!
+              {:post-info! post-info!}
+              address
+              opts)))
           (request-user-non-funding-ledger-updates!
             ([address start-time-ms]
              (request-user-non-funding-ledger-updates! address start-time-ms nil {}))
@@ -367,6 +375,7 @@
      :request-user-abstraction! request-user-abstraction!
      :request-portfolio! request-portfolio!
      :request-user-fees! request-user-fees!
+     :request-referral! request-referral!
      :request-user-non-funding-ledger-updates! request-user-non-funding-ledger-updates!
      :request-clearinghouse-state! request-clearinghouse-state!}))
 

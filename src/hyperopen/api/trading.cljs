@@ -106,6 +106,24 @@
   ([store address name options]
    (agent-actions/create-sub-account! store address name options)))
 
+(defn set-referrer!
+  ([store address code]
+   (agent-actions/set-referrer! store address code))
+  ([store address code options]
+   (agent-actions/set-referrer! store address code options)))
+
+(defn register-referrer!
+  ([store address code]
+   (agent-actions/register-referrer! store address code))
+  ([store address code options]
+   (agent-actions/register-referrer! store address code options)))
+
+(defn claim-rewards!
+  ([store address]
+   (agent-actions/claim-rewards! store address))
+  ([store address options]
+   (agent-actions/claim-rewards! store address options)))
+
 (defn modify-sub-account!
   ([store address sub-account-user name]
    (agent-actions/modify-sub-account! store address sub-account-user name))

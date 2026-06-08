@@ -6,6 +6,7 @@
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.optimizer.actions :as portfolio-optimizer-actions]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
@@ -84,6 +85,7 @@
                 (vault-actions/load-vault-route state normalized-path)
                 (funding-comparison-actions/load-funding-comparison-route state normalized-path)
                 (staking-actions/load-staking-route state normalized-path)
+                (referrals-actions/load-referrals-route state normalized-path)
                 (api-wallets-actions/load-api-wallet-route state normalized-path)
                 (subaccounts-actions/load-subaccounts-route state normalized-path))))
 
@@ -137,6 +139,10 @@
 (defn load-staking-route-action
   [state path]
   (staking-actions/load-staking-route state path))
+
+(defn load-referrals-route-action
+  [state path]
+  (referrals-actions/load-referrals-route state path))
 
 (defn load-api-wallet-route-action
   [state path]

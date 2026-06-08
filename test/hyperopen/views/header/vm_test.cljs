@@ -17,7 +17,7 @@
         leaderboard-vm (vm/header-vm {:router {:path "/leaderboard"}})
         api-vm (vm/header-vm {:router {:path "/API"}})
         subaccounts-vm (vm/header-vm {:router {:path "/subAccounts"}})]
-    (is (= [:trade :portfolio :funding :vaults :staking :leaderboard]
+    (is (= [:trade :portfolio :funding :vaults :staking :referrals :leaderboard]
            (mapv :id (:desktop-nav-items funding-vm))))
     (is (true? (some->> (:desktop-nav-items funding-vm)
                         (some #(when (= :funding (:id %)) (:active? %))))))

@@ -90,6 +90,10 @@
   [{:keys [post-info!]} address opts]
   (account-gateway/request-user-fees! {:post-info! post-info!} address opts))
 
+(defn request-referral!
+  [{:keys [post-info!]} address opts]
+  (account-gateway/request-referral! {:post-info! post-info!} address opts))
+
 (defn request-user-non-funding-ledger-updates!
   [{:keys [post-info!]} address start-time-ms end-time-ms opts]
   (account-gateway/request-user-non-funding-ledger-updates!

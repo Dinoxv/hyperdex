@@ -131,6 +131,12 @@
    opts]
   (account-endpoints/request-user-fees! post-info! address opts))
 
+(defn request-referral!
+  [{:keys [post-info!]}
+   address
+   opts]
+  (account-endpoints/request-referral! post-info! address opts))
+
 (defn request-user-non-funding-ledger-updates!
   [{:keys [post-info!]}
    address

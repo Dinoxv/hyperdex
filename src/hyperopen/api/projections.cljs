@@ -6,6 +6,7 @@
             [hyperopen.api.projections.market :as market]
             [hyperopen.api.projections.orders :as orders]
             [hyperopen.api.projections.portfolio :as portfolio]
+            [hyperopen.api.projections.referrals :as referrals]
             [hyperopen.api.projections.staking :as staking]
             [hyperopen.api.projections.user-abstraction :as user-abstraction]
             [hyperopen.api.projections.user-fees :as user-fees]
@@ -33,6 +34,9 @@
 (def begin-user-fees-load user-fees/begin-load)
 (def apply-user-fees-success user-fees/apply-success)
 (def apply-user-fees-error user-fees/apply-error)
+(def begin-referrals-load referrals/begin-load)
+(def apply-referrals-success referrals/apply-success)
+(def apply-referrals-error referrals/apply-error)
 (def begin-asset-selector-load asset-selector/begin-asset-selector-load)
 (def apply-asset-selector-success asset-selector/apply-asset-selector-success)
 (def apply-asset-selector-error asset-selector/apply-asset-selector-error)

@@ -4,6 +4,7 @@
             [hyperopen.leaderboard.actions :as leaderboard-actions]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.router :as router]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.subaccounts.actions :as subaccounts-actions]
@@ -31,6 +32,9 @@
 
                      (staking-actions/staking-route? route)
                      [[:actions/load-staking-route route]]
+
+                     (referrals-actions/referrals-route? route)
+                     [[:actions/load-referrals-route route]]
 
                      (api-wallets-actions/api-wallet-route? route)
                      [[:actions/load-api-wallet-route route]]

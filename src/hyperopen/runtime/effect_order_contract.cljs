@@ -326,6 +326,30 @@
                         :effects/api-fetch-staking-history
                         :effects/api-fetch-staking-spot-state}}
 
+   :actions/load-referrals-route
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-fetch-referral}}
+
+   :actions/submit-set-referrer
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-set-referrer}}
+
+   :actions/submit-register-referrer
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-register-referrer}}
+
+   :actions/submit-claim-referral-rewards
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-claim-referral-rewards}}
+
    :actions/submit-staking-deposit
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true
@@ -430,6 +454,7 @@
                         :effects/api-fetch-staking-rewards
                         :effects/api-fetch-staking-history
                         :effects/api-fetch-staking-spot-state
+                        :effects/api-fetch-referral
                         :effects/api-load-api-wallets
                         :effects/api-load-subaccounts
                         :effects/fetch-asset-selector-markets}}
@@ -459,6 +484,7 @@
                         :effects/api-fetch-staking-rewards
                         :effects/api-fetch-staking-history
                         :effects/api-fetch-staking-spot-state
+                        :effects/api-fetch-referral
                         :effects/api-load-subaccounts
                         :effects/fetch-asset-selector-markets}}})
 

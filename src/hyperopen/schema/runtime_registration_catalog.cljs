@@ -4,6 +4,7 @@
             [hyperopen.schema.runtime-registration.funding-comparison :as funding-comparison]
             [hyperopen.schema.runtime-registration.leaderboard :as leaderboard]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio]
+            [hyperopen.schema.runtime-registration.referrals :as referrals]
             [hyperopen.schema.runtime-registration.spectate-mode :as spectate-mode]
             [hyperopen.schema.runtime-registration.staking :as staking]
             [hyperopen.schema.runtime-registration.subaccounts :as subaccounts]
@@ -24,6 +25,7 @@
    api-wallets/effect-binding-rows
    subaccounts/effect-binding-rows
    leaderboard/effect-binding-rows
+   referrals/effect-binding-rows
    funding-comparison/effect-binding-rows
    portfolio/effect-binding-rows
    trade/effect-binding-rows
@@ -40,6 +42,7 @@
    trade/action-binding-rows
    funding/action-binding-rows
    leaderboard/action-binding-rows
+   referrals/action-binding-rows
    api-wallets/action-binding-rows
    subaccounts/action-binding-rows
    funding-comparison/action-binding-rows
@@ -54,6 +57,7 @@
            trade/effect-order-policy-required-action-ids
            funding/effect-order-policy-required-action-ids
            leaderboard/effect-order-policy-required-action-ids
+           referrals/effect-order-policy-required-action-ids
            api-wallets/effect-order-policy-required-action-ids
            subaccounts/effect-order-policy-required-action-ids
            funding-comparison/effect-order-policy-required-action-ids

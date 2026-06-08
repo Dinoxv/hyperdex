@@ -290,6 +290,35 @@
                                  :name name}
                                 (management-action-options options))))
 
+(defn set-referrer!
+  ([store address code]
+   (set-referrer! store address code {}))
+  ([store address code options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "setReferrer"
+                                 :code code}
+                                (management-action-options options))))
+
+(defn register-referrer!
+  ([store address code]
+   (register-referrer! store address code {}))
+  ([store address code options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "registerReferrer"
+                                 :code code}
+                                (management-action-options options))))
+
+(defn claim-rewards!
+  ([store address]
+   (claim-rewards! store address {}))
+  ([store address options]
+   (sign-and-post-agent-action! store
+                                address
+                                {:type "claimRewards"}
+                                (management-action-options options))))
+
 (defn modify-sub-account!
   ([store address sub-account-user name]
    (modify-sub-account! store address sub-account-user name {}))

@@ -40,9 +40,12 @@ Reference sources inspected on June 8, 2026:
   - `src/hyperopen/views/header/nav.cljs`
   - `src/hyperopen/route_modules.cljs`
   - `src/hyperopen/app/startup.cljs`
+  - `src/hyperopen/app/effects.cljs`
   - `src/hyperopen/startup/route_refresh.cljs`
+  - `src/hyperopen/api/gateway/account.cljs`
   - `src/hyperopen/api/endpoints/account.cljs`
   - `src/hyperopen/api/endpoints/account/portfolio.cljs`
+  - `src/hyperopen/api/instance.cljs`
   - `src/hyperopen/api/trading.cljs`
   - `src/hyperopen/api/trading/agent_actions.cljs`
   - `src/hyperopen/portfolio/fee_schedule.cljs`
@@ -151,9 +154,13 @@ Observed Hyperopen state:
    - `src/hyperopen/app/actions.cljs`
 5. Account `/info` requests are centralized under
    `src/hyperopen/api/endpoints/account.cljs` with per-feature submodules.
-6. Signed L1 actions already flow through
+6. Default API exports flow through `src/hyperopen/api/default.cljs`, while
+   injectable API-service instances also wire account ops in
+   `src/hyperopen/api/instance.cljs`.
+7. Runtime effect registration is finalized in `src/hyperopen/app/effects.cljs`.
+8. Signed L1 actions already flow through
    `src/hyperopen/api/trading/agent_actions.cljs` for agent-wallet actions.
-7. Portfolio fee schedule already understands `activeReferralDiscount` from
+9. Portfolio fee schedule already understands `activeReferralDiscount` from
    `userFees`; the referrals page must not duplicate or diverge from that
    existing fee model.
 
@@ -275,7 +282,11 @@ styling, mobile card fallback, and focused action buttons.
 5. `Claim Rewards` opens a claim confirmation modal.
 6. Action buttons MUST be disabled while disconnected, legally blocked,
    read-only, in spectate mode, or when agent trading is unavailable.
-7. Disabled actions MUST expose concise reason copy through the same affordance
+7. Referral mutations MUST also be disabled while a connected user has an owned
+   subaccount selected as the active trading context. Hyperopen's general
+   read-only guard does not block that state today, so referrals need an
+   explicit master-account-only action guard.
+8. Disabled actions MUST expose concise reason copy through the same affordance
    pattern used elsewhere in Hyperopen.
 
 ### FR-4 KPI Cards
@@ -422,6 +433,8 @@ styling, mobile card fallback, and focused action buttons.
    explicitly confirms. Do not silently sign a transaction.
 6. After success, navigate to `/referrals` with the pending code cleared.
 7. The join flow MUST never sign for a spectated, vault, or subaccount identity.
+8. The join flow MUST display the exact normalized code before signing because
+   referral selection is sticky account state.
 
 ### FR-11 Fee Schedule Integration
 
@@ -473,6 +486,8 @@ Required inputs:
 4. Spot balances for post-claim balance refresh.
 5. Active wallet and agent-wallet status.
 6. Account-context helpers for master, subaccount, vault, and spectate mode.
+7. A referral-specific mutation guard that returns a disabled reason unless the
+   active signing identity is the connected master account.
 
 ### DR-2 Normalized Referral Shape
 
@@ -568,19 +583,23 @@ Implementation should update:
    - add route loader effects
 6. `src/hyperopen/app/actions.cljs`
    - register referrals actions
+7. `src/hyperopen/app/effects.cljs`
+   - register referrals effects
 
 ### TP-3 API Wiring
 
 Implementation should add:
 1. `request-referral!` wrapper under account endpoints.
-2. `request-referral!` export from `src/hyperopen/api/default.cljs`.
-3. Projection functions:
+2. `request-referral!` forwarding through `src/hyperopen/api/gateway/account.cljs`.
+3. `request-referral!` export from `src/hyperopen/api/default.cljs`.
+4. `request-referral!` account-op wiring in `src/hyperopen/api/instance.cljs`.
+5. Projection functions:
    - `begin-referral-load`
    - `apply-referral-success`
    - `apply-referral-error`
-4. Runtime effect:
+6. Runtime effect:
    - `:effects/api-fetch-referral`
-5. Route-gated effect logic matching leaderboard and staking patterns.
+7. Route-gated effect logic matching leaderboard and staking patterns.
 
 ### TP-4 Signed Action Wiring
 
@@ -667,22 +686,33 @@ Required before implementation is considered complete:
    - `{"type":"setReferrer","code":"..."}`
    - `{"type":"registerReferrer","code":"..."}`
    - `{"type":"claimRewards"}`
-4. Runtime/effect tests for route gating, stale-address protection, success
+4. Signed-action tests MUST assert referral payloads are posted without
+   `vaultAddress`.
+5. Guard tests MUST prove an owned selected subaccount cannot submit
+   `setReferrer`, `registerReferrer`, or `claimRewards`.
+6. Runtime/effect tests for route gating, stale-address protection, success
    refetches, and error toasts.
-5. View tests for disconnected, loading, error, empty, ready, need-to-trade, and
+7. View tests for disconnected, loading, error, empty, ready, need-to-trade, and
    need-to-create-code states.
-6. Playwright coverage for:
+8. Playwright coverage for:
    - `/referrals` first render
    - modal validation
    - tab switching
    - mobile layout
    - `/join/:code` pending-code confirmation
-7. Required repository gates for code changes:
+9. Required repository gates for code changes:
    - `npm run check`
    - `npm test`
    - `npm run test:websocket`
-8. UI implementation must account for the browser-QA passes required by
+10. UI implementation must account for the browser-QA passes required by
    `/hyperopen/docs/BROWSER_TESTING.md`.
+
+## Revision Notes
+
+- 2026-06-08: Updated implementation planning coverage after external reviewer
+  comparison. Added explicit `app/effects.cljs`, API gateway/instance, selected
+  subaccount mutation guard, and no-`vaultAddress` signed-action test
+  requirements.
 
 ## Risks and Mitigations
 
