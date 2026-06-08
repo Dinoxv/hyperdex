@@ -377,4 +377,8 @@
       (table-panel view-state)]
      (referrals-modals/referrals-modal view-state)]))
 
-(def route-view referrals-view)
+(defn ^:export route-view
+  [state]
+  (referrals-view state))
+
+(goog/exportSymbol "hyperopen.views.referrals_view.route_view" route-view)

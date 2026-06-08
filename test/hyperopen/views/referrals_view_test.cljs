@@ -1,5 +1,6 @@
 (ns hyperopen.views.referrals-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [goog.object :as gobj]
             [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.referrals-view :as referrals-view]))
 
@@ -27,6 +28,18 @@
   (->> (hiccup/find-all-nodes view #(= "referrals-row" (get-in % [1 :data-role])))
        (mapv (fn [row]
                (mapv hiccup/node-text (hiccup/node-children row))))))
+
+(defn- resolve-global-path
+  [path]
+  (reduce (fn [acc segment]
+            (when acc
+              (gobj/get acc segment)))
+          (or (some-> js/goog .-global)
+              js/globalThis)
+          path))
+
+(deftest referrals-route-view-is-exported-for-lazy-route-loader-test
+  (is (fn? (resolve-global-path ["hyperopen" "views" "referrals_view" "route_view"]))))
 
 (deftest referrals-view-renders-ready-share-state-and-kpis-test
   (let [view (referrals-view/referrals-view
