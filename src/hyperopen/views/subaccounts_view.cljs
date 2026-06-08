@@ -168,7 +168,7 @@
 
 (defn- unified-account-mode?
   [state]
-  (= :unified (get-in state [:account :mode])))
+  (account-context/subaccounts-owner-unified? state))
 
 (defn- subaccount-availability-state
   [state row]
@@ -341,7 +341,7 @@
     [:table {:class ["min-w-[960px]" "w-full" "text-sm"]}
      (table-header ["Name" "Address" "Perps Account Equity" "Spot Account Equity" "Action"])
      (cond
-       (= :loading status)
+       (and (= :loading status) (empty? rows))
        [:tbody (empty-row 5 "Loading subaccounts...")]
 
        (empty? rows)

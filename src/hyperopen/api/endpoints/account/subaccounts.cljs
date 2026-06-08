@@ -32,13 +32,25 @@
                                str
                                str/trim)))))))
 
+(defn- subaccount-rows
+  "Extracts the row collection from a `subAccounts` response. Hyperliquid
+   returns a bare array, but tolerate a `{:subAccounts [...]}` wrapper too so a
+   proxy/gateway reshaping the payload can't silently collapse the page to
+   \"No subaccounts found.\""
+  [payload]
+  (let [rows (cond
+               (sequential? payload) payload
+               (map? payload) (some (fn [k] (get payload k))
+                                    [:subAccounts :sub-accounts "subAccounts" "sub-accounts"])
+               :else nil)]
+    (when (sequential? rows) rows)))
+
 (defn normalize-subaccounts
   [payload]
-  (if (sequential? payload)
-    (->> payload
-         (keep normalize-subaccount-row)
-         vec)
-    []))
+  (->> (subaccount-rows payload)
+       (filter map?)
+       (keep normalize-subaccount-row)
+       vec))
 
 (defn request-sub-accounts!
   [post-info! address opts]

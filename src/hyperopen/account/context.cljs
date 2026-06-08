@@ -155,6 +155,24 @@
   [state]
   (normalize-address (get-in state [:account-context :subaccounts :selected-address])))
 
+(defn subaccounts-owner-unified?
+  "True when the Sub-Accounts master/owner account is a unified
+   (portfolio-margin) account, which must move funds via `sendAsset` rather
+   than the classic sub-account transfer primitives.
+
+   Prefers the explicitly tracked owner mode (fetched for the master/owner
+   address whenever the Sub-Accounts page loads or refreshes) because the
+   active-account mode at `[:account :mode]` reflects whichever account is
+   *currently selected for trading* — which can be a classic sub-account even
+   while the master is unified. Without this distinction a withdraw back to a
+   unified master, made while a classic sub-account is the active trading
+   account, would fall through to the legacy transfer primitive and fail. Falls
+   back to the active-account mode only until the owner mode has loaded."
+  [state]
+  (if-some [owner-mode (get-in state [:account-context :subaccounts :owner-mode])]
+    (= :unified owner-mode)
+    (= :unified (get-in state [:account :mode]))))
+
 (defn- subaccount-row-address
   [row]
   (normalize-address (or (:sub-account-user row)
@@ -260,6 +278,7 @@
                 :started-at-ms nil}
    :subaccounts {:status :idle
                  :loaded-for-owner nil
+                 :owner-mode nil
                  :rows []
                  :error nil
                  :refreshing? false
