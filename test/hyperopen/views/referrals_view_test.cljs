@@ -51,11 +51,23 @@
 (deftest referrals-view-renders-hyperliquid-parity-reward-summary-and-actions-test
   (let [view (referrals-view/referrals-view
               {:wallet {:address owner-address}
-               :referrals {:raw {:referrerState {:stage "ready"
+               :account-context {:spectate-mode {:active? true
+                                                 :address spectate-address}}
+               :referrals {:raw {:tokenToState [[0 {:cumVlm "5034741.3799999999"
+                                                    :unclaimedRewards "0.08258155"
+                                                    :claimedRewards "208.64995482"
+                                                    :builderRewards "0.0"}]
+                                                [235 {:cumVlm "0.0"
+                                                      :unclaimedRewards "0.00081898"
+                                                      :claimedRewards "0.0"
+                                                      :builderRewards "0.0"}]
+                                                [360 {:cumVlm "680.37"
+                                                      :unclaimedRewards "0.82911511"
+                                                      :claimedRewards "0.0"
+                                                      :builderRewards "0.0"}]]
+                                  :referrerState {:stage "ready"
                                                   :data {:code "MYCODE"
                                                          :nReferrals 6
-                                                         :tokenToState {:USDC {:unclaimedRewards "0.91"
-                                                                               :claimedRewards "208.65"}}
                                                          :referralStates [{:cumVlm "6226785.1799999997"
                                                                            :cumRewardedFeesSinceReferred "4428.91413651"
                                                                            :cumFeesRewardedToReferrer "187.35791924"

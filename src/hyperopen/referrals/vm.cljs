@@ -61,28 +61,47 @@
       "need_to_trade" :need-to-trade
       :unknown)))
 
+(defn- token-label
+  [token]
+  (let [token* (some-> token str)]
+    (case token*
+      nil "USDC"
+      "0" "USDC"
+      token*)))
+
 (defn- token-state-rows
   [payload]
   (let [token-to-state (field payload :token-to-state)]
     (cond
       (map? token-to-state)
       (mapv (fn [[token state]]
-              {:token (name token)
+              {:token (token-label token)
                :unclaimed (or (numberish (field state :unclaimed-rewards)) 0)
                :claimed (or (numberish (field state :claimed-rewards)) 0)
                :builder (or (numberish (field state :builder-rewards)) 0)})
             token-to-state)
 
       (sequential? token-to-state)
-      (mapv (fn [state]
-              {:token (str (or (field state :token) "USDC"))
-               :unclaimed (or (numberish (field state :unclaimed-rewards)) 0)
-               :claimed (or (numberish (field state :claimed-rewards)) 0)
-               :builder (or (numberish (field state :builder-rewards)) 0)})
+      (mapv (fn [entry]
+              (let [[token state] (if (and (sequential? entry)
+                                           (map? (second entry)))
+                                    [(first entry) (second entry)]
+                                    [(field entry :token) entry])]
+                {:token (token-label token)
+                 :unclaimed (or (numberish (field state :unclaimed-rewards)) 0)
+                 :claimed (or (numberish (field state :claimed-rewards)) 0)
+                 :builder (or (numberish (field state :builder-rewards)) 0)}))
             token-to-state)
 
       :else
-      [])))
+      (if (or (some? (field payload :unclaimed-rewards))
+              (some? (field payload :claimed-rewards))
+              (some? (field payload :builder-rewards)))
+        [{:token "USDC"
+          :unclaimed (or (numberish (field payload :unclaimed-rewards)) 0)
+          :claimed (or (numberish (field payload :claimed-rewards)) 0)
+          :builder (or (numberish (field payload :builder-rewards)) 0)}]
+        []))))
 
 (defn- sum-rewards
   [rows k]

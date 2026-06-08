@@ -2,6 +2,55 @@ import { expect, test } from "@playwright/test";
 import { visitRoute, waitForIdle } from "../support/hyperopen.mjs";
 
 const ownerAddress = "0x1234567890abcdef1234567890abcdef12345678";
+const spectateAddress = "0x999e9a397b703d68af21113abededd827b309068";
+
+const liveReadyPayload = {
+  tokenToState: [
+    [
+      0,
+      {
+        cumVlm: "5034741.3799999999",
+        unclaimedRewards: "0.08258155",
+        claimedRewards: "208.64995482",
+        builderRewards: "0.0"
+      }
+    ],
+    [
+      235,
+      {
+        cumVlm: "0.0",
+        unclaimedRewards: "0.00081898",
+        claimedRewards: "0.0",
+        builderRewards: "0.0"
+      }
+    ],
+    [
+      360,
+      {
+        cumVlm: "680.37",
+        unclaimedRewards: "0.82911511",
+        claimedRewards: "0.0",
+        builderRewards: "0.0"
+      }
+    ]
+  ],
+  referrerState: {
+    stage: "ready",
+    data: {
+      code: "MYCODE",
+      nReferrals: 6,
+      referralStates: [
+        {
+          user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+          cumVlm: "6226785.1799999997",
+          cumRewardedFeesSinceReferred: "4428.91413651",
+          cumFeesRewardedToReferrer: "187.35791924",
+          timeJoined: 1761012412763
+        }
+      ]
+    }
+  }
+};
 
 async function interceptReferralApi(page, raw) {
   await page.route("https://api.hyperliquid.xyz/info", async (route) => {
@@ -20,7 +69,7 @@ async function interceptReferralApi(page, raw) {
 }
 
 async function seedReferralsState(page, options = {}) {
-  await page.evaluate(({ owner, referralState }) => {
+  await page.evaluate(({ owner, referralState, spectate }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -38,6 +87,16 @@ async function seedReferralsState(page, options = {}) {
     let nextState = c.deref(store);
     nextState = c.assoc_in(nextState, kwPath("wallet", "address"), owner);
     nextState = c.assoc_in(nextState, kwPath("wallet", "connected?"), true);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "spectate-mode", "active?"),
+      Boolean(spectate)
+    );
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("account-context", "spectate-mode", "address"),
+      spectate ?? null
+    );
     nextState = c.assoc_in(nextState, kwPath("referrals", "raw"), raw);
     nextState = c.assoc_in(nextState, kwPath("referrals", "loading?"), false);
     nextState = c.assoc_in(nextState, kwPath("referrals", "error"), null);
@@ -50,6 +109,7 @@ async function seedReferralsState(page, options = {}) {
     }
   }, {
     owner: ownerAddress,
+    spectate: options.spectate ?? null,
     referralState: {
       raw: options.raw ?? {
         tokenToState: {
@@ -116,34 +176,10 @@ test("referrals route opens modals, validates code, and switches tabs @regressio
 });
 
 test("referrals ready state exposes share and claim modal flows @regression", async ({ page }) => {
-  const readyPayload = {
-    referrerState: {
-      stage: "ready",
-      data: {
-        code: "MYCODE",
-        nReferrals: 6,
-        tokenToState: {
-          USDC: {
-            unclaimedRewards: "0.91",
-            claimedRewards: "208.65"
-          }
-        },
-        referralStates: [
-          {
-            user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-            cumVlm: "6226785.1799999997",
-            cumRewardedFeesSinceReferred: "4428.91413651",
-            cumFeesRewardedToReferrer: "187.35791924",
-            timeJoined: 1761012412763
-          }
-        ]
-      }
-    }
-  };
-  await interceptReferralApi(page, readyPayload);
+  await interceptReferralApi(page, liveReadyPayload);
   await visitRoute(page, "/referrals");
   await seedReferralsState(page, {
-    raw: readyPayload,
+    raw: liveReadyPayload,
     stage: "ready",
     data: {
       code: "MYCODE",
@@ -189,6 +225,21 @@ test("referrals ready state exposes share and claim modal flows @regression", as
   await expect(page.locator("[data-role='referrals-modal-title']")).toHaveText("Claim Rewards");
   await expect(page.locator("[data-role='referrals-modal-claim-total']")).toHaveText("$0.91");
   await expect(page.locator("[data-role='referrals-modal-claim-row']").first()).toContainText("USDC");
+});
+
+test("referrals spectate mode populates live reward pair stats @regression", async ({ page }) => {
+  await interceptReferralApi(page, liveReadyPayload);
+  await visitRoute(page, "/referrals");
+  await seedReferralsState(page, {
+    raw: liveReadyPayload,
+    spectate: spectateAddress
+  });
+
+  await expect(page.locator("[data-role='referrals-read-only']")).toContainText("Spectate Mode is read-only");
+  await expect(page.locator("[data-role='referrals-stat-traders']")).toContainText("6");
+  await expect(page.locator("[data-role='referrals-stat-rewards']")).toContainText("$209.56");
+  await expect(page.locator("[data-role='referrals-stat-claimable']")).toContainText("$0.91");
+  await expect(page.locator("[data-role='referrals-open-claim-rewards']")).toBeDisabled();
 });
 
 test("join route preserves normalized code and requires confirmation @regression", async ({ page }) => {
