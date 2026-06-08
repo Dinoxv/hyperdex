@@ -131,8 +131,10 @@ test("referrals ready state exposes share and claim modal flows @regression", as
         referralStates: [
           {
             user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-            cumVlm: "1000",
-            cumReward: "5"
+            cumVlm: "6226785.1799999997",
+            cumRewardedFeesSinceReferred: "4428.91413651",
+            cumFeesRewardedToReferrer: "187.35791924",
+            timeJoined: 1761012412763
           }
         ]
       }
@@ -149,8 +151,10 @@ test("referrals ready state exposes share and claim modal flows @regression", as
       referralStates: [
         {
           user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-          cumVlm: "1000",
-          cumReward: "5"
+          cumVlm: "6226785.1799999997",
+          cumRewardedFeesSinceReferred: "4428.91413651",
+          cumFeesRewardedToReferrer: "187.35791924",
+          timeJoined: 1761012412763
         }
       ]
     }
@@ -158,6 +162,12 @@ test("referrals ready state exposes share and claim modal flows @regression", as
 
   await expect(page.locator("[data-role='referrals-own-code']")).toHaveText("MYCODE");
   await expect(page.locator("[data-role='referrals-join-link']")).toHaveText("/join/MYCODE");
+  const rowCells = page.locator("[data-role='referrals-row'] > span");
+  await expect(rowCells.nth(0)).toHaveText(/0xabcd.*abcd/);
+  await expect(rowCells.nth(1)).toHaveText("1761012412763");
+  await expect(rowCells.nth(2)).toHaveText("6226785.1799999997");
+  await expect(rowCells.nth(3)).toHaveText("4428.91413651");
+  await expect(rowCells.nth(4)).toHaveText("187.35791924");
 
   await page.locator("[data-role='referrals-open-share-code']").click();
   await expect(page.locator("[data-role='referrals-modal-title']")).toHaveText("Share Referral Code");

@@ -226,15 +226,33 @@
    label])
 
 (defn- referral-row
-  [row idx]
+  [idx row]
   (let [address (or (:user row) (get row "user") (:address row) (get row "address"))
         date-joined (or (:time row) (:timestamp row) (:joinedAt row)
-                        (:date-joined row) (get row "time")
+                        (:timeJoined row) (:date-joined row)
+                        (get row "time")
                         (get row "timestamp") (get row "joinedAt")
+                        (get row "timeJoined")
                         (get row "date-joined") "-")
         volume (or (:cumVlm row) (:cum-vlm row) (get row "cumVlm") (get row "cum-vlm") "0")
-        fees (or (:cumFees row) (:cum-fees row) (get row "cumFees") (get row "cum-fees") "0")
-        rewards (or (:cumReward row) (:cum-reward row) (get row "cumReward") (get row "cum-reward") "0")]
+        fees (or (:cumRewardedFeesSinceReferred row)
+                 (:cum-rewarded-fees-since-referred row)
+                 (:cumFees row)
+                 (:cum-fees row)
+                 (get row "cumRewardedFeesSinceReferred")
+                 (get row "cum-rewarded-fees-since-referred")
+                 (get row "cumFees")
+                 (get row "cum-fees")
+                 "0")
+        rewards (or (:cumFeesRewardedToReferrer row)
+                    (:cum-fees-rewarded-to-referrer row)
+                    (:cumReward row)
+                    (:cum-reward row)
+                    (get row "cumFeesRewardedToReferrer")
+                    (get row "cum-fees-rewarded-to-referrer")
+                    (get row "cumReward")
+                    (get row "cum-reward")
+                    "0")]
     [:div {:class ["grid" "min-w-[760px]" "grid-cols-[minmax(0,1.2fr)_120px_120px_100px_110px]" "gap-3" "px-3" "py-2" "text-sm"]
            :data-role "referrals-row"}
      [:span {:class ["truncate" "num"]} (or (wallet/short-addr address) address (str "Trader " (inc idx)))]
@@ -244,7 +262,7 @@
      [:span {:class ["num" "text-right"]} (str rewards)]]))
 
 (defn- legacy-row
-  [row idx]
+  [idx row]
   (let [time (or (:time row) (:timestamp row) (get row "time") (get row "timestamp"))
         user-volume (or (:userVlm row) (:user-vlm row) (get row "userVlm") (get row "user-vlm") "0")
         referral-volume (or (:referralVlm row) (:referral-vlm row)
@@ -254,7 +272,7 @@
                     (get row "amount") "0")]
     [:div {:class ["grid" "min-w-[680px]" "grid-cols-[minmax(0,1fr)_140px_160px_160px]" "gap-3" "px-3" "py-2" "text-sm"]
            :data-role "referrals-legacy-row"}
-     [:span {:class ["truncate" "num"]} (or time (str "Reward " (inc idx)))]
+     [:span {:class ["truncate" "num"]} (str (or time (str "Reward " (inc idx))))]
      [:span {:class ["num" "text-right"]} (str user-volume)]
      [:span {:class ["num" "text-right"]} (str referral-volume)]
      [:span {:class ["num" "text-right"]} (str rewards)]]))

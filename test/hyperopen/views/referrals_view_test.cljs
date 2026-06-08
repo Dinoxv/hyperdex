@@ -48,6 +48,28 @@
     (is (re-find #"\$5" (hiccup/node-text rewards-stat)))
     (is (re-find #"\$3.50" (hiccup/node-text claimable-stat)))))
 
+(deftest referrals-view-renders-api-shaped-referral-row-fields-test
+  (let [view (referrals-view/referrals-view
+              {:wallet {:address owner-address}
+               :referrals {:raw {:referrerState {:stage "ready"
+                                                  :data {:code "MYCODE"
+                                                         :nReferrals 1
+                                                         :referralStates [{:cumVlm "6226785.1799999997"
+                                                                           :cumRewardedFeesSinceReferred "4428.91413651"
+                                                                           :cumFeesRewardedToReferrer "187.35791924"
+                                                                           :timeJoined 1761012412763
+                                                                           :user referred-address}]}}}}
+               :referrals-ui {:active-tab :referrals
+                              :form {:code ""
+                                     :new-code ""}}})
+        row (hiccup/find-by-data-role view "referrals-row")
+        cells (vec (hiccup/node-children row))]
+    (is (= "0xabcd…abcd" (hiccup/node-text (nth cells 0))))
+    (is (= "1761012412763" (hiccup/node-text (nth cells 1))))
+    (is (= "6226785.1799999997" (hiccup/node-text (nth cells 2))))
+    (is (= "4428.91413651" (hiccup/node-text (nth cells 3))))
+    (is (= "187.35791924" (hiccup/node-text (nth cells 4))))))
+
 (deftest referrals-view-renders-empty-and-join-code-prefill-state-test
   (let [view (referrals-view/referrals-view
               {:wallet {:address owner-address}
@@ -94,6 +116,25 @@
                                      :new-code ""}}})
         empty-node (hiccup/find-by-data-role view "referrals-legacy-empty")]
     (is (= "No rewards earned" (hiccup/node-text empty-node)))))
+
+(deftest referrals-view-renders-legacy-reward-row-fields-test
+  (let [view (referrals-view/referrals-view
+              {:wallet {:address owner-address}
+               :referrals {:raw {:referrerState {:stage "ready"
+                                                  :data {:code "MYCODE"}}
+                                  :rewardHistory [{:time 1761012412763
+                                                   :userVlm "1200"
+                                                   :referralVlm "3400"
+                                                   :totalRewards "12.5"}]}}
+               :referrals-ui {:active-tab :legacy-reward-history
+                              :form {:code ""
+                                     :new-code ""}}})
+        row (hiccup/find-by-data-role view "referrals-legacy-row")
+        cells (vec (hiccup/node-children row))]
+    (is (= "1761012412763" (hiccup/node-text (nth cells 0))))
+    (is (= "1200" (hiccup/node-text (nth cells 1))))
+    (is (= "3400" (hiccup/node-text (nth cells 2))))
+    (is (= "12.5" (hiccup/node-text (nth cells 3))))))
 
 (deftest referrals-view-opens-actions-through-modal-buttons-test
   (let [view (referrals-view/referrals-view
