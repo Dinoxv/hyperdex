@@ -48,6 +48,33 @@
     (is (re-find #"\$5" (hiccup/node-text rewards-stat)))
     (is (re-find #"\$3.50" (hiccup/node-text claimable-stat)))))
 
+(deftest referrals-view-renders-hyperliquid-parity-reward-summary-and-actions-test
+  (let [view (referrals-view/referrals-view
+              {:wallet {:address owner-address}
+               :referrals {:raw {:referrerState {:stage "ready"
+                                                  :data {:code "MYCODE"
+                                                         :nReferrals 6
+                                                         :tokenToState {:USDC {:unclaimedRewards "0.91"
+                                                                               :claimedRewards "208.65"}}
+                                                         :referralStates [{:cumVlm "6226785.1799999997"
+                                                                           :cumRewardedFeesSinceReferred "4428.91413651"
+                                                                           :cumFeesRewardedToReferrer "187.35791924"
+                                                                           :timeJoined 1761012412763
+                                                                           :user referred-address}]}}}}
+               :referrals-ui {:active-tab :referrals
+                              :form {:code ""
+                                     :new-code ""}}})
+        hero (hiccup/find-by-data-role view "referrals-hero")
+        rewards-stat (hiccup/find-by-data-role view "referrals-stat-rewards")
+        claimable-stat (hiccup/find-by-data-role view "referrals-stat-claimable")
+        rewards-panel (hiccup/find-by-data-role view "referrals-rewards-panel")
+        claim-button (hiccup/find-by-data-role view "referrals-open-claim-rewards")]
+    (is (re-find #"\$209.56" (hiccup/node-text rewards-stat)))
+    (is (re-find #"\$0.91" (hiccup/node-text claimable-stat)))
+    (is (nil? rewards-panel))
+    (is (some? claim-button))
+    (is (re-find #"Claim Rewards" (hiccup/node-text hero)))))
+
 (deftest referrals-view-renders-api-shaped-referral-row-fields-test
   (let [view (referrals-view/referrals-view
               {:wallet {:address owner-address}
@@ -65,10 +92,10 @@
         row (hiccup/find-by-data-role view "referrals-row")
         cells (vec (hiccup/node-children row))]
     (is (= "0xabcd…abcd" (hiccup/node-text (nth cells 0))))
-    (is (= "1761012412763" (hiccup/node-text (nth cells 1))))
-    (is (= "6226785.1799999997" (hiccup/node-text (nth cells 2))))
-    (is (= "4428.91413651" (hiccup/node-text (nth cells 3))))
-    (is (= "187.35791924" (hiccup/node-text (nth cells 4))))))
+    (is (= "10/20/2025 - 22:06:52" (hiccup/node-text (nth cells 1))))
+    (is (= "$6,226,785.18" (hiccup/node-text (nth cells 2))))
+    (is (= "$4,428.91" (hiccup/node-text (nth cells 3))))
+    (is (= "$187.36" (hiccup/node-text (nth cells 4))))))
 
 (deftest referrals-view-renders-empty-and-join-code-prefill-state-test
   (let [view (referrals-view/referrals-view

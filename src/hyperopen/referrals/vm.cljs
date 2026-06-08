@@ -89,8 +89,12 @@
   (reduce + 0 (map #(or (numberish (get % k)) 0) rows)))
 
 (defn- reward-summary
-  [payload]
-  (let [rows (token-state-rows payload)
+  [payload referrer-state referrer-data]
+  (let [rows (or (some (fn [source]
+                         (let [rows* (token-state-rows source)]
+                           (when (seq rows*) rows*)))
+                       [referrer-data referrer-state payload])
+                 [])
         unclaimed (sum-rewards rows :unclaimed)
         claimed (sum-rewards rows :claimed)]
     {:rows rows
@@ -113,7 +117,7 @@
   (let [payload (or (get-in state [:referrals :raw]) {})
         referrer-state (or (field payload :referrer-state) {})
         referrer-data (or (field referrer-state :data) {})
-        rewards (reward-summary payload)
+        rewards (reward-summary payload referrer-state referrer-data)
         owner (account-context/effective-account-address state)
         blocked-message (or (account-context/mutations-blocked-message state)
                             (when (account-context/selected-subaccount-owned-by-owner? state)

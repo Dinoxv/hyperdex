@@ -117,17 +117,17 @@ test("referrals route opens modals, validates code, and switches tabs @regressio
 
 test("referrals ready state exposes share and claim modal flows @regression", async ({ page }) => {
   const readyPayload = {
-    tokenToState: {
-      USDC: {
-        unclaimedRewards: "3.5",
-        claimedRewards: "1.5"
-      }
-    },
     referrerState: {
       stage: "ready",
       data: {
         code: "MYCODE",
-        nReferrals: 2,
+        nReferrals: 6,
+        tokenToState: {
+          USDC: {
+            unclaimedRewards: "0.91",
+            claimedRewards: "208.65"
+          }
+        },
         referralStates: [
           {
             user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
@@ -162,12 +162,22 @@ test("referrals ready state exposes share and claim modal flows @regression", as
 
   await expect(page.locator("[data-role='referrals-own-code']")).toHaveText("MYCODE");
   await expect(page.locator("[data-role='referrals-join-link']")).toHaveText("/join/MYCODE");
+  await expect(page.locator("[data-role='referrals-stat-traders']")).toContainText("6");
+  await expect(page.locator("[data-role='referrals-stat-rewards']")).toContainText("$209.56");
+  await expect(page.locator("[data-role='referrals-stat-claimable']")).toContainText("$0.91");
+  await expect(page.locator("[data-role='referrals-rewards-panel']")).toHaveCount(0);
   const rowCells = page.locator("[data-role='referrals-row'] > span");
   await expect(rowCells.nth(0)).toHaveText(/0xabcd.*abcd/);
-  await expect(rowCells.nth(1)).toHaveText("1761012412763");
-  await expect(rowCells.nth(2)).toHaveText("6226785.1799999997");
-  await expect(rowCells.nth(3)).toHaveText("4428.91413651");
-  await expect(rowCells.nth(4)).toHaveText("187.35791924");
+  await expect(rowCells.nth(1)).toHaveText("10/20/2025 - 22:06:52");
+  await expect(rowCells.nth(2)).toHaveText("$6,226,785.18");
+  await expect(rowCells.nth(3)).toHaveText("$4,428.91");
+  await expect(rowCells.nth(4)).toHaveText("$187.36");
+
+  const claimButtonBox = await page.locator("[data-role='referrals-open-claim-rewards']").boundingBox();
+  const tableBox = await page.locator("[data-role='referrals-table-panel']").boundingBox();
+  expect(claimButtonBox).not.toBeNull();
+  expect(tableBox).not.toBeNull();
+  expect(claimButtonBox.y).toBeLessThan(tableBox.y);
 
   await page.locator("[data-role='referrals-open-share-code']").click();
   await expect(page.locator("[data-role='referrals-modal-title']")).toHaveText("Share Referral Code");
@@ -177,7 +187,7 @@ test("referrals ready state exposes share and claim modal flows @regression", as
 
   await page.locator("[data-role='referrals-open-claim-rewards']").click();
   await expect(page.locator("[data-role='referrals-modal-title']")).toHaveText("Claim Rewards");
-  await expect(page.locator("[data-role='referrals-modal-claim-total']")).toHaveText("$3.50");
+  await expect(page.locator("[data-role='referrals-modal-claim-total']")).toHaveText("$0.91");
   await expect(page.locator("[data-role='referrals-modal-claim-row']").first()).toContainText("USDC");
 });
 

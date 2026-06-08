@@ -1,5 +1,6 @@
 (ns hyperopen.views.referrals-view
   (:require [hyperopen.referrals.vm :as referrals-vm]
+            [hyperopen.utils.formatting :as formatting]
             [hyperopen.views.referrals.modals :as referrals-modals]
             [hyperopen.wallet.core :as wallet]))
 
@@ -89,36 +90,6 @@
            :data-role "referrals-disconnected"}
      "Connect your wallet to load referral status."]))
 
-(defn- action-card
-  [{:keys [role title body value value-role secondary-value secondary-value-role
-           action-label action disabled?]}]
-  [:div {:class ["rounded-lg"
-                 "border"
-                 "border-[#1b2429]"
-                 "bg-[#0f1a1f]"
-                 "p-4"
-                 "space-y-3"]
-         :data-role (str role "-panel")}
-   [:div {:class ["space-y-1"]}
-    [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
-     title]
-    (when body
-      [:div {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
-       body])]
-   (when value
-     [:div {:class ["text-xl" "text-[#f6fefd]" "num"]
-            :data-role value-role}
-      value])
-   (when secondary-value
-     [:div {:class ["break-all" "text-sm" "text-[#b7d3d0]"]
-            :data-role secondary-value-role}
-      secondary-value])
-   (button {:label action-label
-            :role role
-            :primary? true
-            :disabled? disabled?
-            :action action})])
-
 (defn- hero
   [view-state]
   (let [{:keys [connected?
@@ -127,87 +98,65 @@
                 stage
                 stage-label
                 referral-code
-                join-link]} view-state
+                join-link
+                rewards]} view-state
         mutation-disabled? (or (not connected?)
                                (seq mutation-blocked-message))
         create-disabled? (or mutation-disabled?
-                             (= :need-to-trade stage))]
+                             (= :need-to-trade stage))
+        claim-disabled? (or mutation-disabled?
+                            (zero? (:claimable rewards))
+                            (= :claim-rewards submitting?))]
     [:div {:class ["bg-[#04251f]" "px-4" "py-4" "space-y-4" "rounded-lg"]
            :data-role "referrals-hero"}
      [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
       [:div {:class ["space-y-2" "max-w-[900px]"]}
        [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-[#ffffff]"]}
         "Referrals"]
-       [:p {:class ["text-sm" "leading-5" "text-[#d3f5ef]" "max-w-[880px]"]}
-        "Refer users, enter a referral code, and claim referral rewards from Hyperliquid."]
-       [:a {:href "https://hyperliquid.gitbook.io/hyperliquid-docs/referrals"
-            :target "_blank"
-            :rel "noreferrer"
-            :class ["text-sm" "text-[#97fce4]" "hover:text-[#d2fff7]"]
-            :data-role "referrals-learn-more"}
-        "Learn more"]]
+       [:p {:class ["text-sm" "leading-5" "font-semibold" "text-[#d3f5ef]" "max-w-[880px]"]}
+        "Refer users to earn rewards. "
+        [:a {:href "https://hyperliquid.gitbook.io/hyperliquid-docs/referrals"
+             :target "_blank"
+             :rel "noreferrer"
+             :class ["text-[#97fce4]" "hover:text-[#d2fff7]"]
+             :data-role "referrals-learn-more"}
+         "Learn more"]]]
+      [:div {:class ["flex" "flex-wrap" "items-center" "justify-end" "gap-2"]}
+       (button {:label "Enter Code"
+                :role "referrals-open-enter-code"
+                :disabled? (or mutation-disabled?
+                               (= :set-referrer submitting?))
+                :action [:actions/open-referrals-modal :enter-code]})
+       (if (= :ready stage)
+         (button {:label "Share Code"
+                  :role "referrals-open-share-code"
+                  :disabled? mutation-disabled?
+                  :action [:actions/open-referrals-modal :share-code]})
+         (button {:label (if (= :register-referrer submitting?)
+                           "Creating..."
+                           "Create Code")
+                  :role "referrals-open-create-code"
+                  :disabled? (or create-disabled?
+                                 (= :register-referrer submitting?))
+                  :action [:actions/open-referrals-modal :create-code]}))
+       (button {:label (if (= :claim-rewards submitting?) "Claiming..." "Claim Rewards")
+                :role "referrals-open-claim-rewards"
+                :primary? true
+                :disabled? claim-disabled?
+                :action [:actions/open-referrals-modal :claim-rewards]})]]
+     [:div {:class ["flex" "flex-wrap" "items-center" "gap-3" "text-sm"]}
       [:div {:class ["rounded-lg" "border" "border-[#1b3d40]" "bg-[#071d22]" "px-3" "py-2" "text-sm" "text-[#d3f5ef]"]
              :data-role "referrals-stage"}
-       stage-label]]
-     [:div {:class ["grid" "gap-3" "lg:grid-cols-2"]}
-      (action-card {:role "referrals-open-enter-code"
-                    :title "Enter Referral Code"
-                    :body "Apply another trader's code to this master account."
-                    :action-label "Enter Code"
-                    :disabled? (or mutation-disabled?
-                                   (= :set-referrer submitting?))
-                    :action [:actions/open-referrals-modal :enter-code]})
-      (if (= :ready stage)
-        (action-card {:role "referrals-open-share-code"
-                      :title "Share Code"
-                      :body "Send your Hyperopen join link to referred traders."
-                      :value (or referral-code "Unavailable")
-                      :value-role "referrals-own-code"
-                      :secondary-value join-link
-                      :secondary-value-role "referrals-join-link"
-                      :action-label "Share Code"
-                      :disabled? mutation-disabled?
-                      :action [:actions/open-referrals-modal :share-code]})
-        (action-card {:role "referrals-open-create-code"
-                      :title "Create Referral Code"
-                      :body (if (= :need-to-trade stage)
-                              stage-label
-                              "Choose the code traders will use when joining.")
-                      :action-label (if (= :register-referrer submitting?)
-                                      "Creating..."
-                                      "Create Code")
-                      :disabled? (or create-disabled?
-                                     (= :register-referrer submitting?))
-                      :action [:actions/open-referrals-modal :create-code]}))]]))
-
-(defn- rewards-panel
-  [{:keys [rewards connected? mutation-blocked-message submitting?]}]
-  (let [claimable (:claimable rewards)
-        disabled? (or (not connected?)
-                      (seq mutation-blocked-message)
-                      (zero? claimable)
-                      (= :claim-rewards submitting?))]
-    [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-4" "space-y-3"]
-           :data-role "referrals-rewards-panel"}
-     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
-      [:div]
-      (button {:label (if (= :claim-rewards submitting?) "Claiming..." "Claim Rewards")
-               :role "referrals-open-claim-rewards"
-               :primary? true
-               :disabled? disabled?
-               :action [:actions/open-referrals-modal :claim-rewards]})]
-     (if (seq (:rows rewards))
-       [:div {:class ["grid" "gap-2"]}
-        (for [{:keys [token unclaimed claimed]} (:rows rewards)]
-          ^{:key token}
-          [:div {:class ["flex" "items-center" "justify-between" "gap-3" "text-sm"]
-                 :data-role "referrals-reward-token-row"}
-           [:span {:class ["text-[#b7d3d0]"]} token]
-           [:span {:class ["num" "text-[#f6fefd]"]}
-            "Claimable " unclaimed " | Claimed " claimed]])]
-      [:div {:class ["text-sm" "text-[#878c8f]"]
-              :data-role "referrals-no-rewards"}
-        "No claimable rewards."])]))
+       stage-label]
+      (when (= :ready stage)
+        [:div {:class ["flex" "min-w-0" "flex-wrap" "items-center" "gap-2" "text-[#b7d3d0]"]}
+         [:span "Code"]
+         [:span {:class ["num" "text-[#f6fefd]"]
+                 :data-role "referrals-own-code"}
+          (or referral-code "Unavailable")]
+         [:span {:class ["hidden" "break-all"]
+                 :data-role "referrals-join-link"}
+          join-link]])]]))
 
 (defn- tab-button
   [active? label tab]
@@ -224,6 +173,41 @@
             :data-role (str "referrals-tab-" (name tab))
             :on {:click [[:actions/set-referrals-active-tab tab]]}}
    label])
+
+(defn- format-referral-date
+  [value]
+  (let [time-ms (js/parseFloat (str value))]
+    (if (js/isFinite time-ms)
+      (let [date (js/Date. time-ms)]
+        (str (inc (.getMonth date))
+             "/"
+             (.getDate date)
+             "/"
+             (.getFullYear date)
+             " - "
+             (formatting/pad2 (.getHours date))
+             ":"
+             (formatting/pad2 (.getMinutes date))
+             ":"
+             (formatting/pad2 (.getSeconds date))))
+      (str value))))
+
+(defn- format-referral-volume
+  [value]
+  (or (formatting/format-intl-number value
+                                     {:style "currency"
+                                      :currency "USD"
+                                      :maximumFractionDigits 2})
+      (str value)))
+
+(defn- format-referral-money
+  [value]
+  (or (formatting/format-intl-number value
+                                     {:style "currency"
+                                      :currency "USD"
+                                      :minimumFractionDigits 2
+                                      :maximumFractionDigits 2})
+      (str value)))
 
 (defn- referral-row
   [idx row]
@@ -256,10 +240,10 @@
     [:div {:class ["grid" "min-w-[760px]" "grid-cols-[minmax(0,1.2fr)_120px_120px_100px_110px]" "gap-3" "px-3" "py-2" "text-sm"]
            :data-role "referrals-row"}
      [:span {:class ["truncate" "num"]} (or (wallet/short-addr address) address (str "Trader " (inc idx)))]
-     [:span {:class ["num" "text-right"]} (str date-joined)]
-     [:span {:class ["num" "text-right"]} (str volume)]
-     [:span {:class ["num" "text-right"]} (str fees)]
-     [:span {:class ["num" "text-right"]} (str rewards)]]))
+     [:span {:class ["num" "text-right"]} (format-referral-date date-joined)]
+     [:span {:class ["num" "text-right"]} (format-referral-volume volume)]
+     [:span {:class ["num" "text-right"]} (format-referral-money fees)]
+     [:span {:class ["num" "text-right"]} (format-referral-money rewards)]]))
 
 (defn- legacy-row
   [idx row]
@@ -340,7 +324,6 @@
        (stat-card "Traders Referred" traders-referred-label "referrals-stat-traders")
        (stat-card "Rewards Earned" (:earned-label rewards) "referrals-stat-rewards")
        (stat-card "Claimable Rewards" (:claimable-label rewards) "referrals-stat-claimable")]
-      (rewards-panel view-state)
       (table-panel view-state)]
      (referrals-modals/referrals-modal view-state)]))
 
