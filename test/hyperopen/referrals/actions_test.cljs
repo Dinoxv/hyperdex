@@ -64,6 +64,15 @@
     (is (= [:effects/api-fetch-referral owner-address]
            (second effects)))))
 
+(deftest load-referrals-route-loads-spectated-account-when-spectate-mode-active-test
+  (let [effects (actions/load-referrals-route
+                 {:wallet {:address owner-address}
+                  :account-context {:spectate-mode {:active? true
+                                                    :address spectate-address}}}
+                 "/referrals")]
+    (is (= [:effects/api-fetch-referral spectate-address]
+           (second effects)))))
+
 (deftest load-referrals-route-preserves-pending-code-while-disconnected-test
   (let [effects (actions/load-referrals-route
                  {:wallet {:address nil}}

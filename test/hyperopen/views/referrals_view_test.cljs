@@ -9,6 +9,9 @@
 (def referred-address
   "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
 
+(def spectate-address
+  "0x7777777777777777777777777777777777777777")
+
 (defn- connected-state
   [overrides]
   (merge {:wallet {:address owner-address}
@@ -61,6 +64,25 @@
     (is (= "ABC123" (get-in code-input [1 :value])))
     (is (= "No referrals yet" (hiccup/node-text empty-node)))
     (is (some? create-node))))
+
+(deftest referrals-view-labels-spectated-referral-state-and-blocks-mutations-test
+  (let [view (referrals-view/referrals-view
+              {:wallet {:address owner-address}
+               :account-context {:spectate-mode {:active? true
+                                                 :address spectate-address}}
+               :referrals {:raw {:referrerState {:stage "ready"
+                                                  :data {:code "WATCHED"
+                                                         :nReferrals 2}}}}
+               :referrals-ui {:active-tab :referrals
+                              :form {:code ""
+                                     :new-code ""}}})
+        owner-node (hiccup/find-by-data-role view "referrals-owner")
+        read-only-node (hiccup/find-by-data-role view "referrals-read-only")
+        share-button (hiccup/find-by-data-role view "referrals-open-share-code")]
+    (is (nil? owner-node))
+    (is (re-find #"Spectate Mode is read-only" (hiccup/node-text read-only-node)))
+    (is (re-find #"0x7777…7777" (hiccup/node-text read-only-node)))
+    (is (some? (get-in share-button [1 :disabled])))))
 
 (deftest referrals-view-renders-legacy-tab-empty-state-test
   (let [view (referrals-view/referrals-view

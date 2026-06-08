@@ -114,7 +114,7 @@
         referrer-state (or (field payload :referrer-state) {})
         referrer-data (or (field referrer-state :data) {})
         rewards (reward-summary payload)
-        owner (account-context/owner-address state)
+        owner (account-context/effective-account-address state)
         blocked-message (or (account-context/mutations-blocked-message state)
                             (when (account-context/selected-subaccount-owned-by-owner? state)
                               "Switch to the master account before changing referral settings."))

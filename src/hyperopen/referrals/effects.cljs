@@ -7,7 +7,7 @@
 (defn- resolve-address
   [store address]
   (or (account-context/normalize-address address)
-      (account-context/owner-address @store)))
+      (account-context/effective-account-address @store)))
 
 (defn api-fetch-referral!
   [{:keys [store

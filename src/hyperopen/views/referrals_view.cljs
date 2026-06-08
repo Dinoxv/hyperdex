@@ -67,7 +67,11 @@
     mutation-blocked-message
     [:div {:class ["rounded-lg" "border" "border-[#725f1d]" "bg-[#241f0b]" "px-3" "py-2" "text-sm" "text-[#ffe08a]"]
            :data-role "referrals-read-only"}
-     mutation-blocked-message]
+     mutation-blocked-message
+     (when owner
+       [:span
+        " Showing referral state for "
+        [:span {:class ["num" "text-[#f6fefd]"]} owner-label]])]
 
     loading?
     [:div {:class ["rounded-lg" "border" "border-[#224247]" "bg-[#0b2025]" "px-3" "py-2" "text-sm" "text-[#b7d3d0]"]

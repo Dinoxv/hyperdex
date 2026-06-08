@@ -74,7 +74,7 @@
   (if-not (referrals-route? path)
     []
     (let [join-code (join-code-from-path path)
-          owner (account-context/owner-address state)]
+          referral-address (account-context/effective-account-address state)]
       (cond-> [[:effects/save-many
                 [[[:referrals-ui :pending-code] join-code]
                  [[:referrals-ui :active-modal] (when join-code :enter-code)]
@@ -83,7 +83,7 @@
                       (get-in state [:referrals-ui :form :code] ""))]
                  [[:referrals-ui :last-error] nil]
                  [[:referrals-ui :submitting?] false]]]]
-        owner (conj [:effects/api-fetch-referral owner])))))
+        referral-address (conj [:effects/api-fetch-referral referral-address])))))
 
 (defn set-form-field
   [_state field value]
