@@ -41,11 +41,46 @@ const liveReadyPayload = {
       nReferrals: 6,
       referralStates: [
         {
-          user: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+          user: "0xb4802e7c9d966ad98106edc14a9bfe97e800098",
           cumVlm: "6226785.1799999997",
           cumRewardedFeesSinceReferred: "4428.91413651",
           cumFeesRewardedToReferrer: "187.35791924",
           timeJoined: 1761012412763
+        },
+        {
+          user: "0x37baedaa536f7144e72915c683e6095177d3e7e8",
+          cumVlm: "1133032.6599999999",
+          cumRewardedFeesSinceReferred: "730.51948073",
+          cumFeesRewardedToReferrer: "19.86966653",
+          timeJoined: 1764625665863
+        },
+        {
+          user: "0x8a19694c2f5e721103da1b6b6cc0bc692fafd8ad",
+          cumVlm: "40724.06",
+          cumRewardedFeesSinceReferred: "61.14729245",
+          cumFeesRewardedToReferrer: "1.12201504",
+          timeJoined: 1760709224945
+        },
+        {
+          user: "0xf2484db7f0e27f88659e41679e3d1765ac9fc2bd",
+          cumVlm: "8914.11",
+          cumRewardedFeesSinceReferred: "10.23690749",
+          cumFeesRewardedToReferrer: "0.34230256",
+          timeJoined: 1765568181361
+        },
+        {
+          user: "0x43b299a16fff6036d136852afbc373098ce977b7",
+          cumVlm: "1406.89",
+          cumRewardedFeesSinceReferred: "0.406336",
+          cumFeesRewardedToReferrer: "0.040633",
+          timeJoined: 1763614157329
+        },
+        {
+          user: "0x623cca9b9a93a58b989350a0f76a0ec1ea110c96",
+          cumVlm: "0.0",
+          cumRewardedFeesSinceReferred: "0.0",
+          cumFeesRewardedToReferrer: "0.0",
+          timeJoined: 1765221864482
         }
       ]
     }
@@ -202,8 +237,8 @@ test("referrals ready state exposes share and claim modal flows @regression", as
   await expect(page.locator("[data-role='referrals-stat-rewards']")).toContainText("$209.56");
   await expect(page.locator("[data-role='referrals-stat-claimable']")).toContainText("$0.91");
   await expect(page.locator("[data-role='referrals-rewards-panel']")).toHaveCount(0);
-  const rowCells = page.locator("[data-role='referrals-row'] > span");
-  await expect(rowCells.nth(0)).toHaveText(/0xabcd.*abcd/);
+  const rowCells = page.locator("[data-role='referrals-row']").first().locator("> span");
+  await expect(rowCells.nth(0)).toHaveText(/0xb480.*0098/);
   await expect(rowCells.nth(1)).toHaveText("10/20/2025 - 22:06:52");
   await expect(rowCells.nth(2)).toHaveText("$6,226,785.18");
   await expect(rowCells.nth(3)).toHaveText("$4,428.91");
@@ -225,6 +260,37 @@ test("referrals ready state exposes share and claim modal flows @regression", as
   await expect(page.locator("[data-role='referrals-modal-title']")).toHaveText("Claim Rewards");
   await expect(page.locator("[data-role='referrals-modal-claim-total']")).toHaveText("$0.91");
   await expect(page.locator("[data-role='referrals-modal-claim-row']").first()).toContainText("USDC");
+});
+
+test("referrals table columns sort rows and expose wider date column @regression", async ({ page }) => {
+  await interceptReferralApi(page, liveReadyPayload);
+  await visitRoute(page, "/referrals");
+  await seedReferralsState(page, {
+    raw: liveReadyPayload
+  });
+
+  const rows = page.locator("[data-role='referrals-row']");
+  await expect(rows).toHaveCount(6);
+  await expect(rows.first().locator("> span").first()).toHaveText(/0xb480.*0098/);
+  await expect(page.locator("[data-role='referrals-sort-total-volume']")).toHaveAttribute("aria-sort", "descending");
+
+  const headerGrid = page.locator("[data-role='referrals-table-header']");
+  await expect(headerGrid).toBeVisible();
+  const gridColumns = await headerGrid.evaluate((node) => getComputedStyle(node).gridTemplateColumns);
+  const firstColumns = gridColumns.split(" ").slice(0, 2).map((value) => Number.parseFloat(value));
+  expect(firstColumns[1]).toBeGreaterThan(180);
+
+  await page.locator("[data-role='referrals-sort-date-joined']").click();
+  await expect(page.locator("[data-role='referrals-sort-date-joined']")).toHaveAttribute("aria-sort", "descending");
+  await expect(rows.first().locator("> span").first()).toHaveText(/0xf248.*c2bd/);
+
+  await page.locator("[data-role='referrals-sort-date-joined']").click();
+  await expect(page.locator("[data-role='referrals-sort-date-joined']")).toHaveAttribute("aria-sort", "ascending");
+  await expect(rows.first().locator("> span").first()).toHaveText(/0x8a19.*d8ad/);
+
+  await page.locator("[data-role='referrals-sort-your-rewards']").click();
+  await expect(page.locator("[data-role='referrals-sort-your-rewards']")).toHaveAttribute("aria-sort", "descending");
+  await expect(rows.first().locator("> span").first()).toHaveText(/0xb480.*0098/);
 });
 
 test("referrals spectate mode populates live reward pair stats @regression", async ({ page }) => {

@@ -32,6 +32,17 @@
   #{:referrals
     :legacy-reward-history})
 
+(def valid-sort-columns
+  #{:address
+    :date-joined
+    :total-volume
+    :fees-paid
+    :your-rewards})
+
+(def default-sort
+  {:column :total-volume
+   :direction :desc})
+
 (defn normalize-referral-code
   [value]
   (-> (or value "")
@@ -96,6 +107,37 @@
                tab
                :referrals)]
     [[:effects/save [:referrals-ui :active-tab] tab*]]))
+
+(defn- normalize-sort-column
+  [column]
+  (let [column* (cond
+                  (keyword? column) column
+                  (string? column) (keyword column)
+                  :else nil)]
+    (if (contains? valid-sort-columns column*)
+      column*
+      (:column default-sort))))
+
+(defn- normalize-sort-direction
+  [direction]
+  (case direction
+    :asc :asc
+    "asc" :asc
+    :desc :desc
+    "desc" :desc
+    (:direction default-sort)))
+
+(defn set-referrals-sort
+  [state column]
+  (let [column* (normalize-sort-column column)
+        current-sort (get-in state [:referrals-ui :sort])
+        current-column (normalize-sort-column (:column current-sort))
+        current-direction (normalize-sort-direction (:direction current-sort))
+        next-direction (if (= column* current-column)
+                         (if (= :asc current-direction) :desc :asc)
+                         (if (= :address column*) :asc :desc))]
+    [[:effects/save [:referrals-ui :sort] {:column column*
+                                           :direction next-direction}]]))
 
 (defn open-referrals-modal
   [_state modal]

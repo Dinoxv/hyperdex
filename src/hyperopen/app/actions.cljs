@@ -37,6 +37,7 @@
    :referrals {:load-referrals-route action-adapters/load-referrals-route-action
                :set-referrals-active-tab referrals-actions/set-active-tab
                :set-referrals-form-field referrals-actions/set-form-field
+               :set-referrals-sort referrals-actions/set-referrals-sort
                :open-referrals-modal referrals-actions/open-referrals-modal
                :close-referrals-modal referrals-actions/close-referrals-modal
                :submit-set-referrer referrals-actions/submit-set-referrer

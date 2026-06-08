@@ -209,6 +209,55 @@
                                       :maximumFractionDigits 2})
       (str value)))
 
+(def referral-grid-cols
+  "grid-cols-[minmax(160px,1.25fr)_minmax(190px,0.9fr)_minmax(140px,0.75fr)_minmax(120px,0.7fr)_minmax(130px,0.75fr)]")
+
+(defn- sort-direction-icon
+  [direction]
+  [:svg {:class (into ["h-3" "w-3" "shrink-0" "opacity-70" "transition-transform"]
+                      (if (= :asc direction)
+                        ["rotate-180"]
+                        ["rotate-0"]))
+         :viewBox "0 0 12 12"
+         :aria-hidden true}
+   [:path {:d "M3 4.5L6 7.5L9 4.5"
+           :fill "none"
+           :stroke "currentColor"
+           :stroke-width "1.5"
+           :stroke-linecap "round"
+           :stroke-linejoin "round"}]])
+
+(defn- sort-aria
+  [column sort-state]
+  (if (= column (:column sort-state))
+    (if (= :asc (:direction sort-state)) "ascending" "descending")
+    "none"))
+
+(defn- sortable-referral-header
+  [label column sort-state align]
+  (let [active? (= column (:column sort-state))
+        direction (:direction sort-state)]
+    [:button {:type "button"
+              :class (into ["inline-flex"
+                            "items-center"
+                            "gap-1"
+                            "font-normal"
+                            "text-[#878c8f]"
+                            "transition-colors"
+                            "hover:text-[#f6fefd]"
+                            "focus:outline-none"
+                            "focus:ring-0"
+                            "focus:ring-offset-0"]
+                           (case align
+                             :right ["justify-end" "text-right"]
+                             ["justify-start" "text-left"]))
+              :data-role (str "referrals-sort-" (name column))
+              :aria-sort (sort-aria column sort-state)
+              :on {:click [[:actions/set-referrals-sort column]]}}
+     [:span label]
+     (when active?
+       (sort-direction-icon direction))]))
+
 (defn- referral-row
   [idx row]
   (let [address (or (:user row) (get row "user") (:address row) (get row "address"))
@@ -237,7 +286,7 @@
                     (get row "cumReward")
                     (get row "cum-reward")
                     "0")]
-    [:div {:class ["grid" "min-w-[760px]" "grid-cols-[minmax(0,1.2fr)_120px_120px_100px_110px]" "gap-3" "px-3" "py-2" "text-sm"]
+    [:div {:class ["grid" "min-w-[860px]" referral-grid-cols "gap-3" "px-3" "py-2" "text-sm"]
            :data-role "referrals-row"}
      [:span {:class ["truncate" "num"]} (or (wallet/short-addr address) address (str "Trader " (inc idx)))]
      [:span {:class ["num" "text-right"]} (format-referral-date date-joined)]
@@ -262,7 +311,7 @@
      [:span {:class ["num" "text-right"]} (str rewards)]]))
 
 (defn- table-panel
-  [{:keys [active-tab referral-rows legacy-rows]}]
+  [{:keys [active-tab referral-rows legacy-rows referrals-sort]}]
   [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "overflow-hidden"]
          :data-role "referrals-table-panel"}
    [:div {:class ["px-3" "pt-2"]}
@@ -284,12 +333,13 @@
      (if (seq referral-rows)
        [:div {:class ["overflow-x-auto"]
               :data-role "referrals-table"}
-        [:div {:class ["grid" "min-w-[760px]" "grid-cols-[minmax(0,1.2fr)_120px_120px_100px_110px]" "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
-         [:span "Address"]
-         [:span {:class ["text-right"]} "Date Joined"]
-         [:span {:class ["text-right"]} "Total Volume"]
-         [:span {:class ["text-right"]} "Fees Paid"]
-         [:span {:class ["text-right"]} "Your Rewards"]]
+        [:div {:class ["grid" "min-w-[860px]" referral-grid-cols "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]
+               :data-role "referrals-table-header"}
+         (sortable-referral-header "Address" :address referrals-sort :left)
+         (sortable-referral-header "Date Joined" :date-joined referrals-sort :right)
+         (sortable-referral-header "Total Volume" :total-volume referrals-sort :right)
+         (sortable-referral-header "Fees Paid" :fees-paid referrals-sort :right)
+         (sortable-referral-header "Your Rewards" :your-rewards referrals-sort :right)]
         (map-indexed referral-row referral-rows)]
        [:div {:class ["px-3" "py-8" "text-center" "text-sm" "text-[#878c8f]"]
               :data-role "referrals-empty"}

@@ -514,6 +514,7 @@
    :actions/load-referrals-route ::common/path-args
    :actions/set-referrals-active-tab ::common/keyword-or-string-args
    :actions/set-referrals-form-field ::referrals-form-field-args
+   :actions/set-referrals-sort ::common/keyword-or-string-args
    :actions/open-referrals-modal ::referrals-modal-args
    :actions/close-referrals-modal ::common/no-args
    :actions/submit-set-referrer ::common/no-args

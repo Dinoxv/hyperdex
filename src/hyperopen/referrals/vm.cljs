@@ -20,6 +20,27 @@
     :claimed-rewards (or (:claimedRewards m) (:claimed-rewards m) (get m "claimedRewards") (get m "claimed-rewards"))
     :builder-rewards (or (:builderRewards m) (:builder-rewards m) (get m "builderRewards") (get m "builder-rewards"))
     :user (or (:user m) (:address m) (get m "user") (get m "address"))
+    :time-joined (or (:timeJoined m) (:time-joined m) (:joinedAt m) (:joined-at m)
+                     (:time m) (:timestamp m)
+                     (get m "timeJoined") (get m "time-joined")
+                     (get m "joinedAt") (get m "joined-at")
+                     (get m "time") (get m "timestamp"))
+    :rewarded-fees (or (:cumRewardedFeesSinceReferred m)
+                       (:cum-rewarded-fees-since-referred m)
+                       (:cumFees m)
+                       (:cum-fees m)
+                       (get m "cumRewardedFeesSinceReferred")
+                       (get m "cum-rewarded-fees-since-referred")
+                       (get m "cumFees")
+                       (get m "cum-fees"))
+    :referrer-rewards (or (:cumFeesRewardedToReferrer m)
+                          (:cum-fees-rewarded-to-referrer m)
+                          (:cumReward m)
+                          (:cum-reward m)
+                          (get m "cumFeesRewardedToReferrer")
+                          (get m "cum-fees-rewarded-to-referrer")
+                          (get m "cumReward")
+                          (get m "cum-reward"))
     :time (or (:time m) (:timestamp m) (get m "time") (get m "timestamp"))
     :amount (or (:amount m) (get m "amount"))
     :token (or (:token m) (get m "token"))
@@ -131,12 +152,70 @@
   [payload]
   (vec (or (field payload :reward-history) [])))
 
+(def default-referrals-sort
+  {:column :total-volume
+   :direction :desc})
+
+(defn- normalize-sort-column
+  [column]
+  (let [column* (cond
+                  (keyword? column) column
+                  (string? column) (keyword column)
+                  :else nil)]
+    (if (contains? #{:address
+                     :date-joined
+                     :total-volume
+                     :fees-paid
+                     :your-rewards}
+                   column*)
+      column*
+      (:column default-referrals-sort))))
+
+(defn- normalize-sort-direction
+  [direction]
+  (case direction
+    :asc :asc
+    "asc" :asc
+    :desc :desc
+    "desc" :desc
+    (:direction default-referrals-sort)))
+
+(defn- referral-row-sort-value
+  [column row]
+  (case column
+    :address (str/lower-case (str (or (field row :user) "")))
+    :date-joined (or (numberish (field row :time-joined)) 0)
+    :total-volume (or (numberish (field row :cum-vlm)) 0)
+    :fees-paid (or (numberish (field row :rewarded-fees)) 0)
+    :your-rewards (or (numberish (field row :referrer-rewards)) 0)
+    0))
+
+(defn- compare-referral-rows
+  [column direction a b]
+  (let [result (compare (referral-row-sort-value column a)
+                        (referral-row-sort-value column b))]
+    (if (= :desc direction)
+      (- result)
+      result)))
+
+(defn- sort-state
+  [state]
+  (let [raw-sort (get-in state [:referrals-ui :sort])]
+    {:column (normalize-sort-column (:column raw-sort))
+     :direction (normalize-sort-direction (:direction raw-sort))}))
+
+(defn- sorted-referral-rows
+  [rows sort-state*]
+  (vec (sort #(compare-referral-rows (:column sort-state*) (:direction sort-state*) %1 %2)
+             rows)))
+
 (defn referrals-vm
   [state]
   (let [payload (or (get-in state [:referrals :raw]) {})
         referrer-state (or (field payload :referrer-state) {})
         referrer-data (or (field referrer-state :data) {})
         rewards (reward-summary payload referrer-state referrer-data)
+        sort (sort-state state)
         owner (account-context/effective-account-address state)
         blocked-message (or (account-context/mutations-blocked-message state)
                             (when (account-context/selected-subaccount-owned-by-owner? state)
@@ -170,5 +249,6 @@
      :cum-vlm (or (numberish (field payload :cum-vlm)) 0)
      :cum-vlm-label (format-usd (or (numberish (field payload :cum-vlm)) 0))
      :rewards rewards
-     :referral-rows (referral-rows referrer-state)
+     :referrals-sort sort
+     :referral-rows (sorted-referral-rows (referral-rows referrer-state) sort)
      :legacy-rows (legacy-rows payload)}))

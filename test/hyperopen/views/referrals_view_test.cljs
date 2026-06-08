@@ -16,9 +16,17 @@
   [overrides]
   (merge {:wallet {:address owner-address}
           :referrals-ui {:active-tab :referrals
+                         :sort {:column :total-volume
+                                :direction :desc}
                          :form {:code ""
                                 :new-code ""}}}
          overrides))
+
+(defn- referral-row-texts
+  [view]
+  (->> (hiccup/find-all-nodes view #(= "referrals-row" (get-in % [1 :data-role])))
+       (mapv (fn [row]
+               (mapv hiccup/node-text (hiccup/node-children row))))))
 
 (deftest referrals-view-renders-ready-share-state-and-kpis-test
   (let [view (referrals-view/referrals-view
@@ -108,6 +116,46 @@
     (is (= "$6,226,785.18" (hiccup/node-text (nth cells 2))))
     (is (= "$4,428.91" (hiccup/node-text (nth cells 3))))
     (is (= "$187.36" (hiccup/node-text (nth cells 4))))))
+
+(deftest referrals-view-renders-sortable-referral-headers-and-sorted-rows-test
+  (let [state {:wallet {:address owner-address}
+               :referrals {:raw {:referrerState {:stage "ready"
+                                                  :data {:code "MYCODE"
+                                                         :nReferrals 3
+                                                         :referralStates [{:cumVlm "100"
+                                                                           :cumRewardedFeesSinceReferred "5"
+                                                                           :cumFeesRewardedToReferrer "1"
+                                                                           :timeJoined 1761012412763
+                                                                           :user "0x1111111111111111111111111111111111111111"}
+                                                                          {:cumVlm "300"
+                                                                           :cumRewardedFeesSinceReferred "9"
+                                                                           :cumFeesRewardedToReferrer "3"
+                                                                           :timeJoined 1764625665863
+                                                                           :user "0x3333333333333333333333333333333333333333"}
+                                                                          {:cumVlm "200"
+                                                                           :cumRewardedFeesSinceReferred "7"
+                                                                           :cumFeesRewardedToReferrer "2"
+                                                                           :timeJoined 1760709224945
+                                                                           :user "0x2222222222222222222222222222222222222222"}]}}}}
+               :referrals-ui {:active-tab :referrals
+                              :sort {:column :date-joined
+                                     :direction :asc}
+                              :form {:code ""
+                                     :new-code ""}}}
+        view (referrals-view/referrals-view state)
+        header (hiccup/find-by-data-role view "referrals-table-header")
+        header-class-set (hiccup/node-class-set header)
+        date-header (hiccup/find-by-data-role view "referrals-sort-date-joined")
+        rewards-header (hiccup/find-by-data-role view "referrals-sort-your-rewards")
+        row-texts (referral-row-texts view)]
+    (is (contains? header-class-set "grid-cols-[minmax(160px,1.25fr)_minmax(190px,0.9fr)_minmax(140px,0.75fr)_minmax(120px,0.7fr)_minmax(130px,0.75fr)]"))
+    (is (= "ascending" (get-in date-header [1 :aria-sort])))
+    (is (= [[:actions/set-referrals-sort :date-joined]]
+           (get-in date-header [1 :on :click])))
+    (is (= [[:actions/set-referrals-sort :your-rewards]]
+           (get-in rewards-header [1 :on :click])))
+    (is (= ["0x2222…2222" "0x1111…1111" "0x3333…3333"]
+           (mapv first row-texts)))))
 
 (deftest referrals-view-renders-empty-and-join-code-prefill-state-test
   (let [view (referrals-view/referrals-view
